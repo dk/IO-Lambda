@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: http-redirect.pl,v 1.1 2007/12/11 15:17:20 dk Exp $
+# $Id: http-redirect.pl,v 1.2 2007/12/11 19:20:05 dk Exp $
 
 use strict;
 use HTTP::Request;
@@ -16,7 +16,6 @@ sub http_request
 	my $socket = IO::Socket::INET-> new(
 		PeerAddr => $req-> uri-> host,
 		PeerPort => $req-> uri-> port,
-		Blocking => 0,
 	);
 	return $q-> fail("socket error:$@") unless $socket;
 

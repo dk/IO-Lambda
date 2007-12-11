@@ -31,7 +31,6 @@ sub uri_to_socket
 	my ( $self, $uri) = @_;
 
 	my $sock = IO::Socket::INET-> new(
-		Blocking => 0,
 		PeerAddr => $uri-> host,
 		PeerPort => $uri-> port,
 		Proto    => 'tcp',

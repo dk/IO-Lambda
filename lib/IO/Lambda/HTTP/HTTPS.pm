@@ -1,4 +1,4 @@
-# $Id: HTTPS.pm,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: HTTPS.pm,v 1.2 2007/12/11 19:20:05 dk Exp $
 package IO::Lambda::HTTPS;
 
 use vars qw(@ISA @EXPORT_OK);
@@ -20,7 +20,6 @@ sub uri_to_socket
 	my ( $self, $uri) = @_;
 
 	my $sock = IO::Socket::SSL-> new(
-		Blocking => 0,
 		PeerAddr => $uri-> host,
 		PeerPort => $uri-> port,
 		Proto    => 'tcp',

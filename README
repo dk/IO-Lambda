@@ -79,7 +79,6 @@ HTTP handler that can understand redirection:
 		my $socket = IO::Socket::INET-> new(
 			PeerAddr => $req-> uri-> host,
 			PeerPort => $req-> uri-> port,
-			Blocking => 0,
 		);
 		return $q-> fail("socket error:$@") unless $socket;
 

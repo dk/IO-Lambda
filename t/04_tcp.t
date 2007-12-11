@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: 04_tcp.t,v 1.2 2007/12/11 19:20:05 dk Exp $
 
 use strict;
 use warnings;
@@ -14,7 +14,6 @@ my $serv_sock = IO::Socket::INET-> new(
 	Listen    => 5,
 	LocalPort => $port,
 	Proto     => 'tcp',
-	Blocking  => 0,
 	ReuseAddr => 1,
 );
 die "listen() error: $!\n" unless $serv_sock;
@@ -61,7 +60,6 @@ sub sock
 		PeerAddr  => 'localhost',
 		PeerPort  => $port,
 		Proto     => 'tcp',
-		Blocking  => 0,
 	);
 	die "connect() error: $!\n" unless $x;
 	return $x;
