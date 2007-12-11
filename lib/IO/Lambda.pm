@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: Lambda.pm,v 1.2 2007/12/11 15:17:20 dk Exp $
 
 package IO::Lambda;
 
@@ -117,6 +117,7 @@ sub dispatch_tail
 {
 	my ( $self, @param) = @_;
 
+	# XXX or should we kill the states instead?
 	die "dispatch_tail called when there are un-called states left" if @{$self->{next}};
 
 	$self-> {last} = \@param;
