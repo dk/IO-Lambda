@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: sequential.pl,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: sequential.pl,v 1.2 2007/12/13 23:00:08 dk Exp $
 # 
 # This example fetches sequentially two pages, one with http/1.0 another with
 # https/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -9,19 +9,18 @@
 use lib qw(./lib);
 use HTTP::Request;
 use IO::Lambda qw(:all);
-use IO::Lambda::HTTP qw(http_get);
-use IO::Lambda::HTTPS qw(https_get);
+use IO::Lambda::HTTP qw(http_request);
 
 my $a = HTTP::Request-> new(
-	GET => "https://addons.mozilla.org/en-US/firefox",
+	GET => "http://www.perl.org/",
 );
 $a-> protocol('HTTP/1.1');
-$a-> headers-> header( Host => 'addons.mozilla.org');
+$a-> headers-> header( Host => $a-> uri-> host);
 $a-> headers-> header( Connection => 'close');
 
 my @chain = (
-	https_get( $a),
-	http_get( HTTP::Request-> new(GET => "http://www.perl.com/")),
+	$a,
+	HTTP::Request-> new(GET => "http://www.perl.com/"),
 );
 
 sub report
@@ -43,16 +42,12 @@ $style = 'object';
 # $IO::Lambda::DEBUG++; # uncomment this to see that it indeed goes sequential
 
 if ( $style eq 'object') {
-
 	# object API, all references and bindings are explicit
-	sub handle
-	{
-		my ( $q, $result) = @_;
-		report($result);
-		shift(@chain)-> tail( \&handle) if @chain;
+	while ( @chain) {
+		my $lambda = IO::Lambda::HTTP-> new( shift @chain);
+		$lambda-> wait;
+		report( $lambda-> peek);
 	}
-	shift(@chain)-> tail( \&handle);
-
 } elsif ( $style eq 'explicit') {
 
 	#
@@ -64,23 +59,26 @@ if ( $style eq 'object') {
 	# Explicit loop unrolling - we know that we have exactly 2 steps
 	# It's not practical in this case, but it is when a (network) protocol
 	# relies on precise series of reads and writes
-	self( $chain[0]);
-	finally {
-		report(shift);
-	
-	self( $chain[1]);
-	finally {
-		report(shift);
-	}};
-
+	this lambda {
+		context $chain[0];
+		http_request {
+			report shift;
+			context $chain[1];
+			http_request \&report;
+		}
+	};
+	this-> wait;
 } else {
 	# implicit loop - we don't know how many states we need
-	self( shift @chain);
-	finally {
-		report(shift);
-		return unless @chain;
-		self(shift @chain);
-		again;
+	lambda {
+		context shift @chain;
+		http_request {
+			report shift;
+			return unless @chain;
+			context shift @chain;
+			again;
+		}
 	};
 }
-run IO::Lambda::Loop;
+
+run IO::Lambda;

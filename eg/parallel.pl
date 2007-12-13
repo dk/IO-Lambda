@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: parallel.pl,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: parallel.pl,v 1.2 2007/12/13 23:00:08 dk Exp $
 # 
 # This example fetches two pages in parallel, one with http/1.0 another with
 # https/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -9,19 +9,18 @@
 use lib qw(./lib);
 use HTTP::Request;
 use IO::Lambda qw(:all);
-use IO::Lambda::HTTP qw(http_get);
-use IO::Lambda::HTTPS qw(https_get);
+use IO::Lambda::HTTP qw(http_request);
 
 my $a = HTTP::Request-> new(
-	GET => "https://addons.mozilla.org/en-US/firefox",
+	GET => "http://www.perl.com/",
 );
 $a-> protocol('HTTP/1.1');
-$a-> headers-> header( Host => 'addons.mozilla.org');
+$a-> headers-> header( Host => $a-> uri-> host);
 $a-> headers-> header( Connection => 'close');
 
-my @chain = (
-	https_get( $a),
-	http_get( HTTP::Request-> new(GET => "http://www.perl.com/")),
+my @chain = ( 
+	$a, 
+	HTTP::Request-> new(GET => "http://www.perl.com/"),
 );
 
 sub report
@@ -40,7 +39,6 @@ my $style;
 #$style = 'explicit';
 $style = 'implicit';
 
-
 # $IO::Lambda::DEBUG++; # uncomment this to see that it indeed goes parallel
 
 if ( $style eq 'object') {
@@ -49,9 +47,13 @@ if ( $style eq 'object') {
 		shift;
 		report(@_);
 	}
-	$_-> tail( \&handle ) for @chain;
+	my $master = IO::Lambda-> new;
+	for ( @chain) {
+		my $lambda = IO::Lambda::HTTP-> new( $_ );
+		$master-> watch_lambda( $lambda, \&handle);
+	}
+	run IO::Lambda;
 } elsif ( $style eq 'explicit') {
-	
 	#
 	# Functional API, based on context() calls. context is
 	# $obj and whatever agruments the current call needs, a RPN of sorts.
@@ -61,15 +63,26 @@ if ( $style eq 'object') {
 	# Explicit loop unrolling - we know that we have exactly 2 steps
 	# It's not practical in this case, but it is when a (network) protocol
 	# relies on precise series of reads and writes
-	self( $chain[0]);
-	finally { report( shift) };
-	self( $chain[1]);
-	finally { report( shift) };
+	this lambda {
+		context $chain[0];
+		http_request \&report;
+		context $chain[1];
+		http_request \&report;
+	};
+	this-> wait;
 } else {
 	# implicit loop - we don't know how many states we need
-	for ( @chain) {
-		self( $_);
-		finally { report( shift) };
-	}
+	# 
+	# also, use 'tails'
+	this lambda {
+		context map {
+			lambda {
+				context shift;
+				&http_request;
+			}-> call($_);
+		} @chain;
+		tails { report $_ for @_ };
+	};
+	this-> wait;
 }
-IO::Lambda::wait_for_all( @chain);
+

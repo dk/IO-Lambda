@@ -1,9 +1,9 @@
-# $Id: Select.pm,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: Select.pm,v 1.2 2007/12/13 23:00:08 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:constants);
 
 IO::Lambda::Loop::default('Select');
 
@@ -19,9 +19,17 @@ sub new
 	return $self;
 }
 
+sub empty
+{
+	my $self = shift;
+	return (@{$self->{timers}} + keys %{$self-> {items}}) ? 0 : 1;
+}
+
 sub yield
 {
 	my ( $self, $nonblocking ) = @_;
+
+	return if $self-> empty;
 
 	my $t;
 	$t = 0 if $nonblocking;
@@ -31,16 +39,20 @@ sub yield
 
 	# timers
 	for ( @{$self-> {timers}}) {
-		$t = $_->[1]
-			if defined $_->[1] and (!defined($t) or $t > $_-> [1]);
+		$t = $_->[WATCH_DEADLINE]
+			if defined $_->[WATCH_DEADLINE] and 
+			(!defined($t) or $t > $_-> [WATCH_DEADLINE]);
 	}
 
 	# handles
 	my ( $R, $W, $E) = @{$self}{qw(read write exc)};
 
-	while ( my ( $fileno, $ticket) = each %{ $self-> {items}} ) {
-		$t = $ticket->[1]
-			if defined $ticket->[1] and (!defined($t) or $t > $ticket-> [1]);
+	while ( my ( $fileno, $bucket) = each %{ $self-> {items}} ) {
+		for ( @$bucket) {
+			$t = $_->[WATCH_DEADLINE]
+				if defined $_->[WATCH_DEADLINE] and 
+				(!defined($t) or $t > $_-> [WATCH_DEADLINE]);
+		}
 		$max = $fileno if $max < $fileno;
 		$min = $fileno if !defined($min) or $min > $fileno;
 	}
@@ -54,102 +66,123 @@ sub yield
 	die "select() error:$!" unless defined $n;
 	
 	# expired timers
-	my @expired_timers;
+	my ( @kill, @expired);
+
 	$t = $self-> {timers};
-	@$t = map { ( $_-> [1] > $ct) ? $_ : ( push @expired_timers, $_ and ()) } @$t;
+	@$t = grep {
+		($$_[WATCH_DEADLINE] >= $ct) ? do {
+			push @expired, $_;
+			0;
+		} : 1;
+	} @$t;
 
 	# handles
-	my @expired_handles;
 	if ( $n > 0) {
-		my %what;
+		# process selected handles
 		for ( my $i = $min; $i <= $max && $n > 0; $i++) {
 			my $what = 0;
 			if ( vec( $R, $i, 1)) {
-				$what |= FH_READ;
+				$what |= IO_READ;
 				vec( $self-> {read}, $i, 1) = 0;
 			}
 			if ( vec( $W, $i, 1)) {
-				$what |= FH_WRITE;
+				$what |= IO_WRITE;
 				vec( $self-> {write}, $i, 1) = 0;
 			}
 			if ( vec( $E, $i, 4)) {
-				$what |= FH_EXCEPTION;
+				$what |= IO_EXCEPTION;
 				vec( $self-> {exc}, $i, 1) = 0;
 			}
 			next unless $what;
-			push @expired_handles, $i;
-			push @{ $self-> {items}-> {$i} }, $what;
+
+			my $bucket = $self-> {items}-> {$i};
+			@$bucket = grep {
+				($$_[WATCH_IO_FLAGS] & $what) ? do {
+					$$_[WATCH_IO_FLAGS] &= $what;
+					push @expired, $_;
+					0;
+				} : 1;
+			} @$bucket;
+			delete $self-> {items}->{$i} unless @$bucket;
 			$n--;
 		}
 	} else {
-		while ( my ( $fileno, $ticket) = each %{ $self-> {items}}) {
-			next if !defined($ticket->[1]) || $ticket->[1] > $ct;
-			push @expired_handles, $fileno;
-			push @$ticket, 0; # if not a timeout, this is a 1|2|4 combination
-			vec( $self-> {read},  $fileno, 1) = 0;
-			vec( $self-> {write}, $fileno, 1) = 0;
-			vec( $self-> {exc},   $fileno, 1) = 0;
+		# else process timeouts
+		my @kill;
+		while ( my ( $fileno, $bucket) = each %{ $self-> {items}}) {
+			@$bucket = grep {
+				(
+					defined($_->[WATCH_DEADLINE]) && 
+					$_->[WATCH_DEADLINE] >= $ct
+				) ? do {
+					$$_[WATCH_IO_FLAGS] = 0;
+					push @expired, $_;
+					0;
+				} : 1;
+			} @$bucket;
+			push @kill, $fileno unless @$bucket;
 		}
+		delete @{$self->{items}}{@kill};
+		$self-> rebuild_vectors;
 	}
-	@expired_handles = delete @{$self-> {items}}{@expired_handles};
 		
 	# call them
-	for ( @expired_handles) {
-		my $flags = pop @$_;
-		$$_[2]-> callback_handle( $flags, @$_[0,3..$#$_]);
-	}
-	for ( @expired_timers) {
-		$$_[2]-> callback_timer( @$_[3..$#$_]);
-	}
-}
-
-sub run
-{
-	my $self = $_[0];
-	$self-> yield while 
-		@{$self->{timers}} + keys %{$self-> {items}};
+	$$_[WATCH_OBJ]-> io_handler( $_) for @expired;
 }
 
 sub watch
 {
-	my ( $self, $flags, $handle, $deadline, $obj, @param) = @_;
-	my $fileno = fileno $handle; 
+	my ( $self, $rec) = @_;
+	my $fileno = fileno $rec->[WATCH_IO_HANDLE]; 
 	die "Invalid filehandle" unless defined $fileno;
+	my $flags  = $rec->[WATCH_IO_FLAGS];
 
-	vec($self-> {read},  $fileno, 1) = 1 if $flags & FH_READ;
-	vec($self-> {write}, $fileno, 1) = 1 if $flags & FH_WRITE;
-	vec($self-> {exc},   $fileno, 1) = 1 if $flags & FH_EXCEPTION;
-	$self-> {items}-> {$fileno} = [
-		$handle,
-		$deadline,
-		$obj,
-		@param
-	];
+	vec($self-> {read},  $fileno, 1) = 1 if $flags & IO_READ;
+	vec($self-> {write}, $fileno, 1) = 1 if $flags & IO_WRITE;
+	vec($self-> {exc},   $fileno, 1) = 1 if $flags & IO_EXCEPTION;
+
+	push @{$self-> {items}-> {$fileno}}, $rec;
 }
 
 sub after
 {
-	my ( $self, $deadline, $obj, @param) = @_;
-	push @{ $self-> {timers}}, [
-		undef,
-		$deadline,
-		$obj,
-		@param,
-	];
+	my ( $self, $rec) = @_;
+	push @{$self-> {timers}}, $rec;
 }
 
 sub remove
 {
-	my ( $self, $obj) = @_;
+	my ($self, $obj) = @_;
 
-	@{ $self-> {timers}} = grep { $obj != $$_[2] } @{ $self-> {timers}};
+	@{$self-> {timers}} = grep { 
+		defined($_->[WATCH_OBJ]) and $_->[WATCH_OBJ] != $obj 
+	} @{$self-> {timers}};
+
 	my @kill;
-	while ( my ( $fileno, $ticket) = each %{$self->{items}}) {
-		next if not defined($ticket->[2]) or $ticket->[2] != $obj;
+	while ( my ( $fileno, $bucket) = each %{$self->{items}}) {
+		@$bucket = grep { defined($_->[WATCH_OBJ]) and $_->[WATCH_OBJ] != $obj } @$bucket;
+		next if @$bucket;
 		push @kill, $fileno;
-		vec($self-> {$_},  $fileno, 1) = 0 for qw(read write exc);
 	}
 	delete @{$self->{items}}{@kill};
+
+	$self-> rebuild_vectors;
+}
+
+sub rebuild_vectors
+{
+	my $self = $_[0];
+	$self-> {$_} = '' for qw(read write exc);
+	my $r = \ $self-> {read};
+	my $w = \ $self-> {write};
+	my $e = \ $self-> {exc};
+	while ( my ( $fileno, $bucket) = each %{$self->{items}}) {
+		for my $flags ( map { $_-> [WATCH_IO_FLAGS] } @$bucket) {
+			vec($$r, $fileno, 1) = 1 if $flags & IO_READ;
+			vec($$w, $fileno, 1) = 1 if $flags & IO_WRITE;
+			vec($$e, $fileno, 1) = 1 if $flags & IO_EXCEPTION;
+		}
+	}
 }
 
 1;

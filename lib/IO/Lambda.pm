@@ -1,323 +1,516 @@
-# $Id: Lambda.pm,v 1.2 2007/12/11 15:17:20 dk Exp $
+# $Id: Lambda.pm,v 1.3 2007/12/13 23:00:08 dk Exp $
 
 package IO::Lambda;
 
+use Carp;
 use strict;
 use warnings;
 use Exporter;
+use Scalar::Util qw(weaken);
 use vars qw(
+	$LOOP @OBJECTS
 	$VERSION @ISA
-	@EXPORT_OK %EXPORT_TAGS 
-	$SELF @CONTEXT $METHOD $CALLBACK @CTX_STACK
+	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_CLIENT
+	$THIS @CONTEXT $METHOD $CALLBACK @CTX_STACK
 	$DEBUG
 );
-$VERSION     = 0.01; 
+$VERSION     = 0.02;
 @ISA         = qw(Exporter);
-@EXPORT_OK   = qw(
-	FH_READ FH_WRITE FH_EXCEPTION 
-	self context self_context again push_context pop_context
-	read write sleep finally pipeline
+@EXPORT_CONSTANTS = qw(
+	IO_READ IO_WRITE IO_EXCEPTION 
+	WATCH_OBJ WATCH_DEADLINE WATCH_LAMBDA WATCH_CALLBACK
+	WATCH_IO_HANDLE WATCH_IO_FLAGS
 );
-%EXPORT_TAGS = ( all => \@EXPORT_OK);
+@EXPORT_CLIENT = qw(
+	this context lambda restart again
+	read write sleep tail tails
+);
+@EXPORT_OK   = (@EXPORT_CLIENT, @EXPORT_CONSTANTS);
+%EXPORT_TAGS = ( all => \@EXPORT_CLIENT, constants => \@EXPORT_CONSTANTS );
+$DEBUG = $ENV{IO_LAMBDA_DEBUG};
 
-use constant FH_READ      => 4;
-use constant FH_WRITE     => 2;
-use constant FH_EXCEPTION => 1;
+use constant IO_READ              => 4;
+use constant IO_WRITE             => 2;
+use constant IO_EXCEPTION         => 1;
+
+use constant WATCH_OBJ            => 0;
+use constant WATCH_DEADLINE       => 1;
+use constant WATCH_LAMBDA         => 1;
+use constant WATCH_CALLBACK       => 2;
+
+use constant WATCH_IO_HANDLE      => 3;
+use constant WATCH_IO_FLAGS       => 4;
 
 sub new
-{ 
-	my ( $class, %opt) = @_;
-
+{
+	IO::Lambda::Loop-> new unless $LOOP;
 	my $self = bless {
-		next    => [],
-		last    => [],
-		tail    => undef,
-		loop    => ( $opt{loop} ? $opt{loop} : IO::Lambda::Loop-> new ),
-	}, $class;
-
-	$self-> $_( $opt{$_}) for 
-		grep { exists $opt{$_} } 
-		qw(tail);
-
-	return $self;
+		in      => [],    # events we wait for 
+		last    => [],    # result of the last state
+		stopped => 0,     # initial state
+		start   => $_[1], # kick-start coderef
+	}, $_[0];
+	push @OBJECTS, $self;
+	weaken $OBJECTS[-1];
+	warn _d( $self, 'created at ', join(':', (caller(1))[1,2])) if $DEBUG;
+	$self;
 }
 
 sub DESTROY
 {
 	my $self = $_[0];
-	if ( $self-> {loop}) {
-		$self-> {loop}-> remove( $self) if @{$self-> {next}};
-		@{$self-> {next}} = ();
-		$self-> {loop} = undef;
-	}
+	@OBJECTS = grep { defined($_) and $_ != $self } @OBJECTS;
+	$LOOP-> remove( $self ) if $LOOP and @{$self-> {in}};
+	@{$self-> {in}}  = ();
 }
 
-# final action 
-sub tail
-{ 
-	my ( $self, $tail) = @_;
-	return $self-> {tail} unless $#_;
-	$self-> {tail} = $tail;
-	warn "$self: register final dispatch $tail\n" if $DEBUG;
-		
-	# finished before coupling?
-	$self-> dispatch_tail( @{$self->{last}}) 
-		if $tail and not @{$self->{next}};
-}
-
-sub peek { wantarray ? @{$_[0]->{last}} : $_[0]-> {last} }
-
-sub fail
+sub _coderef
 {
-	my ( $self, $error) = @_;
-	warn "$self: fail($error)\n" if $DEBUG;	
-	$self-> dispatch_tail($error);
+	my $self = $_[0];
+	sub { $self-> call(@_) }
 }
 
-# called from event loop; info is either a combination of IO flags (READ/WRITE/EXCEPTION)
-# or undef if this was a timer event
-sub callback_timer { 
-	warn "$_[0]: timer expired\n" if $DEBUG;	
-	goto &dispatch 
-}
-
-sub callback_handle
+sub _d     { _obj(shift), ': ', @_, "\n" }
+sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1)" }
+sub _t     { defined($_[0]) ? ( "time(", $_[0]-time, ")" ) : () }
+sub _ev
 {
-	my ( $self, $flags, $handle, $cb, @param) = @_;
-	warn "$self: handle #", fileno($handle), " called back with ", 
-		($flags ? "flags=$flags" : 'a timeout'),
-		"\n" if $DEBUG;	
-#	$handle-> blocking(0); # do we need that?
-	$self-> dispatch( $cb, $flags, @param);
+	$_[0] =~ /0x([\w]+)/;
+	"event($1) ",
+	(($#{$_[0]} == WATCH_IO_FLAGS) ?  (
+		'fd=', 
+		fileno($_[0]->[WATCH_IO_HANDLE]), 
+		' ',
+		( $_[0]->[WATCH_IO_FLAGS] ? (
+			join('/',
+				(($_[0]->[WATCH_IO_FLAGS] & IO_READ)      ? 'read'  : ()),
+				(($_[0]->[WATCH_IO_FLAGS] & IO_WRITE)     ? 'write' : ()),
+				(($_[0]->[WATCH_IO_FLAGS] & IO_EXCEPTION) ? 'exc'   : ()),
+			)) : 
+			'timeout'
+		),
+		' ', _t($_[0]->[WATCH_DEADLINE]),
+	) : (
+		ref($_[0]-> [WATCH_LAMBDA]) ?
+			_obj($_[0]-> [WATCH_LAMBDA]) :
+			_t($_[0]->[WATCH_DEADLINE])
+	))
 }
-
-
-# Calls all internal states, until none left.
-# After that propagates the event to the external object or callback.
-sub dispatch
+sub _msg
 {
-	my ( $self, $cb, @param) = @_;
-
-	my $n = $self-> {next};
-	my $nn = @$n;
-	@$n = grep { $cb != $_ } @$n;
-	die "stray callback" if $nn == @$n;
-
-	@param = $cb-> ($self, @param);
-	$self-> {last} = \@param;
-
-	return if @$n;
-	return unless $self-> {tail};
-
-	$self-> dispatch_tail(@param);
+	_d($_[0], '*', '(',
+	join(',', map { 
+		defined($_) ? $_ : 'undef'
+	} @{$_[0]->{last}}),
+	')')
 }
 
-# callout to the next lambda in the pipeline
-sub dispatch_tail
-{
-	my ( $self, @param) = @_;
-
-	# XXX or should we kill the states instead?
-	die "dispatch_tail called when there are un-called states left" if @{$self->{next}};
-
-	$self-> {last} = \@param;
-	return unless $self-> {tail};
-
-	# dispatch to the next object that waits for us
-	my $last = $self-> {last};
-	my $tail = $self-> {tail};
-	$self-> {last} = [];
-	$self-> {tail} = undef;
-
-	warn "$self: dispatch tail to $tail( @$last )\n" if $DEBUG;
-
-	if ( ref($tail) eq 'CODE') {
-		# either plain callback
-		$tail-> ( $self, @$last );
-	} else {
-		# or a IO::Lambda object
-		$tail-> dispatch( @$last );
-	}
-}
+#
+# Part I - Object interface to callback and 
+# messaging interface with event loop and lambdas
+#
+#########################################################
 
 # register an IO event
-sub watch
+sub watch_io
 {
-	my ( $self, $flags, $handle, $deadline, $cb) = @_;
+	my ( $self, $flags, $handle, $deadline, $callback) = @_;
 
-#	$handle-> blocking(0); # do we need that?
-	push @{$self-> {next}}, $cb;
-	
-	warn "$self: register IO(", $flags, ") ",
-		(defined($deadline) ? "deadline($deadline) " : ''),
-		"handle #", fileno($handle), "\n" if $DEBUG;
-	$self-> {loop}-> watch( $flags, $handle, $deadline, $self, $cb);
+	croak "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
+
+	my $rec = [
+		$self,
+		$deadline,
+		$callback,
+		$handle,
+		$flags,
+	];
+	push @{$self-> {in}}, $rec;
+
+	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
+
+	$LOOP-> watch( $rec );
 }
 
 # register a timeout
-sub after
+sub watch_timer
 {
-	my ( $self, $deadline, $cb) = @_;
+	my ( $self, $deadline, $callback) = @_;
 
-	die "time is undefined" unless defined $deadline;
+	croak "$self: time is undefined" unless defined $deadline;
 
-	push @{$self-> {next}}, $cb;
+	my $rec = [
+		$self,
+		$deadline,
+		$callback,
+	];
+	push @{$self-> {in}}, $rec;
 
-	warn "$self: register timer deadline $deadline\n" if $DEBUG;
-	$self-> {loop}-> after( $deadline, $self, $cb);
+	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
+
+	$LOOP-> after( $rec);
 }
 
-sub add_callback
+# register a callback when another lambda exits
+sub watch_lambda
 {
-	my ( $self, $cb) = @_;
-	push @{$self-> {next}}, $cb;
+	my ( $self, $lambda, $callback) = @_;
+
+	croak "bad lambda" unless $lambda and $lambda->isa('IO::Lambda');
+	croak "won't watch myself" if $self == $lambda;
+
+	my $rec = [
+		$self,
+		$lambda,
+		$callback,
+	];
+	push @{$self-> {in}}, $rec;
+
+	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
 }
 
-# loop handling
-sub loop       { $_[0]-> {loop} }
-sub run        { $_[0]-> {loop}-> run }
-sub is_charged { @{$_[0]->{next}} or $_[0]->{tail} }
+# handle uncoming asynchronous events
+sub io_handler
+{
+	my ( $self, $rec) = @_;
 
-sub wait { goto &wait_for_all }
+	warn _d( $self, '< ', _ev($rec)) if $DEBUG;
+
+	my $in = $self-> {in};
+	my $nn = @$in;
+	@$in = grep { $rec != $_ } @$in;
+	die _d($self, 'stray ', _ev($rec)) if $nn == @$in or $self != $rec->[WATCH_OBJ];
+
+	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
+		$self, 
+		(($#$rec == WATCH_IO_FLAGS) ? $rec-> [WATCH_IO_FLAGS] : ()),
+		@{$self->{last}}
+	);
+	warn $self-> _msg if $DEBUG;
+
+	unless ( @$in) {
+		warn _d( $self, 'stopped') if $DEBUG;
+		$self-> {stopped}++;
+	}
+}
+
+sub stopped  { $_[0]-> {stopped}  }
+
+# resets the state machine
+sub reset
+{
+	my $self = shift;
+	$LOOP-> remove( $self ) if @{$self-> {in}};
+	@{$self-> {in}}   = ();
+	@{$self-> {last}} = ();
+	delete $self-> {stopped};
+	warn _d( $self, 'reset') if $DEBUG;
+}
+
+# advances all possible states, returns a flag that is
+# 1 - no more states to call (also if stopped)
+# 0 - have some asynchronous states left
+sub step
+{
+	my $self = shift;
+
+	return 1 if $self-> {stopped};
+
+	die _d($self, 'cyclic dependency detected') if $self-> {locked}; 
+			
+	unless ( @{$self->{in}} ) {
+		# kick-start the execution chain
+		if ( $self-> {start}) {
+			warn _d( $self, 'started') if $DEBUG;
+			@{$self->{last}} = $self-> {start}-> ($self, @{$self->{last}}, @_);
+			warn $self-> _msg if $DEBUG;
+		}
+	}
+
+	# drive the states
+	my $changed = 1;
+	$self-> {locked} = 1;
+	my $in = $self-> {in};
+	while ( $changed) {
+		$changed = 0;
+		for my $rec ( @$in) {
+			# asyncrohous event
+			unless (ref($rec-> [WATCH_LAMBDA])) {
+				warn _d( $self, 'still waiting for ', _ev($rec)) if $DEBUG;
+				next;
+			}
+			# synchronous event
+			my $lambda = $rec->[WATCH_LAMBDA];
+			unless ( $lambda-> step) {
+				warn _d( $self, 'still waiting for ', _ev($rec)) if $DEBUG;
+				next;
+			}
+			$changed = 1;
+		
+			warn _d( $self, '< ', _ev($rec)) if $DEBUG;
+
+			@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> ($self, @{$lambda->{last}});
+			warn $self-> _msg if $DEBUG;
+			@$in = grep { $rec != $_ } @$in;
+		}
+	}
+	delete $self-> {locked};
+
+	unless ( @$in) {
+		warn _d( $self, 'stopped') if $DEBUG;
+		$self-> {stopped}++;
+	}
+
+	return $self-> {stopped};
+}
+
+# peek into the current state
+sub peek { wantarray ? @{$_[0]->{last}} : $_[0]-> {last} }
+
+# pass initial parameters to lambda
+sub call 
+{
+	my $self = shift;
+
+	croak "can't call stopped lambda" if $self-> {stopped};
+	croak "can't call started lambda" if @{$self->{in}};
+
+	@{$self-> {last}} = @_;
+	$self;
+}
+
+# abandon all states and stop with constant message
+sub terminate
+{
+	my ( $self, @error) = @_;
+	warn _d( $self, "terminate(@error)") if $DEBUG;
+
+	$LOOP-> remove( $self ) if @{$self-> {in}};
+	@{$self-> {in}}  = ();
+	$self-> {stopped} = 1;
+	$self-> {last} = \@error;
+	warn $self-> _msg if $DEBUG;
+}
+
+# synchronization
+
+# drives all objects until all of them
+# are either stopped, or in a blocking state
+sub drive
+{
+	my $changed = 1;
+	warn "IO::Lambda::drive --------\n" if $DEBUG;
+	while ( $changed) {
+		$changed = 0;
+		for my $o ( grep { not $_-> {stopped} } @OBJECTS) {
+			next unless $o-> step;
+			$changed = 1;
+		}
+	warn "IO::Lambda::drive .........\n" if $DEBUG and $changed;
+	}
+	warn "IO::Lambda::drive +++++++++\n" if $DEBUG;
+}
+
+# wait for all lambdas to stop
+sub wait
+{
+	my $self = shift;
+	$self-> call(@_) if not($self->{stopped}) and not(@{$self->{in}});
+	while ( 1) {
+		drive;
+		last if $self-> {stopped};
+		$LOOP-> yield;
+	}
+	return wantarray ? $self-> peek : $self-> peek-> [0];
+}
+
 sub wait_for_all
 {
-	my $loop    = $_[0]-> loop;
 	my @objects = @_;
 	while ( 1) {
-		@objects = grep { $_-> is_charged } @objects;
+		drive;
+		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
-		$loop-> yield;
+		$LOOP-> yield;
 	}
 }
 
+# wait for at least one lambda to stop, returns those that stopped
 sub wait_for_any
 {
-	my $loop    = $_[0]-> loop;
 	my @objects = @_;
+	$_-> step for @objects;
 	while ( 1) {
-		@objects = grep { ! $_-> is_charged } @objects;
+		drive;
+		@objects = grep { $_-> {stopped} } @objects;
 		return @objects if @objects;
-		$loop-> yield;
+		$LOOP-> yield;
 	}
 }
 
-# the following enables non-method interface for callbacks, for
-# the prettier code style:
-# 
-#  context( $socket, $deadline);
-#  read {
-#     ....
-#  }
+# run the event loop until no lambdas are left in blocking state
+sub run
+{
+	while ( $LOOP) {
+		drive;
+		last if $LOOP-> empty;
+		$LOOP-> yield;
+	}
+}	
+
 #
+# Part II - Procedural interface to the lambda-style pogramming
+#
+################################################################
+
+sub lambda(&)
+{
+	my $cb  = $_[0];
+	my @args;
+	my $wrapper;
+	my $this;
+	$wrapper = sub {
+		$THIS     = $this;
+		@CONTEXT  = ();
+		$CALLBACK = $cb;
+		$METHOD   = $wrapper;
+		$cb ? $cb-> (@args) : @args;
+	};
+	$this = __PACKAGE__-> new( sub {
+		$THIS     = shift;
+		@CONTEXT  = ();
+		@args     = @_;
+		$CALLBACK = $cb;
+		$METHOD   = $wrapper;
+		$cb ? $cb-> (@_) : @_;
+	});
+}
+
+# restart latest state
+sub again
+{ 
+	defined($METHOD) ? 
+		$METHOD-> ( $CALLBACK ) : 
+		croak "again predicate outside of a restartable call" 
+}
 
 # define context
-sub self_context { @_ ? ( $SELF,   @CONTEXT ) = @_ : ( $SELF,   @CONTEXT ) }
-sub self         { @_ ? $SELF = $_[0] : $SELF }
+sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub restart      { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
-sub push_context { push @CTX_STACK, [ $SELF, $METHOD, $CALLBACK, @CONTEXT ] }
-sub pop_context  { ($SELF, $METHOD, $CALLBACK, @CONTEXT) = @{ pop @CTX_STACK } }
+sub push_context { push @CTX_STACK, [ $THIS, $METHOD, $CALLBACK, @CONTEXT ] }
+sub pop_context  { ($THIS, $METHOD, $CALLBACK, @CONTEXT) = @{ pop @CTX_STACK } }
+
 
 #
 # Predicates:
 #
 
+# common wrapper for declaration of handle-watching user predicates
+sub add_watch
+{
+	my ($self, $cb, $method, $flags, $handle, $deadline, @ctx) = @_;
+	$self-> watch_io(
+		$flags, $handle, $deadline,
+		sub {
+			$THIS     = shift;
+			@CONTEXT  = @ctx;
+			$METHOD   = $method;
+			$CALLBACK = $cb;
+			$cb ? $cb-> (@_) : @_;
+		}
+	)
+}
+
+# io($flags,$handle,$deadline)
+sub io(&)
+{
+	$THIS-> add_watch( 
+		shift, \&watch,
+		@CONTEXT[0,1,2,0,1,2]
+	)
+}
+
 # read($handle,$deadline)
 sub read(&)
 {
-	my $cb = $_[0];
-	my ($handle, $deadline) = @CONTEXT;
-	$SELF-> watch(
-		FH_READ,
-		$handle, $deadline,
-		sub {
-			$SELF     = shift;
-			@CONTEXT  = ( $handle, $deadline);
-			$METHOD   = \&read;
-			$CALLBACK = $cb;
-			$cb-> (@_);
-		}
-	);
+	$THIS-> add_watch( 
+		shift, \&read, IO_READ, 
+		@CONTEXT[0,1,0,1]
+	)
 }
 
-# write($handle,$deadline)
+# handle($handle,$deadline)
 sub write(&)
 {
-	my $cb = $_[0];
-	my ($handle, $deadline) = @CONTEXT;
-	$SELF-> watch(
-		FH_WRITE,
-		$handle, $deadline,
+	$THIS-> add_watch( 
+		shift, \&write, IO_WRITE, 
+		@CONTEXT[0,1,0,1]
+	)
+}
+
+# common wrapper for declaration of time-watching user predicates
+sub add_timer
+{
+	my ($self, $cb, $method, $deadline, @ctx) = @_;
+	$self-> watch_timer(
+		$deadline,
 		sub {
-			$SELF     = shift;
-			@CONTEXT  = ( $handle, $deadline);
-			$METHOD   = \&write;
+			$THIS     = shift;
+			@CONTEXT  = @ctx;
+			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$cb-> (@_);
+			$cb ? $cb-> (@_) : @_;
 		}
-	);
+	)
 }
 
 # sleep($deadline)
-sub sleep(&)
+sub sleep(&) { $THIS-> add_timer( shift, \&sleep, @CONTEXT[0,0]) }
+
+# common wrapper for declaration of lambda-watching user predicates
+sub add_tail
 {
-	my $cb = $_[0];
-	my ($deadline) = @CONTEXT;
-	$SELF-> after(
-		$deadline,
+	my ($self, $cb, $method, $lambda, @ctx) = @_;
+	$self-> watch_lambda(
+		$lambda,
 		sub {
-			$SELF     = shift;
-			@CONTEXT  = ($deadline);
-			$METHOD   = \&sleep;
+			$THIS     = shift;
+			@CONTEXT  = @ctx;
+			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$cb-> ();
+			$cb ? $cb-> (@_) : @_;
 		},
 	);
 }
 
-sub again
-{ 
-	defined($METHOD) ? 
-		$METHOD-> ( $CALLBACK ) : 
-		die "again predicate outside of a restartable call" 
-}
+# tail($lambda) -- execute block when $lambda is done
+sub tail(&) { $THIS-> add_tail( shift, \&tail, @CONTEXT[0,0]) }
 
-# finally() -- executes block when done; will do immediately if nothing left
-sub finally(&)
+# tails(@lambdas) -- wait for all lambdas to finish
+sub tails(&)
 {
 	my $cb = $_[0];
-	$SELF-> tail( sub {
-		$SELF     = shift;
-		@CONTEXT  = ();
-		$METHOD   = \&finally;
+	my @lambdas = context;
+	my $n = $#lambdas;
+	croak "no tails" unless @lambdas;
+
+	my @ret;
+	my $watcher = sub {
+		$THIS     = shift;
+		push @ret, @_;
+		return if $n--;
+
+		@CONTEXT  = @lambdas;
+		$METHOD   = \&tails;
 		$CALLBACK = $cb;
-		$cb-> (@_);
-	});
-}
-
-# pipeline($lambda) -- execute block when $lambda is done
-sub pipeline(&)
-{
-	my $cb = $_[0];
-	my $self = $SELF;
-	die "won't pipeline to myself -- use either 'finally', or 'again' inside 'pipeline'"
-		if $SELF == $CONTEXT[0];
-	my $wrapper = sub {
-		shift;
-		$cb-> (@_);
+		$cb ? $cb-> (@ret) : @ret;
 	};
-	$self-> add_callback( $wrapper);
-	$CONTEXT[0]-> tail( sub {
-		$SELF     = $self;
-		@CONTEXT  = (shift);
-		$METHOD   = \&pipeline;
-		$CALLBACK = $cb;
-		$self-> dispatch( $wrapper, @_);
-	});
+	$THIS-> watch_lambda( $_, $watcher) for @lambdas;
 }
 
 package IO::Lambda::Loop;
-use vars qw($LOOP $DEFAULT);
+use vars qw($DEFAULT);
 use strict;
 use warnings;
 
@@ -326,7 +519,7 @@ sub default { $DEFAULT = shift }
 
 sub new
 {
-	return $LOOP if $LOOP;
+	return $IO::Lambda::LOOP if $IO::Lambda::LOOP;
 
 	my ( $class, %opt) = @_;
 
@@ -335,10 +528,8 @@ sub new
 	eval "use $class;";
 	die $@ if $@;
 
-	return $LOOP = $class-> new();
+	return $IO::Lambda::LOOP = $class-> new();
 }
-
-sub run { $LOOP-> run }
 
 1;
 

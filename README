@@ -5,7 +5,7 @@ This module is another attempt to fight the horrors of non-blocking IO
 programming. The simplicitly of the classic, blocking style is only available
 when one employs threads or coroutines. Otherwise, state machines have to be
 built, often quite complex, and this approach doesn't help the clarity of the
-code. The approach implemented in this module is stringly based on closures.
+code. The approach implemented in this module is strongly based on closures.
 It emulates the blocking style, so the collection of states is local, and can
 be collected under single subroutine. For example, a dumbed down HTTP protocol
 can be described like in the following scheme:
@@ -18,119 +18,31 @@ can be described like in the following scheme:
 		}
 	}
 
-IO::Lambda tries to actually implement that. The following code shows how:
-
-	# prepare the request
-	use IO::Lambda qw(:all);
-	use IO::Socket::INET;
-	my $q     = IO::Lambda-> new;
-	my $sock  = IO::Socket::INET-> new( PeerAddr => 'localhost', PeerPort => 80);
-	die "cannot connect:$@" unless $sock;
-	
-	# declare the object context
-	self_context( $q, $sock);
-
-	# wait for the socket to become writable
-	write { 
-		print $sock "GET / HTTP/1.0\r\n\r\n";
-		my $buf = '';
-		# wait for the socket to become readable
-		read {
-			my $n = sysread( $sock, $buf, 1024, length($buf));
-			return "error:$!" unless defined $n;
-			return $buf unless $n;
-			again;
-		}
-	};
-
-	finally {
-		print shift;
-	};
-
-	# execute
-	$q-> wait;
-
-This approach allows to lay out the protocol locally, without spreading its individual
-stages through the code. The http transport protocol, as described here, can be 
-simplified to this scheme:
-
-and the module guarantees that at whatever stage the protocol stops, the last execution result,
-be it error string or http response, will be delivered to the receiver.
-
-The aim of the module is two-fold. First, to bring back the terseness in non-blocking IO, without
-resorting to the drastic measures of threads and coroutines. Second, to create a framework where
-protocols are subroutines. That means, when a lower-lever protocol is described as a single
-routine (as http above), callers can wrap it easily and construct higher-lever protocols on top
-of it, again, resulting in a protocol that will also be a single subroutine. For example, a
-HTTP handler that can understand redirection:
+IO::Lambda features syntax where one can indeed use the lambda syntax.
+Below is a full-functioning code:
 
 	use strict;
-	use HTTP::Request;
-	use HTTP::Response;
 	use IO::Lambda qw(:all);
 	use IO::Socket::INET;
-
-	# create chain of event on an existsing lambda object, that when
-	# finished, will contain the result
-
-	sub http_request
-	{
-		my ($q, $req) = @_;
-		my $socket = IO::Socket::INET-> new(
-			PeerAddr => $req-> uri-> host,
-			PeerPort => $req-> uri-> port,
-		);
-		return $q-> fail("socket error:$@") unless $socket;
-
-		self_context( $q, $socket);
+	my $q = lambda {
+		my ( $socket, $url) = @_;
+		context $socket;
 		write {
-			print $socket $req-> as_string or return "error:$!";
+			print $socket "GET $url HTTP/1.0\r\n\r\n";
 			my $buf = '';
 			read {
-				my $n = sysread( $socket, $buf, 1024, length($buf));
-				return "error:$!" unless defined $n;
-				return HTTP::Response-> parse($buf) unless $n;
+				return $buf unless 
+					sysread( $socket, $buf, 1024, length($buf));
 				again;
-			};
-		};
-	}
-
-	# wrap http_request by listening to events from http_request
-	sub http_redirect_request
-	{
-		my ( $q, $req) = @_;
-
-		my $subq = IO::Lambda-> new;
-		http_request( $subq, $req);
-
-		self_context( $q, $subq);
-		pipeline {
-			my $result = shift;
-			return $result unless ref($result);
-			return $result if $result-> code !~ /^30/;
-			$req-> uri( $result-> header('Location'));
-			warn "redirected to ", $req-> uri, "\n";
-			push_context;
-			http_request( $subq, $req);
-			pop_context;
-			again;
-		};
-	}
-
-	# main call
-	my $q = IO::Lambda-> new;
-	my $r = HTTP::Request-> new( GET => 'http://google.com/');
-	$r-> protocol('HTTP/1.1');
-	$r-> headers-> header( Host => $r-> uri-> host);
-	$r-> headers-> header( Connection => 'close');
-	http_redirect_request( $q, $r);
-	$q-> tail( sub { 
-		my $r = $_[1];
-		unless ( ref($r)) {
-			print "some error:$r\n";
-		} else {
-			print "read ", length($r->as_string), " bytes\n";
+			}
 		}
-	});
-	$q-> wait;
+	};
+	print $q-> wait( 
+		IO::Socket::INET-> new( 
+			PeerAddr => 'www.perl.com', 
+			PeerPort => 80 
+		),
+		'/index.html'
+	);
 
+For more examples, see eg/ directory.
