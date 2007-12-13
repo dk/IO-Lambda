@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.3 2007/12/13 23:00:08 dk Exp $
+# $Id: Lambda.pm,v 1.4 2007/12/13 23:38:58 dk Exp $
 
 package IO::Lambda;
 
@@ -534,5 +534,59 @@ sub new
 1;
 
 =pod
+
+=head1 NAME
+
+IO::Lambda - non-blocking IO in lambda style
+
+=head1 DESCRIPTION
+
+This module is another attempt to fight the horrors of non-blocking I/O
+programming. The simplicity of the sequential programming is only available
+when one employs threads, coroutines, or coprocesses. Otherwise state machines
+are to be built, often quite complex, which fact doesn't help the clarity of
+the code. This module uses closures to achieve clarity of sequential
+programming with single-process, single-thread, non-blocking I/O.
+
+=head1 SYNOPSIS
+
+	use strict;
+	use IO::Lambda qw(:all);
+	use IO::Socket::INET;
+	my $q = lambda {
+		my ( $socket, $url) = @_;
+		context $socket;
+		write {
+			print $socket "GET $url HTTP/1.0\r\n\r\n";
+			my $buf = '';
+			read {
+				return $buf unless 
+					sysread( $socket, $buf, 1024, length($buf));
+				again;
+			}
+		}
+	};
+	print $q-> wait( 
+		IO::Socket::INET-> new( 
+			PeerAddr => 'www.perl.com', 
+			PeerPort => 80 
+		),
+		'/index.html'
+	);
+
+=head1 SEE ALSO
+
+L<Coro>, L<threads>, L<Event::Lib>.
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (c) 2007 capmon ApS. All rights reserved.
+
+This library is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+=head1 AUTHOR
+
+Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
 
 =cut

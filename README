@@ -1,14 +1,18 @@
 IO::Lambda - nonblocking IO in functional style
 ===============================================
 
-This module is another attempt to fight the horrors of non-blocking IO
-programming. The simplicitly of the classic, blocking style is only available
-when one employs threads or coroutines. Otherwise, state machines have to be
-built, often quite complex, and this approach doesn't help the clarity of the
-code. The approach implemented in this module is strongly based on closures.
+This module is another attempt to fight the horrors of non-blocking I/O
+programming. The simplicity of the sequential programming is only available
+when one employs threads, coroutines, or coprocesses. Otherwise state machines
+are to be built, often quite complex, which fact doesn't help the clarity of
+the code. This module uses closures to achieve clarity of sequential
+programming with single-process, single-thread, non-blocking I/O.
+
+The approach implemented in this module is strongly based on closures.
 It emulates the blocking style, so the collection of states is local, and can
 be collected under single subroutine. For example, a dumbed down HTTP protocol
 can be described like in the following scheme:
+
 
 	write {
 		print $fh or die;
