@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.4 2007/12/13 23:38:58 dk Exp $
+# $Id: Lambda.pm,v 1.5 2007/12/13 23:44:38 dk Exp $
 
 package IO::Lambda;
 
@@ -537,7 +537,7 @@ sub new
 
 =head1 NAME
 
-IO::Lambda - non-blocking IO in lambda style
+IO::Lambda - non-blocking I/O in lambda style
 
 =head1 DESCRIPTION
 
@@ -550,29 +550,29 @@ programming with single-process, single-thread, non-blocking I/O.
 
 =head1 SYNOPSIS
 
-	use strict;
-	use IO::Lambda qw(:all);
-	use IO::Socket::INET;
-	my $q = lambda {
-		my ( $socket, $url) = @_;
-		context $socket;
-		write {
-			print $socket "GET $url HTTP/1.0\r\n\r\n";
-			my $buf = '';
-			read {
-				return $buf unless 
-					sysread( $socket, $buf, 1024, length($buf));
-				again;
-			}
-		}
-	};
-	print $q-> wait( 
-		IO::Socket::INET-> new( 
-			PeerAddr => 'www.perl.com', 
-			PeerPort => 80 
-		),
-		'/index.html'
-	);
+    use strict;
+    use IO::Lambda qw(:all);
+    use IO::Socket::INET;
+    my $q = lambda {
+        my ( $socket, $url) = @_;
+        context $socket;
+        write {
+            print $socket "GET $url HTTP/1.0\r\n\r\n";
+            my $buf = '';
+            read {
+                return $buf unless 
+                    sysread( $socket, $buf, 1024, length($buf));
+                again;
+            }
+        }
+    };
+    print $q-> wait( 
+        IO::Socket::INET-> new( 
+            PeerAddr => 'www.perl.com', 
+            PeerPort => 80 
+        ),
+        '/index.html'
+    );
 
 =head1 SEE ALSO
 
