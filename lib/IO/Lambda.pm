@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.5 2007/12/13 23:44:38 dk Exp $
+# $Id: Lambda.pm,v 1.6 2007/12/13 23:45:48 dk Exp $
 
 package IO::Lambda;
 
@@ -532,6 +532,8 @@ sub new
 }
 
 1;
+
+__DATA__
 
 =pod
 
