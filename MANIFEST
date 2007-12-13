@@ -15,4 +15,3 @@ t/99_pod_coverage.t
 eg/sequential.pl
 eg/parallel.pl
 eg/http-redirect.pl
-META.yml                                 Module meta-data (added by MakeMaker)
