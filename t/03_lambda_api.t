@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.1 2007/12/13 23:00:08 dk Exp $
+# $Id: 03_lambda_api.t,v 1.2 2007/12/13 23:09:01 dk Exp $
 
 use strict;
 use warnings;
@@ -60,6 +60,7 @@ this lambda {
 ok(( 'moo' eq this-> wait && $i == -1), 'restart sleep');
 
 SKIP: {
+	skip "select(file) doesn't work on win32", 3 if $^O =~ /win32/i;
 	skip "cannot open $0:$!", 3 unless open FH, '<', $0;
 
 this lambda {

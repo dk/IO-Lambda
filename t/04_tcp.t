@@ -1,9 +1,9 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.3 2007/12/13 23:00:08 dk Exp $
+# $Id: 04_tcp.t,v 1.4 2007/12/13 23:09:01 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More tests => 5;
 use IO::Lambda qw(:all);
 use IO::Handle;
 use IO::Socket::INET;

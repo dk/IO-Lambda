@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.2 2007/12/13 23:00:08 dk Exp $
+# $Id: Select.pm,v 1.3 2007/12/13 23:09:01 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -63,7 +63,7 @@ sub yield
 
 	# do select
 	my $n  = select( $R, $W, $E, $t);
-	die "select() error:$!" unless defined $n;
+	die "select() error:$!$^E" if $n < 0;
 	
 	# expired timers
 	my ( @kill, @expired);
