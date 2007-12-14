@@ -1,24 +1,36 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.2 2007/12/13 23:09:01 dk Exp $
+# $Id: 02_object_api.t,v 1.3 2007/12/14 14:42:04 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 15;
+use Test::More tests => 26;
 use IO::Lambda qw(:all :constants);
 
 # empty lambda
 my $l = IO::Lambda-> new;
 ok( $l, 'create IO::Lambda');
-ok( not($l-> stopped), 'initial lambda is not stopped');
+ok( not($l-> is_stopped), 'initial lambda is not stopped');
+ok( $l-> is_passive, 'initial lambda is passive');
+ok( not($l-> is_active), 'initial lambda is not active');
+ok( not($l-> is_waiting), 'initial lambda is not waiting');
 
-ok( $l-> step, 'step reports data is available');
-ok( $l-> stopped, 'empty lambda is stopped after first step');
+$l-> wait;
+ok( $l-> is_stopped, 'finished lambda is stopped');
+ok( not($l-> is_passive), 'finished lambda is not passive');
+ok( $l-> is_active, 'finished lambda is active');
+ok( not($l-> is_waiting), 'finished lambda is not waiting');
 
 $l-> reset;
-ok( not($l-> stopped), 'reset lambda is not stopped');
+ok( not($l-> is_stopped), 'reset lambda is not stopped');
+ok( $l-> is_passive, 'reset lambda is passive');
+ok( not($l-> is_active), 'reset lambda is not active');
+ok( not($l-> is_waiting), 'reset lambda is not waiting');
 
 $l-> terminate('moo', 42);
-ok( $l-> stopped, 'terminated lambda is stopped');
+ok( $l-> is_stopped, 'terminated lambda is stopped');
+ok( not($l-> is_passive), 'terminated lambda is not passive');
+ok( $l-> is_active, 'terminated lambda is active');
+ok( not($l-> is_waiting), 'terminated lambda is not waiting');
 
 ok( 2 == @{$l-> peek} ,     'passed data ok');
 ok('moo' eq $l-> peek->[0], 'retrieved data ok');
@@ -30,8 +42,8 @@ my @x = $l-> peek;
 ok(( 2 == @x and $x[1] == 42), 'single callback');
 
 # two lambdas, one waiting for another
-my $m = IO::Lambda-> new( sub { 10 } );
 $l-> reset;
+my $m = IO::Lambda-> new( sub { 10 } );
 $l-> watch_lambda( $m, sub { @x = @_ });
 $l-> wait;
 ok(( 2 == @x and $x[1] == 10), 'watch_lambda');
@@ -43,8 +55,8 @@ $m-> wait;
 ok(( 1 == @x and $x[0] eq 'time'), 'watch_timer');
 
 $m-> reset;
-$m-> watch_timer( time, sub { 'time' });
 $l-> reset;
+$m-> watch_timer( time, sub { 'time' });
 $l-> watch_lambda( $m, sub { @x = @_ });
 $l-> wait;
 ok(( 2 == @x and $x[1] eq 'time'), 'propagate timer');

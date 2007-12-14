@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.6 2007/12/13 23:45:48 dk Exp $
+# $Id: Lambda.pm,v 1.7 2007/12/14 14:42:04 dk Exp $
 
 package IO::Lambda;
 
@@ -8,13 +8,13 @@ use warnings;
 use Exporter;
 use Scalar::Util qw(weaken);
 use vars qw(
-	$LOOP @OBJECTS
+	$LOOP %EVENTS @OBJECTS
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_CLIENT
-	$THIS @CONTEXT $METHOD $CALLBACK @CTX_STACK
+	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = 0.02;
+$VERSION     = 0.03;
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -52,22 +52,14 @@ sub new
 	}, $_[0];
 	push @OBJECTS, $self;
 	weaken $OBJECTS[-1];
-	warn _d( $self, 'created at ', join(':', (caller(1))[1,2])) if $DEBUG;
 	$self;
 }
 
 sub DESTROY
 {
 	my $self = $_[0];
+	$self-> cancel_all_events;
 	@OBJECTS = grep { defined($_) and $_ != $self } @OBJECTS;
-	$LOOP-> remove( $self ) if $LOOP and @{$self-> {in}};
-	@{$self-> {in}}  = ();
-}
-
-sub _coderef
-{
-	my $self = $_[0];
-	sub { $self-> call(@_) }
 }
 
 sub _d     { _obj(shift), ': ', @_, "\n" }
@@ -98,11 +90,18 @@ sub _ev
 }
 sub _msg
 {
-	_d($_[0], '*', '(',
-	join(',', map { 
-		defined($_) ? $_ : 'undef'
-	} @{$_[0]->{last}}),
-	')')
+	my $self = shift;
+	_d(
+		$self,
+		"@_ >> (",
+		join(',', 
+			map { 
+				defined($_) ? $_ : 'undef'
+			} 
+			@{$self->{last}}
+		),
+		')'
+	)
 }
 
 #
@@ -116,6 +115,7 @@ sub watch_io
 {
 	my ( $self, $flags, $handle, $deadline, $callback) = @_;
 
+	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
 
 	my $rec = [
@@ -137,6 +137,7 @@ sub watch_timer
 {
 	my ( $self, $deadline, $callback) = @_;
 
+	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "$self: time is undefined" unless defined $deadline;
 
 	my $rec = [
@@ -156,8 +157,11 @@ sub watch_lambda
 {
 	my ( $self, $lambda, $callback) = @_;
 
+	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "bad lambda" unless $lambda and $lambda->isa('IO::Lambda');
+
 	croak "won't watch myself" if $self == $lambda;
+	# XXX check cycling
 
 	my $rec = [
 		$self,
@@ -165,11 +169,12 @@ sub watch_lambda
 		$callback,
 	];
 	push @{$self-> {in}}, $rec;
+	push @{$EVENTS{"$lambda"}}, $rec;
 
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
 }
 
-# handle uncoming asynchronous events
+# handle incoming asynchronous events
 sub io_handler
 {
 	my ( $self, $rec) = @_;
@@ -179,14 +184,15 @@ sub io_handler
 	my $in = $self-> {in};
 	my $nn = @$in;
 	@$in = grep { $rec != $_ } @$in;
-	die _d($self, 'stray ', _ev($rec)) if $nn == @$in or $self != $rec->[WATCH_OBJ];
+	die _d($self, 'stray ', _ev($rec))
+		if $nn == @$in or $self != $rec->[WATCH_OBJ];
 
 	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
 		$self, 
 		(($#$rec == WATCH_IO_FLAGS) ? $rec-> [WATCH_IO_FLAGS] : ()),
 		@{$self->{last}}
 	);
-	warn $self-> _msg if $DEBUG;
+	warn $self-> _msg('io') if $DEBUG;
 
 	unless ( @$in) {
 		warn _d( $self, 'stopped') if $DEBUG;
@@ -194,74 +200,94 @@ sub io_handler
 	}
 }
 
-sub stopped  { $_[0]-> {stopped}  }
+# handle incoming synchronous events 
+sub lambda_handler
+{
+	my ( $self, $rec) = @_;
+
+	warn _d( $self, '< ', _ev($rec)) if $DEBUG;
+
+	my $in = $self-> {in};
+	my $nn = @$in;
+	@$in = grep { $rec != $_ } @$in;
+	die _d($self, 'stray ', _ev($rec))
+		if $nn == @$in or $self != $rec->[WATCH_OBJ];
+
+	my $lambda = $rec-> [WATCH_LAMBDA];
+	die _d($self, 
+		'handler called but ', _obj($lambda),
+		' is not ready') unless $lambda-> {stopped};
+
+	my $arr = $EVENTS{"$lambda"};
+	@$arr = grep { $_ != $rec } @$arr;
+	delete $EVENTS{"$lambda"} unless @$arr;
+
+	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
+		$self, 
+		@{$rec-> [WATCH_LAMBDA]-> {last}}
+	);
+	warn $self-> _msg('tail') if $DEBUG;
+
+	unless ( @$in) {
+		warn _d( $self, 'stopped') if $DEBUG;
+		$self-> {stopped} = 1;
+	}
+}
+
+# Removes all avents bound to the object, notified the interested objects.
+# The object becomes stopped, so no new events will be allowed to register.
+sub cancel_all_events
+{
+	my $self = shift;
+
+	$self-> {stopped} = 1;
+
+	return unless @{$self-> {in}};
+
+	$LOOP-> remove( $self) if $LOOP;
+	my $arr = delete $EVENTS{$self};
+	@{$self-> {in}} = (); 
+
+	if ( $arr) {
+		for my $rec ( @$arr) {
+			next unless my $watcher = $rec-> [WATCH_OBJ];
+			$watcher-> lambda_handler( $rec);
+		}
+	}
+}
+
+sub is_stopped  { $_[0]-> {stopped}  }
+sub is_waiting  { not($_[0]->{stopped}) and @{$_[0]->{in}} }
+sub is_passive  { not($_[0]->{stopped}) and not(@{$_[0]->{in}}) }
+sub is_active   { $_[0]->{stopped} or @{$_[0]->{in}} }
 
 # resets the state machine
 sub reset
 {
 	my $self = shift;
-	$LOOP-> remove( $self ) if @{$self-> {in}};
-	@{$self-> {in}}   = ();
+
+	$self-> cancel_all_events;
 	@{$self-> {last}} = ();
 	delete $self-> {stopped};
 	warn _d( $self, 'reset') if $DEBUG;
 }
 
-# advances all possible states, returns a flag that is
-# 1 - no more states to call (also if stopped)
-# 0 - have some asynchronous states left
-sub step
+# starts the state machine
+sub start
 {
 	my $self = shift;
 
-	return 1 if $self-> {stopped};
+	croak "can't start active lambda, call reset() first" if $self-> is_active;
 
-	die _d($self, 'cyclic dependency detected') if $self-> {locked}; 
-			
-	unless ( @{$self->{in}} ) {
-		# kick-start the execution chain
-		if ( $self-> {start}) {
-			warn _d( $self, 'started') if $DEBUG;
-			@{$self->{last}} = $self-> {start}-> ($self, @{$self->{last}}, @_);
-			warn $self-> _msg if $DEBUG;
-		}
-	}
-
-	# drive the states
-	my $changed = 1;
-	$self-> {locked} = 1;
-	my $in = $self-> {in};
-	while ( $changed) {
-		$changed = 0;
-		for my $rec ( @$in) {
-			# asyncrohous event
-			unless (ref($rec-> [WATCH_LAMBDA])) {
-				warn _d( $self, 'still waiting for ', _ev($rec)) if $DEBUG;
-				next;
-			}
-			# synchronous event
-			my $lambda = $rec->[WATCH_LAMBDA];
-			unless ( $lambda-> step) {
-				warn _d( $self, 'still waiting for ', _ev($rec)) if $DEBUG;
-				next;
-			}
-			$changed = 1;
-		
-			warn _d( $self, '< ', _ev($rec)) if $DEBUG;
-
-			@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> ($self, @{$lambda->{last}});
-			warn $self-> _msg if $DEBUG;
-			@$in = grep { $rec != $_ } @$in;
-		}
-	}
-	delete $self-> {locked};
-
-	unless ( @$in) {
+	warn _d( $self, 'started') if $DEBUG;
+	@{$self->{last}} = $self-> {start}-> ($self, @{$self->{last}})
+		if $self-> {start};
+	warn $self-> _msg('initial') if $DEBUG;
+	
+	unless ( @{$self->{in}}) {
 		warn _d( $self, 'stopped') if $DEBUG;
-		$self-> {stopped}++;
+		$self-> {stopped} = 1;
 	}
-
-	return $self-> {stopped};
 }
 
 # peek into the current state
@@ -272,8 +298,7 @@ sub call
 {
 	my $self = shift;
 
-	croak "can't call stopped lambda" if $self-> {stopped};
-	croak "can't call started lambda" if @{$self->{in}};
+	croak "can't call active lambda" if $self-> is_active;
 
 	@{$self-> {last}} = @_;
 	$self;
@@ -283,13 +308,10 @@ sub call
 sub terminate
 {
 	my ( $self, @error) = @_;
-	warn _d( $self, "terminate(@error)") if $DEBUG;
 
-	$LOOP-> remove( $self ) if @{$self-> {in}};
-	@{$self-> {in}}  = ();
-	$self-> {stopped} = 1;
+	$self-> cancel_all_events;
 	$self-> {last} = \@error;
-	warn $self-> _msg if $DEBUG;
+	warn $self-> _msg('terminate') if $DEBUG;
 }
 
 # synchronization
@@ -299,26 +321,38 @@ sub terminate
 sub drive
 {
 	my $changed = 1;
+	my $executed = 0;
 	warn "IO::Lambda::drive --------\n" if $DEBUG;
 	while ( $changed) {
 		$changed = 0;
-		for my $o ( grep { not $_-> {stopped} } @OBJECTS) {
-			next unless $o-> step;
+
+		# kickstart
+		$executed++, $_-> start
+			for grep { $_-> is_passive } @OBJECTS;
+
+		# dispatch
+		for my $rec ( map { @$_ } values %EVENTS) {
+			next unless $rec->[WATCH_LAMBDA]-> {stopped};
+			$rec->[WATCH_OBJ]-> lambda_handler( $rec);
 			$changed = 1;
+			$executed++;
 		}
 	warn "IO::Lambda::drive .........\n" if $DEBUG and $changed;
 	}
 	warn "IO::Lambda::drive +++++++++\n" if $DEBUG;
+
+	return $executed;
 }
 
 # wait for all lambdas to stop
 sub wait
 {
 	my $self = shift;
-	$self-> call(@_) if not($self->{stopped}) and not(@{$self->{in}});
+	$self-> call(@_) if $self-> is_passive;
 	while ( 1) {
-		drive;
+		my $n = drive;
 		last if $self-> {stopped};
+		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
 		$LOOP-> yield;
 	}
 	return wantarray ? $self-> peek : $self-> peek-> [0];
@@ -328,9 +362,10 @@ sub wait_for_all
 {
 	my @objects = @_;
 	while ( 1) {
-		drive;
+		my $n = drive;
 		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
+		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
 		$LOOP-> yield;
 	}
 }
@@ -341,9 +376,10 @@ sub wait_for_any
 	my @objects = @_;
 	$_-> step for @objects;
 	while ( 1) {
-		drive;
+		my $n = drive;
 		@objects = grep { $_-> {stopped} } @objects;
 		return @objects if @objects;
+		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
 		$LOOP-> yield;
 	}
 }
@@ -398,8 +434,6 @@ sub again
 sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub restart      { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
-sub push_context { push @CTX_STACK, [ $THIS, $METHOD, $CALLBACK, @CONTEXT ] }
-sub pop_context  { ($THIS, $METHOD, $CALLBACK, @CONTEXT) = @{ pop @CTX_STACK } }
 
 
 #

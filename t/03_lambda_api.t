@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.2 2007/12/13 23:09:01 dk Exp $
+# $Id: 03_lambda_api.t,v 1.3 2007/12/14 14:42:04 dk Exp $
 
 use strict;
 use warnings;
@@ -8,7 +8,7 @@ use IO::Lambda qw(:all);
 
 this lambda {};
 this-> wait;
-ok( this-> stopped, 'lambda api');
+ok( this-> is_stopped, 'lambda api');
 
 this lambda {42};
 ok( 42 == this-> wait, 'simple lambda');
@@ -18,7 +18,6 @@ this lambda {
 	tail { 1 + shift };
 };
 ok( 43 == this-> wait, 'tail lambda');
-
 my $i = 42;
 my $r;
 this lambda {
