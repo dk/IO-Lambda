@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.10 2007/12/14 22:46:05 dk Exp $
+# $Id: Lambda.pm,v 1.11 2007/12/14 22:51:59 dk Exp $
 
 package IO::Lambda;
 
@@ -1094,3 +1094,4 @@ under the same terms as Perl itself.
 Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
 
 =cut
+
