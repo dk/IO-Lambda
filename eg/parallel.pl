@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: parallel.pl,v 1.2 2007/12/13 23:00:08 dk Exp $
+# $Id: parallel.pl,v 1.3 2007/12/14 20:27:05 dk Exp $
 # 
 # This example fetches two pages in parallel, one with http/1.0 another with
 # https/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -73,7 +73,7 @@ if ( $style eq 'object') {
 } else {
 	# implicit loop - we don't know how many states we need
 	# 
-	# also, use 'tails'
+	# also, use 'tail'
 	this lambda {
 		context map {
 			lambda {
@@ -81,7 +81,7 @@ if ( $style eq 'object') {
 				&http_request;
 			}-> call($_);
 		} @chain;
-		tails { report $_ for @_ };
+		tail { report $_ for @_ };
 	};
 	this-> wait;
 }

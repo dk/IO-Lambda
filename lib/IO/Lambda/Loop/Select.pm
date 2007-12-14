@@ -1,9 +1,10 @@
-# $Id: Select.pm,v 1.3 2007/12/13 23:09:01 dk Exp $
+# $Id: Select.pm,v 1.4 2007/12/14 20:27:05 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
 use IO::Lambda qw(:constants);
+#use Time::HiRes qw(time);
 
 IO::Lambda::Loop::default('Select');
 

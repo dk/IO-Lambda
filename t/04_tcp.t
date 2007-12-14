@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.5 2007/12/14 14:42:04 dk Exp $
+# $Id: 04_tcp.t,v 1.6 2007/12/14 20:27:05 dk Exp $
 
 use strict;
 use warnings;
@@ -116,7 +116,7 @@ sub conn
 }
 this lambda {
 	context map { conn $_ } (1,22,333,4444);
-	tails { join '+', map { m/(\d+)/ } @_ };
+	tail { join '+', map { m/(\d+)/ } @_ };
 };
 ok(this-> wait eq '4+5+6+7', 'parallel connections');
 

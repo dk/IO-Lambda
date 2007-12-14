@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.7 2007/12/14 14:42:04 dk Exp $
+# $Id: Lambda.pm,v 1.8 2007/12/14 20:27:05 dk Exp $
 
 package IO::Lambda;
 
@@ -23,7 +23,7 @@ $VERSION     = 0.03;
 );
 @EXPORT_CLIENT = qw(
 	this context lambda restart again
-	read write sleep tail tails
+	read write sleep tail
 );
 @EXPORT_OK   = (@EXPORT_CLIENT, @EXPORT_CONSTANTS);
 %EXPORT_TAGS = ( all => \@EXPORT_CLIENT, constants => \@EXPORT_CONSTANTS );
@@ -518,11 +518,8 @@ sub add_tail
 	);
 }
 
-# tail($lambda) -- execute block when $lambda is done
-sub tail(&) { $THIS-> add_tail( shift, \&tail, @CONTEXT[0,0]) }
-
-# tails(@lambdas) -- wait for all lambdas to finish
-sub tails(&)
+# tail(@lambdas) -- wait for all lambdas to finish
+sub tail(&)
 {
 	my $cb = $_[0];
 	my @lambdas = context;
@@ -536,7 +533,7 @@ sub tails(&)
 		return if $n--;
 
 		@CONTEXT  = @lambdas;
-		$METHOD   = \&tails;
+		$METHOD   = \&tail;
 		$CALLBACK = $cb;
 		$cb ? $cb-> (@ret) : @ret;
 	};
@@ -586,6 +583,110 @@ programming with single-process, single-thread, non-blocking I/O.
 
 =head1 SYNOPSIS
 
+=head2 Execution flow
+    
+Prerequisite
+    
+    use IO::Lambda qw(:all);
+
+Create an empty IO::Lambda object
+
+    my $q = lambda {};
+
+Wait for it to finish
+
+    $q-> wait;
+
+Create lambda object and get its value
+
+    $q = lambda { 42 };
+    print $q-> wait; # will print 42
+
+Create pipeline of two lambda objects
+
+    $q = lambda {
+        context lambda { 42 };
+	tail { 1 + shift };
+    };
+    print $q-> wait; # will print 43
+
+Create pipeline that waits for 2 lambdas
+    
+    $q = lambda {
+        context lambda { 2 }, lambda { 3 };
+	tail { sort @_ }; # order is not guaranteed
+    };
+    print $q-> wait; # will print 23
+
+=head2 Non-blocking I/O
+
+Given a socket, create a lambda that implements http protocol
+
+    sub talk
+    {
+        my $req    = shift;
+        my $socket = IO::Socket::INET-> new( $req-> host, $req-> port);
+
+	lambda {
+	    context $socket;
+	    write {
+	        # connected
+		print $socket "GET ", $req-> uri, "\r\n\r\n";
+		my $buf = '';
+		read {
+		    sysread $socket, $buf, 1024, length($buf) or return $buf;
+		    again; # wait for reading and re-do the block
+		}
+	    }
+	}
+    }
+
+Connect and talk to the remote
+
+    $request = HTTP::Request-> new( GET => 'http://www.perl.com');
+
+    my $q = talk( $request );
+    print $q-> wait; # will print content of $buf
+
+Connect two parallel connections: by explicitly waiting for each 
+
+    $q = lambda {
+        context talk($request);
+	tail { print shift };
+        context talk($request2);
+	tail { print shift };
+    };
+    $q-> wait;
+
+Connect two parallel connections: by waiting for all
+
+    $q = lambda {
+        context talk($request1), talk($request2);
+	tail { print for @_ };
+    };
+    $q-> wait;
+
+Teach our simple http request to redirect by wrapping talk().
+talk_redirect() will have exactly the same properties as talk() does
+
+    sub talk_redirect
+    {
+        my $req = shift;
+	lambda {
+	    context talk( $req);
+	    tail {
+	        my $res = HTTP::Response-> parse( shift );
+		return $res unless $res-> code == 302;
+
+		$req-> uri( $res-> uri);
+	        context talk( $req);
+		again;
+	    }
+	}
+    }
+
+=head2 Working example
+
     use strict;
     use IO::Lambda qw(:all);
     use IO::Socket::INET;
@@ -596,8 +697,9 @@ programming with single-process, single-thread, non-blocking I/O.
             print $socket "GET $url HTTP/1.0\r\n\r\n";
             my $buf = '';
             read {
-                return $buf unless 
-                    sysread( $socket, $buf, 1024, length($buf));
+                my $n = sysread( $socket, $buf, 1024, length($buf));
+		return "read error:$!" unless defined $n;
+		return $buf unless $n;
                 again;
             }
         }
@@ -609,6 +711,174 @@ programming with single-process, single-thread, non-blocking I/O.
         ),
         '/index.html'
     );
+
+See tests and examples in directory C<eg/> for more.
+
+=head1 API
+
+=head2 Events and states
+
+A lambda is a C<IO::Lambda> object, that waits for IO and timeout events, and
+also events generated when other lambdas are finished. On each event a callback
+bound to the event is executed. The result of this code is saved, and passed on
+the next callback.
+
+A lambda can be in one of three modes: passive, waiting, and stopped. A lambda
+that is just created, or was later reset with C<reset> call, is in passive state.
+When it will be started, the only callback associated with the lambda will be executed:
+
+    $q = lambda { print "hello world!\n" };
+    # here not printed anything yet
+
+A lambda is never started explicitly; C<wait> will start passive lambdas, and will
+wait for the caller lambda to finish. A lambda is finished when there are no more
+events to listen to. The example lambda above will be finished as soon as it is started.
+
+Lambda can listen to events by calling predicates, that internally subscribe the
+lambda object to either corresponding file handles, timers, or other lambdas. There
+are only those three types of events that basically constitute everything needed for
+building state machive driven by non-blocking IO. Parameters to be passed to predicates
+are stored on stack with C<context> call; for example, to listen for when a file handle
+becomes readable, such code is used:
+
+    $q = lambda {
+        context \*SOCKET;
+	read { print "I'm readable!\n"; }
+	# here is nothing printed yet
+    };
+    # and here is nothing printed yet
+
+This lambda, when started, will switch to the waiting state, - waiting for the socket.
+After the callback associated with C<read> will be called, only then the lambda will finish.
+
+Of course, new events can be created inside all callbacks, on each state. This way,
+lambdas resemble dynamic programming, when the state machine is not given in advance,
+but is built as soon as code that gets there is executed.
+
+The events can be created either by explicitly calling predicates, or restarting the
+last predicate with C<again> call. For example, code
+
+     read { int(rand 2) ? 0 : again }
+
+will be impossible to tell how many times was called.
+
+=head2 Context
+
+Each lambda executes in its own, private context. The context here means that all predicates
+register callbacks on an implicitly given lambda object, and retain the parameters passed to
+them further on. That helps for example to rely on the fact that context is preserved in
+a series on IO calls,
+
+    context \*SOCKET;
+    write {
+    read {
+    }}
+
+which is actually a shorter form for
+
+    context \*SOCKET;
+    write {
+    context \*SOCKET; # <-- context here is retained from one frame up
+    read {
+    }}
+
+Where the parameters to predicates are stored in context, the current lambda object
+is also implicitly stored in C<this> property. The above code is actually is
+
+    my $self = this;
+    context \*SOCKET;
+    write {
+    this $self;      # <-- object reference is retained here
+    context \*SOCKET;
+    read {
+    }}
+
+C<this> can be used if more than one lambda is need to be accessed. In which case,
+
+    this $object;
+    context @context;
+
+is the same as
+
+    this $object, @context;
+
+which means that explicitly setting C<this> will always clear the context.
+
+=head2 Time
+
+Timers and I/O timeouts are given not in the timeout values, as it usually
+is in event libraries, but as deadline in (fractional) seconds. This,
+strange at first sight decision, actually helps a lot when a total execution
+time is to be tracked. For example, the following code reads as many bytes from
+a socket within 5 seconds:
+
+   lambda {
+       my $buf = '';
+       context $socket, time + 5;
+       read {
+           if ( shift ) {
+	       return again if sysread $socket, $buf, 1024, length($buf);
+	   } else {
+	       print "oops! a timeout\n";
+	   }
+	   $buf;
+       }
+   };
+
+Internally, timers use C<Time::HiRes::time> that gives fractional seconds.
+However, this is not required for the caller, in which case timeouts will
+be simply rounded to integer second.
+
+=head2 Predicates
+
+All predicates read parameters from the context. The only parameter passed
+with perl call, is a callback. Predicates can be called without the callback,
+in which case, they will simply pass further data that otherwise would be
+passed as C<@_> to the callback. So, a predicate can be called either as
+
+    read { .. code ... }
+
+or 
+
+    &read; # no callback
+
+=over
+
+=item read($filehandle, $deadline = undef)
+
+Executes either when C<$filehandle> becomes readable, or after C<$deadline>.
+Passes one argument, which is either TRUE if the handle is readable, or FALSE
+if time is expired. If C<deadline> is C<undef>, no timeout is registered, i.e.
+will never execute with FALSE.
+
+=item write($filehandle, $deadline = undef)
+
+Exaclty same as C<read>, but executes when C<$filehandle> becomes writable.
+
+=item io($flags, $filehandle, $deadline = undef)
+
+Executes either when C<$filehandle> satisfies the condition passed in C<$flags>,
+or after C<$deadline>. C<$flags> is a combination of three integer constants,
+C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION>, that are imported with
+
+   use IO::Lambda qw(:constants);
+
+Passes one argument, which is either a combination of the same C<IO_XXX> flags,
+that show what conditions the handle satisfies, or 0 if time is expired. If
+C<deadline> is C<undef>, no timeout is registered, i.e.  will never execute
+with 0.
+
+=item sleep($deadline)
+
+Executes after C<$deadline>. C<$deadline> cannot be C<undef>.
+
+=item tail(@lambdas)
+
+Executes when all objects in C<@lambdas> are finished, passes the
+collected results of the lambdas to the callback. The result order
+is not guaranteed.
+
+=back
 
 =head1 SEE ALSO
 
