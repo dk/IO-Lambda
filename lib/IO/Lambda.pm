@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.9 2007/12/14 20:47:49 dk Exp $
+# $Id: Lambda.pm,v 1.10 2007/12/14 22:46:05 dk Exp $
 
 package IO::Lambda;
 
@@ -23,7 +23,7 @@ $VERSION     = 0.03;
 );
 @EXPORT_CLIENT = qw(
 	this context lambda restart again
-	read write sleep tail
+	io read write sleep tail
 );
 @EXPORT_OK   = (@EXPORT_CLIENT, @EXPORT_CONSTANTS);
 %EXPORT_TAGS = ( all => \@EXPORT_CLIENT, constants => \@EXPORT_CONSTANTS );
@@ -291,7 +291,7 @@ sub start
 }
 
 # peek into the current state
-sub peek { wantarray ? @{$_[0]->{last}} : $_[0]-> {last} }
+sub peek { wantarray ? @{$_[0]->{last}} : $_[0]-> {last}-> [0] }
 
 # pass initial parameters to lambda
 sub call 
@@ -355,25 +355,30 @@ sub wait
 		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
 		$LOOP-> yield;
 	}
-	return wantarray ? $self-> peek : $self-> peek-> [0];
+	return $self-> peek;
 }
 
 sub wait_for_all
 {
 	my @objects = @_;
+	return unless @objects;
+	my @ret;
 	while ( 1) {
 		my $n = drive;
+		push @ret, map { $_-> peek } grep { $_-> {stopped} } @objects;
 		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
 		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
 		$LOOP-> yield;
 	}
+	return @ret;
 }
 
 # wait for at least one lambda to stop, returns those that stopped
 sub wait_for_any
 {
 	my @objects = @_;
+	return unless @objects;
 	$_-> step for @objects;
 	while ( 1) {
 		my $n = drive;
@@ -434,7 +439,6 @@ sub again
 sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub restart      { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
-
 
 #
 # Predicates:
@@ -583,10 +587,10 @@ programming with single-process, single-thread, non-blocking I/O.
 
 =head1 SYNOPSIS
 
-=head2 Execution flow
-    
+=head2 Basics
+
 Prerequisite
-    
+
     use IO::Lambda qw(:all);
 
 Create an empty IO::Lambda object
@@ -611,7 +615,7 @@ Create pipeline of two lambda objects
     print $q-> wait; # will print 43
 
 Create pipeline that waits for 2 lambdas
-    
+
     $q = lambda {
         context lambda { 2 }, lambda { 3 };
 	tail { sort @_ }; # order is not guaranteed
@@ -762,7 +766,7 @@ last predicate with C<again> call. For example, code
 
 will be impossible to tell how many times was called.
 
-=head2 Context
+=head2 Contexts
 
 Each lambda executes in its own, private context. The context here means that all predicates
 register callbacks on an implicitly given lambda object, and retain the parameters passed to
@@ -804,6 +808,39 @@ is the same as
 
 which means that explicitly setting C<this> will always clear the context.
 
+=head2 Data and execution flow
+
+Lambda's first callback is called with arguments passed from outside.
+These arguments can be stored using C<call> method; C<wait> also issues
+C<call> internally, thus replacing any previous data stored by C<call>.
+Inside the first callback these arguments are available as C<@_>.
+
+Whatever is returned by a predicate callback (including C<lambda> predicate),
+will be passed as C<@_> to the next callback, or to outside, if lambda is finished.
+The result of a finished lambda is available by C<peek> method, that returns
+either all array of data available in the array context, or first item in the
+array otherwise. C<wait> returns the same data as C<peek> does.
+
+When more than one lambda watches for another lambda, the latter will get
+its last callback results passed to all callbacks of the wathers. However,
+when a lambda creates more than one state that derive from the current state,
+a 'forking' of sorts, the latest stored results will get overwritten by the
+first executed callback, so the constructions like
+
+    read  { 1 + shift };
+    write { 2 + shift };
+    ...
+    wait(0)
+
+will eventually return 3, but will it be 1+2 or 2+1, is never guaranteed.
+
+C<wait> is not the only function that synchronizes input and output.
+C<wait_for_all> method waits for all lambdas, including the caller,
+to finish. It returns collected results of all the objects as a single list.
+C<wait_for_any> method waits for at least one lambda, from the list of passed
+lambdas (again, including the caller), to finish. It returns list of finished
+objects as soon as possible.
+
 =head2 Time
 
 Timers and I/O timeouts are given not in the timeout values, as it usually
@@ -842,7 +879,16 @@ or
 
     &read; # no callback
 
+
+Predicates can only be used after explicit exporting of them by
+
+   use IO::Lambda qw(:all);
+
 =over
+
+=item lambda()
+
+Creates a new C<IO::Lambda> object.
 
 =item read($filehandle, $deadline = undef)
 
@@ -877,6 +923,158 @@ Executes after C<$deadline>. C<$deadline> cannot be C<undef>.
 Executes when all objects in C<@lambdas> are finished, passes the
 collected results of the lambdas to the callback. The result order
 is not guaranteed.
+
+=item again()
+
+Restarts the current state with the current context. All the predicates above,
+including C<lambda>, are restartable. The code
+
+   context $obj1;
+   tail {
+       return if $null++;
+       context $obj2;
+       again;
+   };
+
+is thus equivalent to
+
+   context $obj1;
+   tail {
+       context $obj2;
+       &tail;
+   };
+
+=item context @ctx
+
+If called with no parameters, returns the current context, otherwise
+replaces the current context with C<@ctx>. It is thus not possible 
+(not that it is practical anyway) to clear the context with this call.
+If really needed, use C<this(this)> syntax.
+
+=item this $this, @ctx
+
+If called with no parameters, returns the current lambda objects.
+Otherwise, replaces both the current lambda and the current context.
+Can be useful either when juggling with several lambdas, or as a
+conveniency over C<my> variables, for example,
+
+    this lambda { ... };
+    this-> wait;
+
+instead of
+
+    my $q = lambda { ... };
+    $q-> wait;
+
+=item restart $method, $callback
+
+The predicate used for declaration of user-defined restartable predicates
+(it is not a requirement for a predicate to be restartable though).
+
+This predicate is mostly for internal use, and it is not really decided yet 
+if it will stay. See the module source code for use details.
+
+=back
+
+=head2 Object API
+
+This section lists methods of C<IO::Lambda> class. Note that all lambda-style
+functionality by design is also available for object-style programming -- not
+that it looks nice, or has much practical value, but still.
+
+=over
+
+=item new
+
+Creates new C<IO::Lambda> object in passive state.
+
+=item watch_io($flags, $handle, $deadline, $callback)
+
+Registers an IO event listener that will call C<$callback>
+either after C<$handle> will satisfy condition of C<$flags>
+( a combination of IO_READ, IO_WRITE, and IO_EXCEPTION bits),
+or after C<$deadline> time is passed. If C<$deadline> is
+undef, will watch for the file handle indefinitely.
+
+The callback will be called with first parameter as integer
+set of IO_XXX flags, or 0 if timed out. Other parameters, 
+as with the other callbacks, will be passed the result of the
+last called callback. The result of the callback will be stored
+and passed on to the next callback.
+
+=item watch_timer($deadline, $callback)
+
+Registers a timer listener that will call C<$callback> after
+C<$deadline> time.
+
+=item watch_lambda($lambda, $callback)
+
+Registers a listener that will call C<$callback> after C<$lambda>,
+a C<IO::Lambda> object is finished. If C<$lambda> is in passive state,
+it will be started first.
+
+=item is_stopped
+
+Reports whether lambda is stopped or not.
+
+=item is_waiting
+
+Reports whether lambda has any registered callbacks left or not.
+
+=item is_passive
+
+Reports if lambda wasn't run yet, -- either after C<new>
+or C<reset>.
+
+=item is_active
+
+Reports if lambda was run.
+
+=item reset
+
+Cancels all watchers and resets lambda in the passive state. 
+If there are any lambdas that watch for this object, these will
+be called first.
+
+=item peek
+
+At any given time, returns stored data that are either passed
+in by C<call> if the lambda is in the passive state, or stored result
+of execution of the latest callback.
+
+=item call @args
+
+Stores C<@args> internally to be passed to a first callback. Only
+works in passive state, croaks otherwise. If called multiple times,
+arguments from the previous calls are discarded.
+
+=item terminate @args
+
+Cancels all watchers and resets lambda in the stopped state.  If there are any
+lambdas that watch for this object, these will be called first. C<@args> will
+be stored and available for later calls by C<peek>.
+
+=item wait @args
+
+Waits for the caller lambda to finish, returns the result of C<peek>.
+If the object was in passive state, calls C<call(@args)>, otherwise
+C<@args> are not used.
+
+=item wait_for_all @lambdas
+
+Waits for caller lambda and C<@lambdas> to finish. Returns
+collection of C<peek> results for all objects. The return results
+are unordered.
+
+=item wait_for_any @lambdas
+
+Waits for at least one lambda from list of caller lambda and C<@lambdas> to
+finish.  Returns list of finished objects.
+
+=item run
+
+Enters the event loop and doesn't exit until there are no registered events.
+Can be also called as package method.
 
 =back
 

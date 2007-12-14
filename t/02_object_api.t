@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.4 2007/12/14 20:47:49 dk Exp $
+# $Id: 02_object_api.t,v 1.5 2007/12/14 22:46:05 dk Exp $
 
 use strict;
 use warnings;
@@ -33,8 +33,8 @@ ok( not($l-> is_passive), 'terminated lambda is not passive');
 ok( $l-> is_active, 'terminated lambda is active');
 ok( not($l-> is_waiting), 'terminated lambda is not waiting');
 
-ok( 2 == @{$l-> peek} ,     'passed data ok');
-ok('moo' eq $l-> peek->[0], 'retrieved data ok');
+ok( 2 == @{[$l-> peek]},    'passed data ok');
+ok('moo' eq $l-> peek,      'retrieved data ok');
 
 # lambda with initial callback
 $l = IO::Lambda-> new( sub { 1, 42 } );
