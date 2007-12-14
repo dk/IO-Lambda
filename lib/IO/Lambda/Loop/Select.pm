@@ -1,10 +1,10 @@
-# $Id: Select.pm,v 1.4 2007/12/14 20:27:05 dk Exp $
+# $Id: Select.pm,v 1.5 2007/12/14 20:47:49 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
 use IO::Lambda qw(:constants);
-#use Time::HiRes qw(time);
+use Time::HiRes qw(time);
 
 IO::Lambda::Loop::default('Select');
 
@@ -71,7 +71,7 @@ sub yield
 
 	$t = $self-> {timers};
 	@$t = grep {
-		($$_[WATCH_DEADLINE] >= $ct) ? do {
+		($$_[WATCH_DEADLINE] <= $ct) ? do {
 			push @expired, $_;
 			0;
 		} : 1;
@@ -114,7 +114,7 @@ sub yield
 			@$bucket = grep {
 				(
 					defined($_->[WATCH_DEADLINE]) && 
-					$_->[WATCH_DEADLINE] >= $ct
+					$_->[WATCH_DEADLINE] <= $ct
 				) ? do {
 					$$_[WATCH_IO_FLAGS] = 0;
 					push @expired, $_;

@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.8 2007/12/14 20:27:05 dk Exp $
+# $Id: Lambda.pm,v 1.9 2007/12/14 20:47:49 dk Exp $
 
 package IO::Lambda;
 
@@ -502,7 +502,7 @@ sub add_timer
 # sleep($deadline)
 sub sleep(&) { $THIS-> add_timer( shift, \&sleep, @CONTEXT[0,0]) }
 
-# common wrapper for declaration of lambda-watching user predicates
+# common wrapper for declaration of single lambda-watching user predicates
 sub add_tail
 {
 	my ($self, $cb, $method, $lambda, @ctx) = @_;

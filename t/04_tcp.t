@@ -1,10 +1,11 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.6 2007/12/14 20:27:05 dk Exp $
+# $Id: 04_tcp.t,v 1.7 2007/12/14 20:47:49 dk Exp $
 
 use strict;
 use warnings;
 use Test::More tests => 6;
 use IO::Lambda qw(:all);
+use Time::HiRes qw(time);
 use IO::Handle;
 use IO::Socket::INET;
 

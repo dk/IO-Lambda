@@ -1,8 +1,9 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.3 2007/12/14 14:42:04 dk Exp $
+# $Id: 02_object_api.t,v 1.4 2007/12/14 20:47:49 dk Exp $
 
 use strict;
 use warnings;
+use Time::HiRes qw(time);
 use Test::More tests => 26;
 use IO::Lambda qw(:all :constants);
 
