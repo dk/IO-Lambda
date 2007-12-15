@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.14 2007/12/15 22:45:57 dk Exp $
+# $Id: Lambda.pm,v 1.15 2007/12/15 23:03:15 dk Exp $
 
 package IO::Lambda;
 
@@ -8,7 +8,7 @@ use warnings;
 use Exporter;
 use Scalar::Util qw(weaken);
 use vars qw(
-	$LOOP %EVENTS @OBJECTS @UNSUBSCRIBERS
+	$LOOP %EVENTS @OBJECTS @LOOPS
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_CLIENT
 	$THIS @CONTEXT $METHOD $CALLBACK
@@ -245,7 +245,7 @@ sub cancel_all_events
 	return unless @{$self-> {in}};
 
 	$LOOP-> remove( $self) if $LOOP;
-	$_-> ($self) for @UNSUBSCRIBERS;
+	$_-> remove($self) for @LOOPS;
 	my $arr = delete $EVENTS{$self};
 	@{$self-> {in}} = (); 
 
@@ -385,6 +385,7 @@ sub wait_for_any
 	$_-> step for @objects;
 	while ( 1) {
 		my $n = drive;
+		$_-> yield for @LOOPS;
 		@objects = grep { $_-> {stopped} } @objects;
 		return @objects if @objects;
 		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
@@ -397,6 +398,7 @@ sub run
 {
 	while ( $LOOP) {
 		drive;
+		$_-> yield for @LOOPS;
 		last if $LOOP-> empty;
 		$LOOP-> yield;
 	}
@@ -625,13 +627,8 @@ sub resolve
 	}
 }
 
-# Unsubscribers get called when lambda cancels an event.
-# Currently lamda nevers cancels a particular event, but all associated
-# events at once; therefore, unsubscribers are called with the lambda as
-# the only parameter, and are expected to remove all events associated
-# with it
-sub add_unsubscriber    { push @UNSUBSCRIBERS, shift }
-sub remove_unsubscriber { @UNSUBSCRIBERS = grep { $_ != $_[0] } @UNSUBSCRIBERS }
+sub add_loop     { push @LOOPS, shift }
+sub remove_loop  { @LOOPS = grep { $_ != $_[0] } @LOOPS }
 
 package IO::Lambda::Loop;
 use vars qw($DEFAULT);
