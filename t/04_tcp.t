@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.7 2007/12/14 20:47:49 dk Exp $
+# $Id: 04_tcp.t,v 1.8 2007/12/15 17:03:08 dk Exp $
 
 use strict;
 use warnings;
@@ -88,11 +88,12 @@ this lambda {
 	context $c;
 	write {
 		print $c "moo";
-		read {
-			$_ = <$c>;
+		context $c, \(my $buf = '');
+		getline {
+			$_ = shift;
 			chomp;
 			return $_;
-		}
+		};
 	};
 };
 ok(this-> wait eq 'read 3 bytes', 'got echo');

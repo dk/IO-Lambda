@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.12 2007/12/15 14:26:38 dk Exp $
+# $Id: Lambda.pm,v 1.13 2007/12/15 17:03:08 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = 0.03;
+$VERSION     = 0.04;
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -23,7 +23,7 @@ $VERSION     = 0.03;
 );
 @EXPORT_CLIENT = qw(
 	this context lambda restart again
-	io read write sleep tail
+	io read getline write sleep tail
 );
 @EXPORT_OK   = (@EXPORT_CLIENT, @EXPORT_CONSTANTS);
 %EXPORT_TAGS = ( all => \@EXPORT_CLIENT, constants => \@EXPORT_CONSTANTS );
@@ -467,6 +467,53 @@ sub read(&)
 		shift, \&read, IO_READ, 
 		@CONTEXT[0,1,0,1]
 	)
+}
+
+# getline($handle,$buf_ptr,$deadline)
+sub getline(&)
+{
+	my ( $cb, $fh, $buf, $deadline) = ( shift, context);
+
+	my $bufsize;
+	croak "getline: buffer is required" unless $buf;
+	$$buf = '' unless defined $$buf;
+
+	# each time we're called, create a new lambda
+	# depending on whether there is something alredy in the buffer or not
+	my $lambda = ( $$buf =~ s/^([^\n]*\n)//) ?
+		# create lambda with constant value
+		IO::Lambda-> new-> call($1) : 
+		# create lambda that will read from handle
+		lambda {
+			context $fh, $deadline;
+			IO::Lambda::read {
+				# timeout? return nothing
+				return undef, 'timeout' unless shift;
+				my $n = sysread $fh, $$buf, 1024, length($$buf);
+				# error? return undef
+				return undef, $! unless defined $n;
+				# closed handle?
+				unless ( $n) {
+					return undef, 'eof' unless length $$buf;
+					# return whatever left in the buffer
+					my $x = $$buf;
+					$$buf = '';
+					return $x;
+				};
+				# got line? return it
+				return $1 if $$buf =~ s/^([^\n]*\n)//;
+				# otherwise, just wait for more data
+				again;
+			}
+		};
+	
+	# register the caller to wait for the lambda
+	this-> add_tail(
+		$cb,
+		\&getline,
+		$lambda,
+		$fh, $buf, $deadline
+	);
 }
 
 # handle($handle,$deadline)
@@ -931,6 +978,14 @@ Executes either when C<$filehandle> becomes readable, or after C<$deadline>.
 Passes one argument, which is either TRUE if the handle is readable, or FALSE
 if time is expired. If C<deadline> is C<undef>, no timeout is registered, i.e.
 will never execute with FALSE.
+
+=item getline($filehandle, $$buffer, $deadline = undef)
+
+Executes either when a line can be read from C<$filehandle>, or after C<$deadline>
+if the latter is defined. On success, returns the line read. Otherwise, returns
+undef and line describing the reason: either C<timeout>, C<eof>, or C<$!> value.
+
+Note: buffer must be shared for all C<$filehandle> operations.
 
 =item write($filehandle, $deadline = undef)
 
