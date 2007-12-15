@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.15 2007/12/15 23:03:15 dk Exp $
+# $Id: Lambda.pm,v 1.16 2007/12/15 23:07:01 dk Exp $
 
 package IO::Lambda;
 
@@ -1209,7 +1209,7 @@ callbacks, which is intentional.
 
 =head1 SEE ALSO
 
-L<Coro>, L<threads>, L<Event::Lib>.
+L<Coro>, L<threads>, L<POE>.
 
 =head1 LICENSE AND COPYRIGHT
 
