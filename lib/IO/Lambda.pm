@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.13 2007/12/15 17:03:08 dk Exp $
+# $Id: Lambda.pm,v 1.14 2007/12/15 22:45:57 dk Exp $
 
 package IO::Lambda;
 
@@ -284,6 +284,8 @@ sub start
 	@{$self->{last}} = $self-> {start}-> ($self, @{$self->{last}})
 		if $self-> {start};
 	warn $self-> _msg('initial') if $DEBUG;
+
+	return if delete $self-> {restarted_hack};
 	
 	unless ( @{$self->{in}}) {
 		warn _d( $self, 'stopped') if $DEBUG;
@@ -416,7 +418,12 @@ sub lambda(&)
 		$cb ? $cb-> (@_) : @_;
 	});
 }
-sub _lambda_restart { $THIS-> {start}-> ($THIS, @{$THIS->{last}}) }
+sub _lambda_restart
+{
+	$THIS-> cancel_all_events;
+	delete $THIS-> {stopped};
+	$THIS-> {restarted_hack} = 1;
+}
 
 # restart latest state
 sub again
@@ -804,28 +811,32 @@ See tests and examples in directory C<eg/> for more.
 
 =head2 Events and states
 
-A lambda is a C<IO::Lambda> object, that waits for IO and timeout events, and
-also events generated when other lambdas are finished. On each event a callback
-bound to the event is executed. The result of this code is saved, and passed on
-the next callback.
+A lambda is an C<IO::Lambda> object, that waits for IO and timeout events, and
+for events generated when other lambdas are finished. On each such event a
+callback is executed. The result of the execution is saved, and passed on to the
+next callback, when the next event arrives.
 
-A lambda can be in one of three modes: passive, waiting, and stopped. A lambda
-that is just created, or was later reset with C<reset> call, is in passive state.
-When it will be started, the only callback associated with the lambda will be executed:
+Life cycle of a lambda goes through three modes: passive, waiting, and stopped.
+A lambda that is just created, or was later reset with C<reset> call, is in
+passive state.  When the lambda is started, the only callback associated with the
+lambda will be executed:
 
     $q = lambda { print "hello world!\n" };
-    # here not printed anything yet
+    # not printed anything yet
+    $q-> wait; # <- here will
 
-A lambda is never started explicitly; C<wait> will start passive lambdas, and will
-wait for the caller lambda to finish. A lambda is finished when there are no more
-events to listen to. The example lambda above will be finished as soon as it is started.
+Lambdas are never started explicitly; C<wait> will start passive lambdas, and
+will wait for the caller lambda to finish. Lambda is finished when there are no
+more events to listen to. The example lambda above will finish right after
+C<print> statement.
 
-Lambda can listen to events by calling predicates, that internally subscribe the
-lambda object to either corresponding file handles, timers, or other lambdas. There
-are only those three types of events that basically constitute everything needed for
-building state machive driven by non-blocking IO. Parameters to be passed to predicates
-are stored on stack with C<context> call; for example, to listen for when a file handle
-becomes readable, such code is used:
+Lambda can listen to events by calling predicates, that internally subscribe
+the lambda object to corresponding file handles, timers, and other lambdas.
+There are only those three types of events that basically constitute everything
+needed for building a state machive driven by external events, in particular,
+by non-blocking I/O. Parameters passed to predicates with explicit C<context>
+call, not by perl subroutine call convention. In the example below,
+lambda watches for file handle readability:
 
     $q = lambda {
         context \*SOCKET;
@@ -834,33 +845,35 @@ becomes readable, such code is used:
     };
     # and here is nothing printed yet
 
-This lambda, when started, will switch to the waiting state, - waiting for the socket.
-After the callback associated with C<read> will be called, only then the lambda will finish.
+Such lambda, when started, will switch to the waiting state, - will be waiting
+for the socket. The lambda will finish only after the callback associated with
+C<read> predicate is called.
 
-Of course, new events can be created inside all callbacks, on each state. This way,
-lambdas resemble dynamic programming, when the state machine is not given in advance,
-but is built as soon as code that gets there is executed.
+Of course, new events can be created inside all callbacks, on each state. This
+style resembles a dynamic programming of sorts, when the state machine is not
+hard-coded in advance, but is built as soon as code that gets there is executed.
 
-The events can be created either by explicitly calling predicates, or restarting the
-last predicate with C<again> call. For example, code
+The events can be created either by explicitly calling predicates, or by
+restarting the last predicate with C<again> call. For example, code
 
-     read { int(rand 2) ? 0 : again }
+     read { int(rand 2) ? print 1 : again }
 
-will be impossible to tell how many times was called.
+will print undeterminable number of ones.
 
 =head2 Contexts
 
-Each lambda executes in its own, private context. The context here means that all predicates
-register callbacks on an implicitly given lambda object, and retain the parameters passed to
-them further on. That helps for example to rely on the fact that context is preserved in
-a series on IO calls,
+Each lambda callback (further on, merely lambda) executes in its own, private
+context. The context here means that all predicates register callbacks on an
+implicitly given lambda object, and keep the passed parameters on the context
+stack. The fact that context is preserved between states, help build terser
+code with series of IO calls:
 
     context \*SOCKET;
     write {
     read {
     }}
 
-which is actually a shorter form for
+is actually a shorter form for
 
     context \*SOCKET;
     write {
@@ -868,8 +881,8 @@ which is actually a shorter form for
     read {
     }}
 
-Where the parameters to predicates are stored in context, the current lambda object
-is also implicitly stored in C<this> property. The above code is actually is
+And as context is kept, the current lambda object is also, but in C<this>
+property. The code above is actually
 
     my $self = this;
     context \*SOCKET;
@@ -879,7 +892,7 @@ is also implicitly stored in C<this> property. The above code is actually is
     read {
     }}
 
-C<this> can be used if more than one lambda is need to be accessed. In which case,
+C<this> can be used if more than one lambda needs to be accessed. In which case,
 
     this $object;
     context @context;
@@ -892,42 +905,42 @@ which means that explicitly setting C<this> will always clear the context.
 
 =head2 Data and execution flow
 
-Lambda's first callback is called with arguments passed from outside.
-These arguments can be stored using C<call> method; C<wait> also issues
-C<call> internally, thus replacing any previous data stored by C<call>.
-Inside the first callback these arguments are available as C<@_>.
+Lambda is initially called with arguments passed from outside. These arguments
+can be stored using C<call> method; C<wait> also issues C<call> internally,
+thus replacing any previous data stored by C<call>. Inside the lambda
+these arguments are available as C<@_>.
 
 Whatever is returned by a predicate callback (including C<lambda> predicate),
-will be passed as C<@_> to the next callback, or to outside, if lambda is finished.
-The result of a finished lambda is available by C<peek> method, that returns
-either all array of data available in the array context, or first item in the
-array otherwise. C<wait> returns the same data as C<peek> does.
+will be passed as C<@_> to the next callback, or to outside, if the lambda is
+finished. The result of a finished lambda is available by C<peek> method, that
+returns either all array of data available in the array context, or first item
+in the array otherwise. C<wait> returns the same data as C<peek> does.
 
-When more than one lambda watches for another lambda, the latter will get
-its last callback results passed to all callbacks of the wathers. However,
-when a lambda creates more than one state that derive from the current state,
-a 'forking' of sorts, the latest stored results will get overwritten by the
-first executed callback, so the constructions like
+When more than one lambda watches for another lambda, the latter will get its
+last callback results passed to all the watchers. However, when a lambda
+creates more than one state that derive from the current state, a forking
+behaviour of sorts, the latest stored results will get overwritten by the first
+executed callback, so constructions like
 
     read  { 1 + shift };
     write { 2 + shift };
     ...
     wait(0)
 
-will eventually return 3, but will it be 1+2 or 2+1, is never guaranteed.
+will eventually return 3, but whether it will be 1+2 or 2+1, is not known.
 
-C<wait> is not the only function that synchronizes input and output.
-C<wait_for_all> method waits for all lambdas, including the caller,
-to finish. It returns collected results of all the objects as a single list.
+C<wait> is not the only function that synchronizes input and output data.
+C<wait_for_all> method waits for all lambdas, including the caller, to finish.
+It returns collected results of all the objects in a single list.
 C<wait_for_any> method waits for at least one lambda, from the list of passed
 lambdas (again, including the caller), to finish. It returns list of finished
 objects as soon as possible.
 
 =head2 Time
 
-Timers and I/O timeouts are given not in the timeout values, as it usually
-is in event libraries, but as deadline in (fractional) seconds. This,
-strange at first sight decision, actually helps a lot when a total execution
+Timers and I/O timeouts are given not in the timeout values, as it usually is
+in event libraries, but as deadlines in (fractional) seconds since epoch. This
+decision, strange at first sight, actually helps a lot when total execution
 time is to be tracked. For example, the following code reads as many bytes from
 a socket within 5 seconds:
 
@@ -944,16 +957,20 @@ a socket within 5 seconds:
        }
    };
 
-Internally, timers use C<Time::HiRes::time> that gives fractional seconds.
-However, this is not required for the caller, in which case timeouts will
-be simply rounded to integer second.
+Rewriting it with C<read> semantics that accepts time as timeout instead, is
+left as an exercise to the reader.
+
+Internally, timers use C<Time::HiRes::time> that gives fractional number of
+seconds. This however is not required for the caller, in which case timeouts
+will simply be less precise, and will jitter plus-minus half a second.
 
 =head2 Predicates
 
-All predicates read parameters from the context. The only parameter passed
-with perl call, is a callback. Predicates can be called without the callback,
-in which case, they will simply pass further data that otherwise would be
-passed as C<@_> to the callback. So, a predicate can be called either as
+All predicates receive their parameters from the context stack, or simply the
+context. The only parameter passed to them by using perl call, is a callback
+itself.  Predicates can also be called without a callback, in which case, they
+will simply pass further data that otherwise would be passed as C<@_> to the
+callback. Thus, a predicate can be called either as
 
     read { .. code ... }
 
@@ -961,10 +978,15 @@ or
 
     &read; # no callback
 
-
-Predicates can only be used after explicit exporting of them by
+Predicates can either be used after explicit exporting of them by
 
    use IO::Lambda qw(:all);
+   lambda { ... }
+
+or by using the package syntax,
+
+   use IO::Lambda;
+   IO::Lambda::lambda { ... };
 
 =over
 
@@ -976,8 +998,8 @@ Creates a new C<IO::Lambda> object.
 
 Executes either when C<$filehandle> becomes readable, or after C<$deadline>.
 Passes one argument, which is either TRUE if the handle is readable, or FALSE
-if time is expired. If C<deadline> is C<undef>, no timeout is registered, i.e.
-will never execute with FALSE.
+if time is expired. If C<deadline> is C<undef>, then no timeout is registered,
+that means that it will never execute with FALSE.
 
 =item getline($filehandle, $$buffer, $deadline = undef)
 
@@ -987,22 +1009,24 @@ undef and line describing the reason: either C<timeout>, C<eof>, or C<$!> value.
 
 Note: buffer must be shared for all C<$filehandle> operations.
 
+This predicate is a higher-level predicate, that operates on predicates itself.
+You're welcome to study its source code.
+
 =item write($filehandle, $deadline = undef)
 
 Exaclty same as C<read>, but executes when C<$filehandle> becomes writable.
 
 =item io($flags, $filehandle, $deadline = undef)
 
-Executes either when C<$filehandle> satisfies the condition passed in C<$flags>,
+Executes either when C<$filehandle> satisfies any of the condition C<$flags>,
 or after C<$deadline>. C<$flags> is a combination of three integer constants,
 C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION>, that are imported with
 
    use IO::Lambda qw(:constants);
 
 Passes one argument, which is either a combination of the same C<IO_XXX> flags,
-that show what conditions the handle satisfies, or 0 if time is expired. If
-C<deadline> is C<undef>, no timeout is registered, i.e.  will never execute
-with 0.
+that report which conditions the handle satisfied, or 0 if time is expired. If
+C<deadline> is C<undef>, no timeout is registered, i.e. will never return 0.
 
 =item sleep($deadline)
 
@@ -1010,9 +1034,8 @@ Executes after C<$deadline>. C<$deadline> cannot be C<undef>.
 
 =item tail(@lambdas)
 
-Executes when all objects in C<@lambdas> are finished, passes the
-collected results of the lambdas to the callback. The result order
-is not guaranteed.
+Executes when all objects in C<@lambdas> are finished, returns the collected,
+unordered results of the objects.
 
 =item again()
 
@@ -1034,6 +1057,8 @@ is thus equivalent to
        &tail;
    };
 
+C<again> passes the current context to the predicate.
+
 =item context @ctx
 
 If called with no parameters, returns the current context, otherwise
@@ -1043,7 +1068,7 @@ If really needed, use C<this(this)> syntax.
 
 =item this $this, @ctx
 
-If called with no parameters, returns the current lambda objects.
+If called with no parameters, returns the current lambda.
 Otherwise, replaces both the current lambda and the current context.
 Can be useful either when juggling with several lambdas, or as a
 conveniency over C<my> variables, for example,
@@ -1062,15 +1087,17 @@ The predicate used for declaration of user-defined restartable predicates
 (it is not a requirement for a predicate to be restartable though).
 
 This predicate is mostly for internal use, and it is not really decided yet 
-if it will stay. See the module source code for use details.
+if it will stay. See the module source code for details of the use.
 
 =back
 
 =head2 Object API
 
 This section lists methods of C<IO::Lambda> class. Note that all lambda-style
-functionality by design is also available for object-style programming -- not
-that it looks nice, or has much practical value, but still.
+functionality is also available for object-style programming by design.
+Together with the fact that lambda syntax is not exported by default, it thus
+leaves a place for possible implementations of independent syntaxes, either with
+or without lambdas, on top of the object API, without accessing the internals.
 
 =over
 
@@ -1080,17 +1107,15 @@ Creates new C<IO::Lambda> object in passive state.
 
 =item watch_io($flags, $handle, $deadline, $callback)
 
-Registers an IO event listener that will call C<$callback>
-either after C<$handle> will satisfy condition of C<$flags>
-( a combination of IO_READ, IO_WRITE, and IO_EXCEPTION bits),
-or after C<$deadline> time is passed. If C<$deadline> is
-undef, will watch for the file handle indefinitely.
+Registers an IO event listener that will call C<$callback> either after
+C<$handle> will satisfy condition of C<$flags> ( a combination of IO_READ,
+IO_WRITE, and IO_EXCEPTION bits), or after C<$deadline> time is passed. If
+C<$deadline> is undef, will watch for the file handle indefinitely.
 
-The callback will be called with first parameter as integer
-set of IO_XXX flags, or 0 if timed out. Other parameters, 
-as with the other callbacks, will be passed the result of the
-last called callback. The result of the callback will be stored
-and passed on to the next callback.
+The callback will be called with first parameter as integer set of IO_XXX
+flags, or 0 if timed out. Other parameters, as with the other callbacks, will
+be passed the result of the last called callback. The result of the callback
+will be stored and passed on to the next callback.
 
 =item watch_timer($deadline, $callback)
 
@@ -1122,7 +1147,7 @@ Reports if lambda was run.
 
 =item reset
 
-Cancels all watchers and resets lambda in the passive state. 
+Cancels all watchers and switches the lambda to the passive state. 
 If there are any lambdas that watch for this object, these will
 be called first.
 
@@ -1134,13 +1159,13 @@ of execution of the latest callback.
 
 =item call @args
 
-Stores C<@args> internally to be passed to a first callback. Only
+Stores C<@args> internally, to be passed on to the first callback. Only
 works in passive state, croaks otherwise. If called multiple times,
-arguments from the previous calls are discarded.
+arguments from the previous calls are overwritten.
 
 =item terminate @args
 
-Cancels all watchers and resets lambda in the stopped state.  If there are any
+Cancels all watchers and resets lambda to the stopped state.  If there are any
 lambdas that watch for this object, these will be called first. C<@args> will
 be stored and available for later calls by C<peek>.
 
@@ -1165,6 +1190,23 @@ finish.  Returns list of finished objects.
 
 Enters the event loop and doesn't exit until there are no registered events.
 Can be also called as package method.
+
+=item bind @args
+
+Creates an event record that contains the lambda and C<@args>, and return it.
+The lambda won't finish until this event is returned with C<resolve>.
+
+C<bind> can be called several times on a single lambda; each event requires
+individual C<resolve>.
+
+=item resolve $event
+
+Removes C<$event> from the internal waiting list. If lambda has no more
+events to wait, notifies eventual lambdas that wait to the objects, and
+the stops.
+
+Note that C<resolve> doesn't call provide any means to call associated
+callbacks, which is intentional.
 
 =back
 
