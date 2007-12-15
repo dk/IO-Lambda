@@ -7,3 +7,5 @@
 0.03 - Fri Dec 14 2007
 	document everything
 
+0.04 - Sat Dec 15 2007
+	add condvars and interfaces for additional event loops
