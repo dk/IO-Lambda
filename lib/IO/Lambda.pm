@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.11 2007/12/14 22:51:59 dk Exp $
+# $Id: Lambda.pm,v 1.12 2007/12/15 14:26:38 dk Exp $
 
 package IO::Lambda;
 
@@ -8,7 +8,7 @@ use warnings;
 use Exporter;
 use Scalar::Util qw(weaken);
 use vars qw(
-	$LOOP %EVENTS @OBJECTS
+	$LOOP %EVENTS @OBJECTS @UNSUBSCRIBERS
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_CLIENT
 	$THIS @CONTEXT $METHOD $CALLBACK
@@ -245,6 +245,7 @@ sub cancel_all_events
 	return unless @{$self-> {in}};
 
 	$LOOP-> remove( $self) if $LOOP;
+	$_-> ($self) for @UNSUBSCRIBERS;
 	my $arr = delete $EVENTS{$self};
 	@{$self-> {in}} = (); 
 
@@ -407,31 +408,21 @@ sub run
 sub lambda(&)
 {
 	my $cb  = $_[0];
-	my @args;
-	my $wrapper;
-	my $this;
-	$wrapper = sub {
-		$THIS     = $this;
-		@CONTEXT  = ();
-		$CALLBACK = $cb;
-		$METHOD   = $wrapper;
-		$cb ? $cb-> (@args) : @args;
-	};
-	$this = __PACKAGE__-> new( sub {
+	__PACKAGE__-> new( sub {
 		$THIS     = shift;
 		@CONTEXT  = ();
-		@args     = @_;
 		$CALLBACK = $cb;
-		$METHOD   = $wrapper;
+		$METHOD   = \&_lambda_restart;
 		$cb ? $cb-> (@_) : @_;
 	});
 }
+sub _lambda_restart { $THIS-> {start}-> ($THIS, @{$THIS->{last}}) }
 
 # restart latest state
 sub again
 { 
 	defined($METHOD) ? 
-		$METHOD-> ( $CALLBACK ) : 
+		$METHOD-> ( $CALLBACK) : 
 		croak "again predicate outside of a restartable call" 
 }
 
@@ -543,6 +534,50 @@ sub tail(&)
 	};
 	$THIS-> watch_lambda( $_, $watcher) for @lambdas;
 }
+
+#
+# Part III - Developer API for custom condvars and event loops
+#
+################################################################
+
+# register condvar listener
+sub bind
+{
+	my $self = shift;
+
+	# create new condition
+	croak "can't register events on a stopped lambda" if $self-> {stopped};
+
+	my $rec = [ $self, @_ ];
+	push @{$self-> {in}}, $rec;
+
+	return $rec;
+}
+
+# stop listening on a condvar
+sub resolve
+{
+	my ( $self, $rec) = @_;
+
+	my $in = $self-> {in};
+	my $nn = @$in;
+	@$in = grep { $rec != $_ } @$in;
+	die _d($self, "stray condvar event $rec (@$rec)")
+		if $nn == @$in or $self != $rec->[WATCH_OBJ];
+
+	unless ( @$in) {
+		warn _d( $self, 'stopped') if $DEBUG;
+		$self-> {stopped} = 1;
+	}
+}
+
+# Unsubscribers get called when lambda cancels an event.
+# Currently lamda nevers cancels a particular event, but all associated
+# events at once; therefore, unsubscribers are called with the lambda as
+# the only parameter, and are expected to remove all events associated
+# with it
+sub add_unsubscriber    { push @UNSUBSCRIBERS, shift }
+sub remove_unsubscriber { @UNSUBSCRIBERS = grep { $_ != $_[0] } @UNSUBSCRIBERS }
 
 package IO::Lambda::Loop;
 use vars qw($DEFAULT);
