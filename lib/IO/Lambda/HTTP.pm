@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.4 2007/12/16 17:18:57 dk Exp $
+# $Id: HTTP.pm,v 1.5 2007/12/16 20:20:16 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -11,6 +11,7 @@ use Exporter;
 use IO::Socket;
 use HTTP::Response;
 use IO::Lambda qw(:all);
+use Time::HiRes qw(time);
 
 sub http_request(&)
 {
@@ -103,3 +104,63 @@ sub parse
 }
 
 1;
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+IO::Lambda::HTTP - http requests lambda style
+
+=head1 DESCRIPTION
+
+The module exports a single lambda C<http_request> that accepts a
+C<HTTP::Request> object and set of options as parameters. Returns either a
+C<HTTP::Response> on success, or error string otherwise.
+
+=head1 SYNOPSIS
+
+   use HTTP::Request;
+   use IO::Lambda qw(:all);
+   use IO::Lambda::HTTP qw(http_request);
+   
+   my $r = HTTP::Request-> new( GET => "http://www.perl.com/");
+   $req-> protocol('HTTP/1.1');
+   $req-> headers-> header( Host => $a-> uri-> host);
+   $req-> headers-> header( Connection => 'close');
+   
+   this http_request {
+      my $res = shift;
+      if ( ref($result)) {
+         print "good:", length($result-> content), "\n";
+      } else {
+         print "bad:$result\n";
+      }
+   };
+
+   this-> wait;
+
+=head1 OPTIONS
+
+=over
+
+=item timeout SECONDS = undef
+
+Maximum allowed time the request can take. If undef, no timeouts occur.
+
+=item max_redirect NUM = 7
+
+Maximum allowed redirects. If 1, no redirection attemps are made.
+
+=back
+
+=head1 SEE ALSO
+
+L<IO::Lambda>, L<HTTP::Request>, L<HTTP::Response>
+
+=head1 AUTHOR
+
+Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
+
+=cut

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
-# $Id: parallel.pl,v 1.3 2007/12/14 20:27:05 dk Exp $
+# $Id: parallel.pl,v 1.4 2007/12/16 20:20:16 dk Exp $
 # 
 # This example fetches two pages in parallel, one with http/1.0 another with
-# https/1.1 . The idea is to demonstrate three different ways of doing so, by
+# http/1.1 . The idea is to demonstrate three different ways of doing so, by
 # using object API, and explicit and implicit loop unrolling
 #
 

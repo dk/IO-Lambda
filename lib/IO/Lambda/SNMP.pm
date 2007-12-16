@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.1 2007/12/16 17:18:57 dk Exp $
+# $Id: SNMP.pm,v 1.2 2007/12/16 20:20:16 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(@ISA @EXPORT_OK %EXPORT_OK);
 @ISA = qw(Exporter);
@@ -65,3 +65,52 @@ for ( @methods) {
 }
 
 1;
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+IO::Lambda::SNMP - snmp requests lambda style
+
+=head1 DESCRIPTION
+
+The module exports a set of lambdas: snmpget snmpfget snmpgetnext snmpfgetnext
+snmpset snmpbulkwalk, that behave like the corresponding SNMP:: non-blocking
+counterpart functions. See L<SNMP> for descriptions of their parameters and
+results.
+
+=head1 SYNOPSIS
+
+   use strict;
+   use SNMP;
+   use IO::Lambda::SNMP qw(:all);
+   use IO::Lambda qw(:all);
+   
+   my $sess = SNMP::Session-> new(
+      DestHost => 'localhost',
+      Community => 'public',
+      Version   => '2c',
+   );
+   
+   this lambda {
+      context $sess, new SNMP::Varbind;
+      snmpgetnext {
+         my $vb = shift;
+         print @{$vb->[0]}, "\n" ; 
+         context $sess, $vb;
+         again unless $sess-> {ErrorNum};
+      }
+   };
+   this-> wait;
+
+=head1 SEE ALSO
+
+L<IO::Lambda>, L<SNMP>.
+
+=head1 AUTHOR
+
+Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
+
+=cut

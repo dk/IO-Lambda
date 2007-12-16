@@ -1,8 +1,8 @@
 #!/usr/bin/perl
-# $Id: sequential.pl,v 1.2 2007/12/13 23:00:08 dk Exp $
+# $Id: sequential.pl,v 1.3 2007/12/16 20:20:16 dk Exp $
 # 
 # This example fetches sequentially two pages, one with http/1.0 another with
-# https/1.1 . The idea is to demonstrate three different ways of doing so, by
+# http/1.1 . The idea is to demonstrate three different ways of doing so, by
 # using object API, and explicit and implicit loop unrolling
 #
 

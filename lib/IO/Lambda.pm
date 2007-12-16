@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.17 2007/12/16 17:18:57 dk Exp $
+# $Id: Lambda.pm,v 1.18 2007/12/16 20:20:16 dk Exp $
 
 package IO::Lambda;
 
@@ -1191,7 +1191,7 @@ Can be also called as package method.
 
 =item bind @args
 
-Creates an event record that contains the lambda and C<@args>, and return it.
+Creates an event record that contains the lambda and C<@args>, and returns it.
 The lambda won't finish until this event is returned with C<resolve>.
 
 C<bind> can be called several times on a single lambda; each event requires
@@ -1224,4 +1224,3 @@ under the same terms as Perl itself.
 Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
 
 =cut
-

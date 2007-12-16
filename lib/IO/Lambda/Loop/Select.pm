@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.6 2007/12/16 17:18:57 dk Exp $
+# $Id: Select.pm,v 1.7 2007/12/16 20:20:16 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -27,7 +27,7 @@ sub empty
 	return (
 		@{$self->{timers}} + 
 		keys(%{$self-> {items}}) + 
-		$GETNUMFDS ? $GETNUMFDS-> () : 0
+		($GETNUMFDS ? $GETNUMFDS-> () : 0)
 	) ? 0 : 1;
 }
 
