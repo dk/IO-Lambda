@@ -1,8 +1,9 @@
-# $Id: Select.pm,v 1.5 2007/12/14 20:47:49 dk Exp $
+# $Id: Select.pm,v 1.6 2007/12/16 17:18:57 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
+use vars qw($SELECT $GETNUMFDS);
 use IO::Lambda qw(:constants);
 use Time::HiRes qw(time);
 
@@ -23,7 +24,11 @@ sub new
 sub empty
 {
 	my $self = shift;
-	return (@{$self->{timers}} + keys %{$self-> {items}}) ? 0 : 1;
+	return (
+		@{$self->{timers}} + 
+		keys(%{$self-> {items}}) + 
+		$GETNUMFDS ? $GETNUMFDS-> () : 0
+	) ? 0 : 1;
 }
 
 sub yield
@@ -35,7 +40,7 @@ sub yield
 	my $t;
 	$t = 0 if $nonblocking;
 
-	my ($min,$max) = ( undef, 0);
+	my ($min,$max) = ( 0, -1);
 	my $ct  = time;
 
 	# timers
@@ -63,7 +68,9 @@ sub yield
 	}
 
 	# do select
-	my $n  = select( $R, $W, $E, $t);
+	my $n  = $SELECT ?
+		$SELECT->(\$R, \$W, \$E, $t) :
+		select( $R, $W, $E, $t);
 	die "select() error:$!$^E" if $n < 0;
 	
 	# expired timers

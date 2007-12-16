@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.16 2007/12/15 23:07:01 dk Exp $
+# $Id: Lambda.pm,v 1.17 2007/12/16 17:18:57 dk Exp $
 
 package IO::Lambda;
 
@@ -355,7 +355,7 @@ sub wait
 	while ( 1) {
 		my $n = drive;
 		last if $self-> {stopped};
-		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
+		$_-> yield for @LOOPS;
 		$LOOP-> yield;
 	}
 	return $self-> peek;
@@ -371,7 +371,7 @@ sub wait_for_all
 		push @ret, map { $_-> peek } grep { $_-> {stopped} } @objects;
 		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
-		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
+		$_-> yield for @LOOPS;
 		$LOOP-> yield;
 	}
 	return @ret;
@@ -385,10 +385,9 @@ sub wait_for_any
 	$_-> step for @objects;
 	while ( 1) {
 		my $n = drive;
-		$_-> yield for @LOOPS;
 		@objects = grep { $_-> {stopped} } @objects;
 		return @objects if @objects;
-		croak "IO::Lambda: infinite loop detected" if not($n) and $LOOP-> empty;
+		$_-> yield for @LOOPS;
 		$LOOP-> yield;
 	}
 }
@@ -620,6 +619,8 @@ sub resolve
 	@$in = grep { $rec != $_ } @$in;
 	die _d($self, "stray condvar event $rec (@$rec)")
 		if $nn == @$in or $self != $rec->[WATCH_OBJ];
+
+	undef $rec-> [WATCH_OBJ]; # unneeded references
 
 	unless ( @$in) {
 		warn _d( $self, 'stopped') if $DEBUG;

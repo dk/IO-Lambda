@@ -5,6 +5,7 @@ Makefile.PL
 lib/IO/Lambda.pm
 lib/IO/Lambda/HTTP.pm
 lib/IO/Lambda/HTTPS.pm
+lib/IO/Lambda/SNMP.pm
 lib/IO/Lambda/Loop/Select.pm
 t/01_load.t
 t/02_object_api.t
@@ -16,3 +17,4 @@ t/99_pod_coverage.t
 eg/sequential.pl
 eg/parallel.pl
 eg/http-redirect.pl
+eg/snmp.pl

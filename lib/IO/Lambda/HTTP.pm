@@ -1,3 +1,4 @@
+# $Id: HTTP.pm,v 1.4 2007/12/16 17:18:57 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
