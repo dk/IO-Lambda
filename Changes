@@ -9,3 +9,6 @@
 
 0.04 - Sat Dec 15 2007
 	add condvars and interfaces for additional event loops
+
+0.06 - Fri Dec 28 2007
+	add some documentation

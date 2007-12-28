@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 99_pod_coverage.t,v 1.3 2007/12/28 17:32:28 dk Exp $
+# $Id: 99_pod_coverage.t,v 1.4 2007/12/28 17:49:09 dk Exp $
 
 use strict;
 use warnings;
@@ -13,4 +13,4 @@ pod_coverage_ok( 'IO::Lambda' => { trustme => [qr/^(add_\w+|\w+_handler|drive|st
 pod_coverage_ok( 'IO::Lambda::Loop::Select' => { trustme => [qr/^(rebuild_vectors)$/] });
 pod_coverage_ok( 'IO::Lambda::HTTP' => { trustme => [qr/^(parse|redirect_request|single_request|uri_to_socket)$/] });
 pod_coverage_ok( 'IO::Lambda::HTTPS' => { trustme => [qr/^(redirect_request|single_request|uri_to_socket)$/] });
-pod_coverage_ok( 'IO::Lambda::SNMP');
+pod_coverage_ok( 'IO::Lambda::SNMP' => {trustme => [qr/^(snmpcallback|wrapper)$/]});
