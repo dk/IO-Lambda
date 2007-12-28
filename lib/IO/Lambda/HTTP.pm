@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.6 2007/12/28 16:58:45 dk Exp $
+# $Id: HTTP.pm,v 1.7 2007/12/28 17:32:28 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -115,7 +115,7 @@ IO::Lambda::HTTP - http requests lambda style
 
 =head1 DESCRIPTION
 
-The module exports a single lambda C<http_request> that accepts a
+The module exports a single predicate C<http_request> that accepts a
 C<HTTP::Request> object and set of options as parameters. Returns either a
 C<HTTP::Response> on success, or error string otherwise.
 
@@ -143,6 +143,25 @@ C<HTTP::Response> on success, or error string otherwise.
    };
 
    this-> wait($req);
+
+=head1 API
+
+=over
+
+=item http_request $HTTP::Request
+
+C<http_request> is a lambda predicate that accepts C<HTTP::Request> object in
+the context. Returns either a C<HTTP::Response> object on success, or error
+string otherwise.
+
+=item new $HTTP::Request
+
+Stores C<HTTP::Request> object and returns a new lambda that will finish 
+when the request associated with it completes. The lambda callback will
+be passed either a C<HTTP::Response> object on success, or error
+string otherwise. 
+
+=back
 
 =head1 OPTIONS
 

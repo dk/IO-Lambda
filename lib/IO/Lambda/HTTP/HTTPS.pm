@@ -1,4 +1,4 @@
-# $Id: HTTPS.pm,v 1.5 2007/12/28 16:58:45 dk Exp $
+# $Id: HTTPS.pm,v 1.6 2007/12/28 17:32:28 dk Exp $
 package IO::Lambda::HTTPS;
 
 use vars qw(@ISA @EXPORT_OK);
@@ -109,6 +109,25 @@ explanation of the behavior.
    };
 
    this-> wait($req);
+
+=head1 API
+
+=over
+
+=item https_request $HTTP::Request
+
+C<https_request> is a lambda predicate that accepts C<HTTP::Request> object in
+the context. Returns either a C<HTTP::Response> object on success, or error
+string otherwise.
+
+=item new $HTTP::Request
+
+Stores C<HTTP::Request> object and returns a new lambda that will finish 
+when the request associated with it completes. The lambda callback will
+be passed either a C<HTTP::Response> object on success, or error
+string otherwise. 
+
+=back
 
 =head1 SEE ALSO
 

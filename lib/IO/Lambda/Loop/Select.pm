@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.7 2007/12/16 20:20:16 dk Exp $
+# $Id: Select.pm,v 1.8 2007/12/28 17:32:28 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -194,3 +194,65 @@ sub rebuild_vectors
 }
 
 1;
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+IO::Lambda::Loop::Select - select(2)-based event loop for IO::Lambda
+
+=head1 DESCRIPTION
+
+This is the default implementation of event loop for IO::Lambda. IO::Lambda
+is designed to be agnostic of event loop choice, but currently there's only
+one implemented anyway. The module is not intended for direct use. The documentation
+declares the event loop interface rather than explains specificities of the module.
+
+=head1 SYNOPSIS
+
+  use IO::Lambda::Loop::Select; # explicitly select the event loop module
+  use IO::Lambda;
+
+=head1 API
+
+=over
+
+=item new
+
+Creates new instance of C<IO::Lambda::Loop::Select>.
+
+=item after $RECORD
+
+Stores the timeout record. The timeout record is an array, with the following
+layout: [ $OBJECT, $DEADLINE, $CALLBACK ]. Loop will invoke
+C<IO::Lambda::io_handler> on C<$OBJECT> after C<$DEADLINE> is expired.
+
+=item empty
+
+Returns TRUE if there are no records in the loop, FALSE otherwise.
+
+=item remove $OBJECT
+
+Removes all records associated with C<$OBJECT>.
+
+=item watch $RECORD
+
+Stores the IO record. The IO record in an array, with the following 
+layout: [ $OBJECT, $DEADLINE, $CALLBACK, $HANDLE, $FLAGS ]. Loop will
+invoke C<IO::Lambda::io_handler> on C<$OBJECT> either when C<$HANDLE>
+becomes readable/writable etc, depending on C<$FLAGS>, or after C<$DEADLINE>
+is expired. C<$DEADLINE> can be undef, meaning no timeout. C<$FLAGS> is 
+a combination of C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION> values.
+
+=item yield
+
+Waits for at least one of the stored record to become active, dispatches
+events to C<IO::Lambda::io_handler> for the records that have, then removes
+these records. The invoker must resubmit records in order continue receiving
+new events.
+
+=back
+
+=cut
