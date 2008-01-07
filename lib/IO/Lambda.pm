@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.20 2007/12/28 16:58:45 dk Exp $
+# $Id: Lambda.pm,v 1.21 2008/01/07 10:18:01 dk Exp $
 
 package IO::Lambda;
 
@@ -496,13 +496,13 @@ sub getline(&)
 			context $fh, $deadline;
 			IO::Lambda::read {
 				# timeout? return nothing
-				return undef, 'timeout' unless shift;
+				$@ = 'timeout', return undef unless shift;
 				my $n = sysread $fh, $$buf, 1024, length($$buf);
 				# error? return undef
-				return undef, $! unless defined $n;
+				$@ = $!, return undef unless defined $n;
 				# closed handle?
 				unless ( $n) {
-					return undef, 'eof' unless length $$buf;
+					$@ = $!, return undef unless length $$buf;
 					# return whatever left in the buffer
 					my $x = $$buf;
 					$$buf = '';
@@ -1001,9 +1001,10 @@ that means that it will never execute with FALSE.
 
 =item getline($filehandle, $$buffer, $deadline = undef)
 
-Executes either when a line can be read from C<$filehandle>, or after C<$deadline>
-if the latter is defined. On success, returns the line read. Otherwise, returns
-undef and line describing the reason: either C<timeout>, C<eof>, or C<$!> value.
+Executes either when a line can be read from C<$filehandle>, or after
+C<$deadline> if the latter is defined. On success, returns the line read.
+Otherwise, returns undef, and stores the error message in C<$@>, which can
+either C<timeout>, C<eof>, or C<$!> string value.
 
 Note: buffer must be shared for all C<$filehandle> operations.
 
