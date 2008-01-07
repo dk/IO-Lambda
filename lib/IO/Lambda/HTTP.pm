@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.7 2007/12/28 17:32:28 dk Exp $
+# $Id: HTTP.pm,v 1.8 2008/01/07 10:08:21 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -100,7 +100,8 @@ sub single_request
 sub parse
 {
 	my ( $self, $buf_ptr) = @_;
-	return HTTP::Response-> parse( $$buf_ptr);
+	return HTTP::Response-> parse( $$buf_ptr) if $$buf_ptr =~ /^(\S+)\s+(\d{3})\s+/;
+	return HTTP::Response-> new( '000', '', undef, $$buf_ptr);
 }
 
 1;
