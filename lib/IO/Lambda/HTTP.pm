@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.8 2008/01/07 10:08:21 dk Exp $
+# $Id: HTTP.pm,v 1.9 2008/01/07 12:36:07 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -31,6 +31,9 @@ sub new
 
 	$self-> {deadline}     = $options{timeout} + time if defined $options{timeout};
 	$self-> {max_redirect} = defined($options{max_redirect}) ? $options{max_redirect} : 7;
+		
+	$req-> headers-> header( 'User-Agent' => "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION")
+		unless defined $req-> headers-> header('User-Agent');
 
 	return $self-> redirect_request( $req);
 }
