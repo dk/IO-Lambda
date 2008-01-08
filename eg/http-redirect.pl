@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: http-redirect.pl,v 1.3 2007/12/13 23:00:08 dk Exp $
+# $Id: http-redirect.pl,v 1.4 2008/01/08 14:02:38 dk Exp $
 
 use strict;
 use HTTP::Request;
@@ -56,7 +56,10 @@ sub http_redirect_request
 my $r = HTTP::Request-> new( GET => 'http://google.com/');
 $r-> protocol('HTTP/1.1');
 $r-> headers-> header( Host => $r-> uri-> host);
-$r-> headers-> header( Connection => 'close');
+
+# this example doesn't deal with Connection: Keep-Alive for the simplicity of it
+# see IO::Lambda::HTTP for implementation that does
+$r-> headers-> header( Connection => 'close'); 
 
 this http_redirect_request( $r);
 my $r = this-> wait;

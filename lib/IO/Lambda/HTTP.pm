@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.9 2008/01/07 12:36:07 dk Exp $
+# $Id: HTTP.pm,v 1.10 2008/01/08 14:02:39 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -12,6 +12,8 @@ use IO::Socket;
 use HTTP::Response;
 use IO::Lambda qw(:all);
 use Time::HiRes qw(time);
+
+# XXX
 
 sub http_request(&)
 {
@@ -31,6 +33,7 @@ sub new
 
 	$self-> {deadline}     = $options{timeout} + time if defined $options{timeout};
 	$self-> {max_redirect} = defined($options{max_redirect}) ? $options{max_redirect} : 7;
+	$self-> {conn_cache}   = $options{conn_cache};
 		
 	$req-> headers-> header( 'User-Agent' => "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION")
 		unless defined $req-> headers-> header('User-Agent');
@@ -41,14 +44,29 @@ sub new
 sub uri_to_socket
 {
 	my ( $self, $uri) = @_;
+	my ( $host, $port) = ( $uri-> host, $uri-> port);
+	my $cc  = $self-> {conn_cache};
+
+	if ( $cc) {
+		my $sock = $cc-> withdraw( __PACKAGE__, "$host:$port");
+		return wantarray ? ($sock, 1) : $sock if $sock;
+	}
 
 	my $sock = IO::Socket::INET-> new(
-		PeerAddr => $uri-> host,
-		PeerPort => $uri-> port,
+		PeerAddr => $host,
+		PeerPort => $port,
 		Proto    => 'tcp',
+		Blocking => 0,
 	);
 
-	return $sock ? $sock : (undef, $!);
+	return $sock;
+}
+
+sub init_request
+{
+	my ( $self) = @_;
+
+	delete @{$self}{qw(want_no_headers got_headers want_length)};
 }
 
 sub redirect_request
@@ -57,7 +75,8 @@ sub redirect_request
 
 	lambda {
 		my $was_redirected = 0;
-
+		
+		$self-> init_request;
 		context( $self-> single_request( $req));
 	tail   {
 		my $response = shift;
@@ -79,8 +98,8 @@ sub single_request
 	my ( $self, $req) = @_;
 
 	lambda {
-		my ($sock, $err) = $self-> uri_to_socket( $req-> uri);
-		return "Error creating socket:$err" unless $sock;
+		my $sock = $self-> uri_to_socket( $req-> uri);
+		return "Error creating socket:$!" unless $sock;
 
 		context( $sock, $self-> {deadline});
 	write {
@@ -95,15 +114,56 @@ sub single_request
 
 		my $n = sysread( $sock, $buf, 32768, length($buf));
 		return "read error:$!" unless defined $n;
+		return $self-> parse( \$buf) if $self-> got_content(\$buf);
 		return again if $n;
 		return $self-> parse( \$buf);
 	}}};
 }
 
+# peek into buffer and see: 
+# 1: a) if we have Content-Length in headers b) if we have that many bytes
+# 2: if we're asked to Connection: close just in case when we keep the connection
+sub got_content
+{
+	my ( $self, $buf) = @_;
+
+	return if $self-> {want_no_headers};
+
+	unless ( $self-> {got_headers}) {
+		unless ( $$buf =~ /^HTTP\S+\s+\d{3}\s+/i) {
+			$self-> {want_no_headers}++;
+			return;
+		}
+
+		# no headers yet
+		return unless $$buf =~ /^(.*?\r?\n\r?\n)/s;
+
+		$self-> {got_headers} = 1;
+		my $headers  = $1;
+		my $appendix = length($headers);
+		$headers = HTTP::Response-> parse( $headers);
+
+		# check for Connection: close
+		my $c = lc( $headers-> header('Connection') || '');
+		$c =~ s/\s+$//;
+		$self-> {close_connection} = $c eq 'close';
+
+		# check for Content-Length
+		my $l = $headers-> header('Content-Length');
+		return unless defined ($l) and $l =~ /^(\d+)\s*$/;
+		$self-> {want_length} = $1 + $appendix;
+	} 
+	
+	return unless defined $self-> {want_length};
+
+	# check if got enough
+ 	return length($$buf) >= $self-> {want_length};
+}
+
 sub parse
 {
 	my ( $self, $buf_ptr) = @_;
-	return HTTP::Response-> parse( $$buf_ptr) if $$buf_ptr =~ /^(\S+)\s+(\d{3})\s+/;
+	return HTTP::Response-> parse( $$buf_ptr) if $$buf_ptr =~ /^(HTTP\S+)\s+(\d{3})\s+/i;
 	return HTTP::Response-> new( '000', '', undef, $$buf_ptr);
 }
 
@@ -132,7 +192,6 @@ C<HTTP::Response> on success, or error string otherwise.
    my $req = HTTP::Request-> new( GET => "http://www.perl.com/");
    $req-> protocol('HTTP/1.1');
    $req-> headers-> header( Host => $req-> uri-> host);
-   $req-> headers-> header( Connection => 'close');
    
    this lambda {
       context shift;

@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: parallel.pl,v 1.4 2007/12/16 20:20:16 dk Exp $
+# $Id: parallel.pl,v 1.5 2008/01/08 14:02:39 dk Exp $
 # 
 # This example fetches two pages in parallel, one with http/1.0 another with
 # http/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -10,13 +10,13 @@ use lib qw(./lib);
 use HTTP::Request;
 use IO::Lambda qw(:all);
 use IO::Lambda::HTTP qw(http_request);
+use LWP::ConnCache;
 
 my $a = HTTP::Request-> new(
 	GET => "http://www.perl.com/",
 );
 $a-> protocol('HTTP/1.1');
 $a-> headers-> header( Host => $a-> uri-> host);
-$a-> headers-> header( Connection => 'close');
 
 my @chain = ( 
 	$a, 

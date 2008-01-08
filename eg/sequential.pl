@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: sequential.pl,v 1.3 2007/12/16 20:20:16 dk Exp $
+# $Id: sequential.pl,v 1.4 2008/01/08 14:02:39 dk Exp $
 # 
 # This example fetches sequentially two pages, one with http/1.0 another with
 # http/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -16,7 +16,6 @@ my $a = HTTP::Request-> new(
 );
 $a-> protocol('HTTP/1.1');
 $a-> headers-> header( Host => $a-> uri-> host);
-$a-> headers-> header( Connection => 'close');
 
 my @chain = (
 	$a,
