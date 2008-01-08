@@ -1,14 +1,17 @@
 #! /usr/bin/perl
-# $Id: 99_pod_coverage.t,v 1.6 2008/01/08 14:02:39 dk Exp $
+# $Id: 99_pod_coverage.t,v 1.7 2008/01/08 16:42:48 dk Exp $
 
 use strict;
 use warnings;
 
-use Test::More tests => 5;
+use Test::More;
 
 eval 'use Test::Pod::Coverage';
 plan skip_all => 'Test::Pod::Coverage required for testing POD coverage'
      if $@;
+
+
+plan tests => 5;
 pod_coverage_ok( 'IO::Lambda' => { trustme => [qr/^(add_\w+|\w+_handler|drive|start|cancel_all_events|remove_loop)$/x] });
 pod_coverage_ok( 'IO::Lambda::Loop::Select' => { trustme => [qr/^(rebuild_vectors)$/x] });
 pod_coverage_ok( 'IO::Lambda::HTTP' => { trustme => [qr/^(parse|redirect_request|
