@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.11 2008/01/09 11:47:18 dk Exp $
+# $Id: HTTP.pm,v 1.12 2008/01/09 11:50:46 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -349,6 +349,11 @@ Can optionally use a C<LWP::ConnCache> object to reuse connections on per-host p
 See L<LWP::ConnCache> for details.
 
 =back
+
+=head1 BUGS
+
+Non-blocking connects, and hence the module, don't work on win32 on perl5.8.X
+due to under-implementation in ext/IO.xs .  They do work on 5.10 however. 
 
 =head1 SEE ALSO
 
