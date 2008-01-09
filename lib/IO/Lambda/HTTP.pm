@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.12 2008/01/09 11:50:46 dk Exp $
+# $Id: HTTP.pm,v 1.13 2008/01/09 13:25:16 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -163,7 +163,7 @@ sub handle_redirects
 		my $response = shift;
 		return $response unless ref($response);
 
-		return $response if $response-> code ne '302' and $response-> code ne '301';
+		return $response unless $response-> code =~ /^3/;
 		return 'too many redirects' 
 			if ++$was_redirected > $self-> {max_redirect};
 		
