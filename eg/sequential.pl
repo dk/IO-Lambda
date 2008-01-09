@@ -1,25 +1,28 @@
 #!/usr/bin/perl
-# $Id: sequential.pl,v 1.4 2008/01/08 14:02:39 dk Exp $
+# $Id: sequential.pl,v 1.5 2008/01/09 11:47:18 dk Exp $
 # 
 # This example fetches sequentially two pages, one with http/1.0 another with
 # http/1.1 . The idea is to demonstrate three different ways of doing so, by
 # using object API, and explicit and implicit loop unrolling
 #
+# Note how connections are reused with LWP::ConnCache.
 
 use lib qw(./lib);
 use HTTP::Request;
 use IO::Lambda qw(:all);
 use IO::Lambda::HTTP qw(http_request);
+use LWP::ConnCache;
 
-my $a = HTTP::Request-> new(
-	GET => "http://www.perl.org/",
-);
+my $cache = LWP::ConnCache-> new;
+my $url   = "http://www.perlmonks.org/";
+
+my $a = HTTP::Request-> new( GET => $url);
 $a-> protocol('HTTP/1.1');
 $a-> headers-> header( Host => $a-> uri-> host);
 
 my @chain = (
 	$a,
-	HTTP::Request-> new(GET => "http://www.perl.com/"),
+	HTTP::Request-> new( GET => $url)
 );
 
 sub report
@@ -43,7 +46,7 @@ $style = 'object';
 if ( $style eq 'object') {
 	# object API, all references and bindings are explicit
 	while ( @chain) {
-		my $lambda = IO::Lambda::HTTP-> new( shift @chain);
+		my $lambda = IO::Lambda::HTTP-> new( shift(@chain), conn_cache => $cache);
 		$lambda-> wait;
 		report( $lambda-> peek);
 	}
@@ -59,10 +62,10 @@ if ( $style eq 'object') {
 	# It's not practical in this case, but it is when a (network) protocol
 	# relies on precise series of reads and writes
 	this lambda {
-		context $chain[0];
+		context $chain[0], conn_cache => $cache;
 		http_request {
 			report shift;
-			context $chain[1];
+			context $chain[1], conn_cache => $cache;
 			http_request \&report;
 		}
 	};
@@ -70,11 +73,11 @@ if ( $style eq 'object') {
 } else {
 	# implicit loop - we don't know how many states we need
 	lambda {
-		context shift @chain;
+		context shift(@chain), conn_cache => $cache;
 		http_request {
 			report shift;
 			return unless @chain;
-			context shift @chain;
+			context shift(@chain), conn_cache => $cache;
 			again;
 		}
 	};
