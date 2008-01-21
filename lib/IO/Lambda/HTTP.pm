@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.13 2008/01/09 13:25:16 dk Exp $
+# $Id: HTTP.pm,v 1.14 2008/01/21 09:34:25 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -137,7 +137,10 @@ sub handle_request
 		# connected
 		return 'connect timeout' unless shift;
 		my $err = unpack('i', getsockopt($sock, SOL_SOCKET, SO_ERROR));
-		return "connect error:$err" if $err;
+		if ( $err) {
+			$! = $err;
+			return "$!";
+		}
 
 		context $protocol-> ( $self, $req, $sock, $cached);
 	tail {
