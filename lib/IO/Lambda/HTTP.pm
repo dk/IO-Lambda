@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.14 2008/01/21 09:34:25 dk Exp $
+# $Id: HTTP.pm,v 1.15 2008/01/22 13:52:30 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -207,11 +207,11 @@ sub got_content
 
 		# Connection: close
 		my $c = lc( $headers-> header('Connection') || '');
-		$self-> {close_connection} = $c =~ /^close\s*$/;
+		$self-> {close_connection} = $c =~ /^close\s*$/i;
 		
 		# Transfer-Encoding: chunked
 		my $te = lc( $headers-> header('Transfer-Encoding') || '');
-		if ( $self-> {chunked} = $te =~ /^chunked\s*$/) {
+		if ( $self-> {chunked} = $te =~ /^chunked\s*$/i) {
 			$self-> {want_chunk} = $appendix;
 			return 1 if $self-> got_te( $buf);
 		}
@@ -235,7 +235,7 @@ sub got_content
 	return 0;
 }
 
-# checks if Transfer-Encoding: chunked produced enough data to close connection
+# checks if Transfer-Encoding: chunked produced enough data to close the connection
 sub got_te
 {
 	my ( $self, $buf) = @_;
