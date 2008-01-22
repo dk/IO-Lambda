@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.15 2008/01/22 13:52:30 dk Exp $
+# $Id: HTTP.pm,v 1.16 2008/01/22 14:13:22 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -65,7 +65,8 @@ sub init_request
 {
 	my ( $self) = @_;
 
-	delete @{$self}{qw(want_no_headers got_headers want_length close_connection chunked want_chunk)};
+	delete @{$self}{qw(want_no_headers got_headers want_length close_connection chunked 
+		want_chunk got_proto)};
 }
 
 # get scheme and eventually load module
@@ -192,10 +193,12 @@ sub got_content
 	unless ( $self-> {got_headers}) {
 		return unless $$buf =~ /\n/;
 
-		unless ( $$buf =~ /^HTTP\S+\s+\d{3}\s+/i) {
+		unless ( $$buf =~ /^HTTP\/([\.\d]+)\s+\d{3}\s+/i) {
 			$self-> {want_no_headers}++;
 			return;
 		}
+
+		$self-> {got_proto} = $1;
 
 		# no headers yet
 		return unless $$buf =~ /^(.*?\r?\n\r?\n)/s;
@@ -218,7 +221,10 @@ sub got_content
 
 		# Content-Length
 		my $l = $headers-> header('Content-Length');
-		return unless defined ($l) and $l =~ /^(\d+)\s*$/;
+		unless ( defined ($l) and $l =~ /^(\d+)\s*$/) {
+			return 1 if $self->{got_proto} > 1; # RFC 2616 14.13
+			return;
+		}
 		$self-> {want_length} = $1 + $appendix;
 	} 
 	
