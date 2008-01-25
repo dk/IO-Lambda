@@ -1,11 +1,13 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.5 2007/12/15 22:45:57 dk Exp $
+# $Id: 03_lambda_api.t,v 1.6 2008/01/25 13:46:04 dk Exp $
 
 use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Test::More tests => 12;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda);
+
+alarm(10);
 
 this lambda {};
 this-> wait;
@@ -20,21 +22,15 @@ this lambda {
 };
 ok( 43 == this-> wait, 'tail lambda');
 
-this lambda {
-	again unless $_[0] > 3;
-	$_[0] + 1;
-};
-ok(( 5 == this-> wait(0)), 'restart lambda');
-
-this-> reset;
-ok(( 5 == this-> wait(3)), 'rerun lambda');
-
 my $i = 42;
 this lambda {
 	context lambda {};
 	tail { ( $i++ > 44) ? $i : again };
 };
 ok( 46 == this-> wait, 'restart tail');
+
+this-> reset;
+ok( 47 == this-> wait, 'rerun lambda');
 
 this lambda {
 	context time + 0.01;
@@ -57,6 +53,20 @@ this lambda {
 	sleep { $i-- ? again : 'moo' };
 };
 ok(( 'moo' eq this-> wait && $i == -1), 'restart sleep');
+
+this lambda {
+    context lambda { 1 };
+    tail {
+        return 3 if 3 == shift;
+    	my @frame = this_frame;
+        context lambda { 2 };
+	tail {
+	   context lambda { 3 };
+	   again( @frame);
+	}
+    }
+};
+ok( '3' eq this-> wait, 'frame restart');
 
 SKIP: {
 	skip "select(file) doesn't work on win32", 3 if $^O =~ /win32/i;

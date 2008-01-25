@@ -12,6 +12,7 @@ t/02_object_api.t
 t/03_lambda_api.t
 t/04_tcp.t
 t/05_condvar.t
+t/06_stream.t
 t/98_pod.t
 t/99_pod_coverage.t
 eg/sequential.pl

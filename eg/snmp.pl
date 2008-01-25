@@ -1,8 +1,8 @@
-# $Id: snmp.pl,v 1.1 2007/12/16 17:18:57 dk Exp $
+# $Id: snmp.pl,v 1.2 2008/01/25 13:46:04 dk Exp $
 use strict;
 use SNMP;
 use IO::Lambda::SNMP qw(:all);
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda);
 
 my $sess = SNMP::Session-> new(
 	DestHost => 'localhost',

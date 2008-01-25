@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: parallel.pl,v 1.5 2008/01/08 14:02:39 dk Exp $
+# $Id: parallel.pl,v 1.6 2008/01/25 13:46:04 dk Exp $
 # 
 # This example fetches two pages in parallel, one with http/1.0 another with
 # http/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -8,7 +8,7 @@
 
 use lib qw(./lib);
 use HTTP::Request;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda);
 use IO::Lambda::HTTP qw(http_request);
 use LWP::ConnCache;
 
@@ -56,7 +56,7 @@ if ( $style eq 'object') {
 } elsif ( $style eq 'explicit') {
 	#
 	# Functional API, based on context() calls. context is
-	# $obj and whatever agruments the current call needs, a RPN of sorts.
+	# $obj and whatever arguments the current call needs, a RPN of sorts.
 	# The context though is not stack in this analogy, because it stays
 	# as is in the callback
 	#
@@ -75,13 +75,8 @@ if ( $style eq 'object') {
 	# 
 	# also, use 'tail'
 	this lambda {
-		context map {
-			lambda {
-				context shift;
-				&http_request;
-			}-> call($_);
-		} @chain;
-		tail { report $_ for @_ };
+		context map { IO::Lambda::HTTP-> new( $_ ) } @chain;
+		tails { report $_ for @_ };
 	};
 	this-> wait;
 }

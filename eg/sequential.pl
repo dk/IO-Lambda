@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: sequential.pl,v 1.5 2008/01/09 11:47:18 dk Exp $
+# $Id: sequential.pl,v 1.6 2008/01/25 13:46:04 dk Exp $
 # 
 # This example fetches sequentially two pages, one with http/1.0 another with
 # http/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -9,7 +9,7 @@
 
 use lib qw(./lib);
 use HTTP::Request;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda);
 use IO::Lambda::HTTP qw(http_request);
 use LWP::ConnCache;
 
@@ -37,9 +37,9 @@ sub report
 }
 
 my $style;
-$style = 'object';
+#$style = 'object';
 #$style = 'explicit';
-#$style = 'implicit';
+$style = 'implicit';
 
 # $IO::Lambda::DEBUG++; # uncomment this to see that it indeed goes sequential
 
@@ -80,7 +80,7 @@ if ( $style eq 'object') {
 			context shift(@chain), conn_cache => $cache;
 			again;
 		}
-	};
+	}-> start;
 }
 
 run IO::Lambda;

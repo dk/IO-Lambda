@@ -1,10 +1,10 @@
 #!/usr/bin/perl
-# $Id: http-redirect.pl,v 1.5 2008/01/08 16:42:48 dk Exp $
+# $Id: http-redirect.pl,v 1.6 2008/01/25 13:46:04 dk Exp $
 
 use strict;
 use HTTP::Request;
 use HTTP::Response;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda);
 use IO::Socket::INET;
 
 # create chain of event on an existsing lambda object, that when

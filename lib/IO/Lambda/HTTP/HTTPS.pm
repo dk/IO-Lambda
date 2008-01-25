@@ -1,34 +1,46 @@
-# $Id: HTTPS.pm,v 1.8 2008/01/09 11:47:18 dk Exp $
+# $Id: HTTPS.pm,v 1.9 2008/01/25 13:46:04 dk Exp $
 package IO::Lambda::HTTPS;
 
 use strict;
 use warnings;
 use Socket;
 use IO::Socket::SSL;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda :stream);
 
-sub handle_read
+sub https_wrapper
 {
-	my ( $self, $sock, $buf) = @_;
-	my $n = sysread( $sock, $$buf, 32768, length($$buf));
-	return if not defined $n and $SSL_ERROR == SSL_WANT_READ;
-	return "read error:$!" unless defined $n;
-
-	return $self-> parse($buf) if $self-> got_content($buf);
-	return if $n;
-	return $self-> parse($buf);
+	my $sock = shift;
+	tail {
+		my ( $bytes, $error) = @_;
+		return $bytes if defined $bytes;
+		return $error if $error eq 'timeout';
+	
+		my $v = '';
+		vec( $v, fileno($sock), 1) = 1;
+		if ( $SSL_ERROR == SSL_WANT_READ) {
+			select( $v, undef, undef, 0);
+			return again;
+		} elsif ( $SSL_ERROR == SSL_WANT_WRITE) {
+			select( undef, $v, undef, 0);
+			return again;
+		} else {
+			return $bytes, $error;
+		}
+	}
 }
 
-# execute a single https request over an established connection
-sub https_protocol
+
+sub https_writer
 {
-	my ( $self, $req, $sock, $cached) = @_;
+	my $cached = shift;
+	my $writer = syswriter;
 
 	lambda {
-		unless ( $cached) {
-			# upgrade socket
-			IO::Socket::SSL-> start_SSL( $sock, SSL_startHandshake => 0 );
+		my ( $sock, $req, $length, $offset, $deadline) = @_;
 
+		# upgrade the socket
+		unless ( $cached) {
+			IO::Socket::SSL-> start_SSL( $sock, SSL_startHandshake => 0 );
 			# XXX Warning, this'll block because IO::Socket::SSL doesn't 
 			# work with non-blocking connects. And I don't really want to 
 			# rewrite the SSL handshake myself.
@@ -36,30 +48,26 @@ sub https_protocol
 			my $r = $sock-> connect_SSL;
 			$sock-> blocking(0);
 
-			return "SSL connect error: " . ( defined($SSL_ERROR) ? $SSL_ERROR : $!)
+			return undef, "SSL connect error: " . ( defined($SSL_ERROR) ? $SSL_ERROR : $!)
 				unless $r;
+			$cached = 1;
 		}
 
-		unless ( print $sock $req-> as_string) {
-			return again if $SSL_ERROR == SSL_WANT_WRITE;
-			return "write error:$!";
-		}
-
-		my $buf = '';
-
-		# OpenSSL does some internal buffering so SSL_read does not always
-		# return data even if socket is selected for reading
-		my $ret = handle_read( $self, $sock, \$buf);
-		return $ret if defined $ret;
-
-		context $sock, $self-> {deadline};
-	read {
-		return 'timeout' unless shift;
-
-		my $ret = handle_read( $self, $sock, \$buf);
-		return defined($ret) ? $ret : again;
-	}};
+		context $writer, $sock, $req, $length, $offset, $deadline;
+		https_wrapper($sock);
+	}
 }
+
+sub https_reader
+{
+	my $reader = sysreader;
+	lambda {
+		my ( $sock, $buf, $length, $deadline) = @_;
+		context $reader, $sock, $buf, $length, $deadline;
+		https_wrapper($sock);
+	}
+}
+
 
 1;
 
@@ -75,7 +83,7 @@ IO::Lambda::HTTPS - https requests lambda style
 
 The module is used internally by L<IO::Lambda::HTTP> and is a separate module
 for installations where underlying C<IO::Socket::SSL> and C<Net::SSLeay> modules
-are not installed. The module is not to be used directly.
+are installed. The module is not to be used directly.
 
 =head1 SEE ALSO
 

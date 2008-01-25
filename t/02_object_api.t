@@ -1,11 +1,13 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.5 2007/12/14 22:46:05 dk Exp $
+# $Id: 02_object_api.t,v 1.6 2008/01/25 13:46:04 dk Exp $
 
 use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Test::More tests => 26;
-use IO::Lambda qw(:all :constants);
+use IO::Lambda qw(:all);
+
+alarm(10);
 
 # empty lambda
 my $l = IO::Lambda-> new;

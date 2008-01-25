@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.16 2008/01/22 14:13:22 dk Exp $
+# $Id: HTTP.pm,v 1.17 2008/01/25 13:46:04 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -10,7 +10,7 @@ use Socket;
 use Exporter;
 use IO::Socket;
 use HTTP::Response;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda :stream);
 use Time::HiRes qw(time);
 
 sub http_request(&)
@@ -36,132 +36,18 @@ sub new
 	$req-> headers-> header( 'User-Agent' => "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION")
 		unless defined $req-> headers-> header('User-Agent');
 
-	return $self-> handle_redirects( $req);
+	return $self-> handle_redirect( $req);
 }
 
-# execute a single http request over an established connection
-sub http_protocol
-{
-	my ( $self, $req, $sock, $cached) = @_;
-
-	lambda {
-		print $sock $req-> as_string or return "write error:$!";
-
-		my $buf = '';
-		context $sock, $self-> {deadline};
-	read {
-		return 'timeout' unless shift;
-
-		my $n = sysread( $sock, $buf, 32768, length($buf));
-		return "read error:$!" unless defined $n;
-
-		return $self-> parse( \$buf) if $self-> got_content(\$buf);
-		return again if $n;
-		return $self-> parse( \$buf);
-	}};
-}
-
-sub init_request
-{
-	my ( $self) = @_;
-
-	delete @{$self}{qw(want_no_headers got_headers want_length close_connection chunked 
-		want_chunk got_proto)};
-}
-
-# get scheme and eventually load module
-my $got_https;
-sub get_protocol
-{
-	my ( $self, $req) = @_;
-	my $protocol;
-	my $scheme = $req-> uri-> scheme;
-	if ( $scheme eq 'https') {
-		unless ( $got_https) {
-			eval { require IO::Lambda::HTTPS; };
-			return undef, "https not supported: $@" if $@;
-			$got_https++;
-		}
-		$protocol = \&IO::Lambda::HTTPS::https_protocol;
-	} elsif ( $scheme ne 'http') {
-		return ( undef, "bad URI scheme: $scheme");
-	} else {
-		$protocol = \&http_protocol;
-	}
-
-	return $protocol;
-}
-
-sub connect
-{
-	my ( $self, $host, $port) = @_;
-
-	return IO::Socket::INET-> new(
-		PeerAddr => $host,
-		PeerPort => $port,
-		Proto    => 'tcp',
-		Blocking => 0,
-	), $!;
-}
-
-# connect to the remote, execute a single http or https request
-sub handle_request
-{
-	my ( $self, $req) = @_;
-
-	# have a chance to load eventual modules early
-	my ( $protocol, $err) = $self-> get_protocol( $req);
-	
-	lambda {
-		return $err unless $protocol;
-
-		$self-> init_request;
-
-		# get cached socket?
-		my ( $sock, $cached);
-		my $cc = $self-> {conn_cache};
-		my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
-		if ( $cc) {
-			$sock = $cc-> withdraw( __PACKAGE__, "$host:$port");
-			if ( $sock) {
-				my $err = unpack('i', getsockopt( $sock, SOL_SOCKET, SO_ERROR));
-				$err ? undef $sock : $cached++;
-			}
-		}
-
-		# connect
-		( $sock, $err) = $self-> connect( $host, $port) unless $sock;
-		return $err unless $sock;
-		context( $sock, $self-> {deadline});
-
-	write {
-		# connected
-		return 'connect timeout' unless shift;
-		my $err = unpack('i', getsockopt($sock, SOL_SOCKET, SO_ERROR));
-		if ( $err) {
-			$! = $err;
-			return "$!";
-		}
-
-		context $protocol-> ( $self, $req, $sock, $cached);
-	tail {
-		# protocol finished
-		my $result = shift;
-		$cc-> deposit( __PACKAGE__, "$host:$port", $sock)
-			if ref($result) and $cc and not $self-> {close_connection};
-		return $result;
-	}}}
-}
-
-# 
-sub handle_redirects
+# reissue the request if it request returns 30X code
+sub handle_redirect
 {
 	my ( $self, $req) = @_;
 		
 	my $was_redirected = 0;
 
 	lambda {
-		context $self-> handle_request( $req);
+		context $self-> handle_connection( $req);
 	tail   {
 		# request is finished
 		my $response = shift;
@@ -179,94 +65,218 @@ sub handle_redirects
 	}};
 }
 
-
-# peek into buffer and see: 
-# 1: if we have Content-Length in headers and we have that many bytes
-# 2: if we have Transfer-Encoding: chunked in headers and we have read all chunks
-# 3: if we're asked to Connection: close just in case when we keep the connection
-sub got_content
+# get scheme and eventually load module
+my $got_https;
+sub prepare_transport
 {
-	my ( $self, $buf) = @_;
+	my ( $self, $req) = @_;
+	my $scheme = $req-> uri-> scheme;
 
-	return if $self-> {want_no_headers};
+	if ( $scheme eq 'https') {
+		unless ( $got_https) {
+			eval { require IO::Lambda::HTTPS; };
+			return  "https not supported: $@" if $@;
+			$got_https++;
+		}
+		$self-> {reader} = IO::Lambda::HTTPS::https_reader();
+		$self-> {writer} = \&IO::Lambda::HTTPS::https_writer;
+	} elsif ( $scheme ne 'http') {
+		return "bad URI scheme: $scheme";
+	} else {
+		$self-> {reader} = undef;
+		$self-> {writer} = undef;
+	}
 
-	unless ( $self-> {got_headers}) {
-		return unless $$buf =~ /\n/;
+	return;
+}
 
-		unless ( $$buf =~ /^HTTP\/([\.\d]+)\s+\d{3}\s+/i) {
-			$self-> {want_no_headers}++;
-			return;
+sub http_read
+{
+	my ( $self, $cond) = @_;
+	return $self-> {reader}, $self-> {socket}, \ $self-> {buf}, $cond, $self-> {deadline};
+}
+
+sub http_tail
+{
+	my ( $self, $cond) = @_;
+	context $self-> http_read($cond);
+	&tail();
+}
+
+sub connect
+{
+	my ( $self, $host, $port) = @_;
+
+	return IO::Socket::INET-> new(
+		PeerAddr => $host,
+		PeerPort => $port,
+		Proto    => 'tcp',
+		Blocking => 0,
+	), $!;
+}
+
+# Connect to the remote, wait for protocol to finish, and
+# close the connection if needed. Returns HTTP::Reponse object on success
+sub handle_connection
+{
+	my ( $self, $req) = @_;
+
+	# have a chance to load eventual modules early
+	my $err = $self-> prepare_transport( $req);
+	
+	lambda {
+		return $err if defined $err;
+
+		delete $self-> {close_connection};
+
+		# get cached socket?
+		my ( $sock, $cached);
+		my $cc = $self-> {conn_cache};
+		my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
+		if ( $cc) {
+			$sock = $cc-> withdraw( __PACKAGE__, "$host:$port");
+			if ( $sock) {
+				my $err = unpack('i', getsockopt( $sock, SOL_SOCKET, SO_ERROR));
+				$err ? undef $sock : $cached++;
+			}
 		}
 
-		$self-> {got_proto} = $1;
+		# connect
+		my $err;
+		( $sock, $err) = $self-> connect( $host, $port) unless $sock;
+		return $err unless $sock;
+		context( $sock, $self-> {deadline});
 
-		# no headers yet
-		return unless $$buf =~ /^(.*?\r?\n\r?\n)/s;
+	write {
+		# connected
+		return 'connect timeout' unless shift;
+		my $err = unpack('i', getsockopt($sock, SOL_SOCKET, SO_ERROR));
+		if ( $err) {
+			$! = $err;
+			return "$!";
+		}
 
-		$self-> {got_headers} = 1;
-		my $headers  = $1;
-		my $appendix = length($headers);
-		$headers = HTTP::Response-> parse( $headers);
+		$self-> {buf}    = '';
+		$self-> {socket} = $sock;
+		$self-> {reader} = readbuf ( $self-> {reader});
+		$self-> {writer} = $self-> {writer}-> ($cached) if $self-> {writer}; 
+		$self-> {writer} = writebuf( $self-> {writer});
+
+		context $self-> handle_request( $req);
+	tail {
+		my ( undef, $error) = @_; # readbuf style
+		
+		# protocol is finished
+		my $ret = defined($error) ? $error : $self-> parse( \ $self-> {buf} );
+		delete @{$self}{qw(close_connection socket buf writer reader)};
+
+		# put back the connection, if possible
+		if ( $cc and not $self-> {close_connection}) {
+			my $err = unpack('i', getsockopt( $sock, SOL_SOCKET, SO_ERROR));
+			$cc-> deposit( __PACKAGE__, "$host:$port", $sock)
+				unless $err;
+		}
+		return $ret;
+	}}}
+}
+
+# Execute single http request over an established connection.
+# Returns 2 parameters, readbuf-style, where actually only the 2nd matters,
+# and signals error if defined. 2 parameters are there for readbuf compatibility,
+# so protocol handler can easily fall back to readbuf itself.
+sub handle_request
+{
+	my ( $self, $req) = @_;
+
+	lambda {
+		# send request
+		$req = $req-> as_string;
+		context 
+			$self-> {writer}, 
+			$self-> {socket}, \ $req, 
+			undef, 0, $self-> {deadline};
+	tail {
+		my ( $bytes_written, $error) = @_;
+		return undef, $error if $error;
+
+		context $self-> {socket}, $self-> {deadline};
+	read {
+		# request sent, now wait for data
+		return undef, 'timeout' unless shift;
+		
+		# read first line
+		context $self-> http_read(qr/^.*?\n/);
+	tail {
+		my $line = shift;
+		return undef, shift unless defined $line;
+
+		# no headers? 
+		return $self-> http_tail
+			unless $line =~ /^HTTP\/([\.\d]+)\s+(\d{3})\s+/i;
+		
+		my ( $proto, $code) = ( $1, $2);
+		# got some headers
+		context $self-> http_read( qr/^.*?\r?\n\r?\n/s);
+	tail {
+		$line = shift;
+		return undef, shift unless defined $line;
+
+		my $headers = HTTP::Response-> parse( $line);
+		my $offset  = length( $line);
 
 		# Connection: close
 		my $c = lc( $headers-> header('Connection') || '');
 		$self-> {close_connection} = $c =~ /^close\s*$/i;
 		
-		# Transfer-Encoding: chunked
-		my $te = lc( $headers-> header('Transfer-Encoding') || '');
-		if ( $self-> {chunked} = $te =~ /^chunked\s*$/i) {
-			$self-> {want_chunk} = $appendix;
-			return 1 if $self-> got_te( $buf);
-		}
-
-		# Content-Length
+		# have Content-Length? read that many bytes then
 		my $l = $headers-> header('Content-Length');
-		unless ( defined ($l) and $l =~ /^(\d+)\s*$/) {
-			return 1 if $self->{got_proto} > 1; # RFC 2616 14.13
-			return;
-		}
-		$self-> {want_length} = $1 + $appendix;
-	} 
-	
-	if ( defined $self-> {want_length}) {
-		# check if got enough using Content-Length
- 		return length($$buf) >= $self-> {want_length};
-	}
-	
-	if ( $self-> {chunked}) {
-		# check if got enough using Transfer-Encoding: chunked
-		return 1 if $self-> got_te( $buf);
-	}
+		return $self-> http_tail( $1 + $offset )
+			if defined ($l) and $l =~ /^(\d+)\s*$/;
 
-	return 0;
+		# have 'Transfer-Encoding: chunked' ? read the chunks
+		my $te = lc( $headers-> header('Transfer-Encoding') || '');
+		return $self-> http_read_chunked($offset)
+			if $self-> {chunked} = $te =~ /^chunked\s*$/i;
+	
+		# just read as much as possible then
+		return $self-> http_tail;
+	}}}}}
 }
 
-# checks if Transfer-Encoding: chunked produced enough data to close the connection
-sub got_te
+# read sequence of TE chunks
+sub http_read_chunked
 {
-	my ( $self, $buf) = @_;
+	my ( $self, $offset) = @_;
 
-	# walk through all available chunks, advance want_chunk pointer
-	while ( 1) {
-		return if length($$buf) < $self-> {want_chunk};
+	my ( @frame, @ctx);
 
-		# got chunk size?
-		pos( $$buf) = $self-> {want_chunk};
-		return unless $$buf =~ /\G(.*?)\r?\n/g;
-		my $size = $1;
-		unless ( $size =~ /^([\da-f]+)/i) {
-			# not a chunk size, won't continue in chunk mode
-			$self-> {chunked} = 0;
-			return;
-		}
-		$size = hex $size;
+	# read chunk size
+	pos( $self-> {buf} ) = $offset;
+	context @ctx = $self-> http_read( qr/\G[\da-f]+\r?\n/i);
+	tail {
+		# save this lambda frame
+		@frame = this_frame;
+		# got error
+		my $line = shift;
+		return undef, shift unless defined $line;
 
-		# enough!
-		return 1 if $size == 0;
+		# advance
+		$offset += length($line);
+		$line =~ s/\r?\n//;
+		my $size = hex $line;
+		return 1 unless $size;
 
-		$self-> {want_chunk} = pos($$buf) + $size + 2; # 2 for CRLF
-	}
+	# read the chunk itself
+	context $self-> http_read( $size);
+	tail {
+		return undef, shift unless shift;
+		$offset += $size + 2; # 2 for CRLF
+		pos( $self-> {buf} ) = $offset;
+		context @ctx;
+		again( @frame);
+	}};
 }
+
 
 sub parse
 {

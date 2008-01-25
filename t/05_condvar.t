@@ -1,11 +1,11 @@
 #! /usr/bin/perl
-# $Id: 05_condvar.t,v 1.2 2007/12/15 23:03:16 dk Exp $
+# $Id: 05_condvar.t,v 1.3 2008/01/25 13:46:04 dk Exp $
 
 use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Test::More tests => 5;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda);
 
 package PseudoLoop;
 
@@ -22,6 +22,7 @@ my $q2   = lambda {
 	ok( not( $q-> is_stopped), 'bind');
 	sleep { $q-> resolve($cond) }
 };
+$q2-> start;
 $q-> wait;
 ok( $q-> is_stopped, 'resolve');
 

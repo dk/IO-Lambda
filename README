@@ -26,7 +26,7 @@ IO::Lambda features syntax where one can indeed use the lambda syntax.
 Below is a full-functioning code:
 
 	use strict;
-	use IO::Lambda qw(:all);
+	use IO::Lambda qw(:lambda);
 	use IO::Socket::INET;
 	my $q = lambda {
 		my ( $socket, $url) = @_;

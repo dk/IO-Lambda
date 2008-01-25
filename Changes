@@ -15,3 +15,7 @@
 
 0.07 - Fri Jan 09 2008
 	improve http handler versatility
+
+0.08 - Fri Jan 25 2008
+	add stream I/O
+	rewrite insides of http protocol in lambda style

@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.2 2007/12/16 20:20:16 dk Exp $
+# $Id: SNMP.pm,v 1.3 2008/01/25 13:46:04 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(@ISA @EXPORT_OK %EXPORT_OK);
 @ISA = qw(Exporter);
@@ -12,7 +12,7 @@ use SNMP;
 use IO::Handle;
 use Exporter;
 use Time::HiRes qw(time);
-use IO::Lambda qw(:all :constants);
+use IO::Lambda qw(:all);
 use IO::Lambda::Loop::Select;
 
 $IO::Lambda::Loop::Select::SELECT = sub {

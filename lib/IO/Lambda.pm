@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.22 2008/01/09 11:50:46 dk Exp $
+# $Id: Lambda.pm,v 1.23 2008/01/25 13:46:04 dk Exp $
 
 package IO::Lambda;
 
@@ -6,27 +6,34 @@ use Carp;
 use strict;
 use warnings;
 use Exporter;
-use Scalar::Util qw(weaken);
 use vars qw(
-	$LOOP %EVENTS @OBJECTS @LOOPS
+	$LOOP %EVENTS @LOOPS
 	$VERSION @ISA
-	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_CLIENT
+	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = 0.07;
+$VERSION     = 0.08;
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
 	WATCH_OBJ WATCH_DEADLINE WATCH_LAMBDA WATCH_CALLBACK
 	WATCH_IO_HANDLE WATCH_IO_FLAGS
 );
-@EXPORT_CLIENT = qw(
-	this context lambda restart again
-	io read getline write sleep tail
+@EXPORT_STREAM = qw(
+	sysreader syswriter getline readbuf writebuf
 );
-@EXPORT_OK   = (@EXPORT_CLIENT, @EXPORT_CONSTANTS);
-%EXPORT_TAGS = ( all => \@EXPORT_CLIENT, constants => \@EXPORT_CONSTANTS );
+@EXPORT_LAMBDA = qw(
+	this context lambda this_frame again
+	io read write sleep tail tails
+);
+@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
+%EXPORT_TAGS = (
+	lambda    => \@EXPORT_LAMBDA, 
+	stream    => \@EXPORT_STREAM, 
+	constants => \@EXPORT_CONSTANTS,
+	all       => \@EXPORT_OK,
+);
 $DEBUG = $ENV{IO_LAMBDA_DEBUG};
 
 use constant IO_READ              => 4;
@@ -44,26 +51,25 @@ use constant WATCH_IO_FLAGS       => 4;
 sub new
 {
 	IO::Lambda::Loop-> new unless $LOOP;
-	my $self = bless {
+	return bless {
 		in      => [],    # events we wait for 
 		last    => [],    # result of the last state
 		stopped => 0,     # initial state
 		start   => $_[1], # kick-start coderef
 	}, $_[0];
-	push @OBJECTS, $self;
-	weaken $OBJECTS[-1];
-	$self;
 }
 
 sub DESTROY
 {
 	my $self = $_[0];
 	$self-> cancel_all_events;
-	@OBJECTS = grep { defined($_) and $_ != $self } @OBJECTS;
 }
 
-sub _d     { _obj(shift), ': ', @_, "\n" }
-sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1)" }
+my  $_doffs = 0;
+sub _d_in  { $_doffs++ }
+sub _d_out { $_doffs-- if $_doffs }
+sub _d     { ('  ' x $_doffs), _obj(shift), ': ', @_, "\n" }
+sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1).$_[0]->{caller}" }
 sub _t     { defined($_[0]) ? ( "time(", $_[0]-time, ")" ) : () }
 sub _ev
 {
@@ -162,6 +168,8 @@ sub watch_lambda
 
 	croak "won't watch myself" if $self == $lambda;
 	# XXX check cycling
+	
+	$lambda-> reset if $lambda-> is_stopped;
 
 	my $rec = [
 		$self,
@@ -170,6 +178,8 @@ sub watch_lambda
 	];
 	push @{$self-> {in}}, $rec;
 	push @{$EVENTS{"$lambda"}}, $rec;
+
+	$lambda-> start if $lambda-> is_passive;
 
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
 }
@@ -187,11 +197,15 @@ sub io_handler
 	die _d($self, 'stray ', _ev($rec))
 		if $nn == @$in or $self != $rec->[WATCH_OBJ];
 
+	_d_in if $DEBUG;
+
 	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
 		$self, 
 		(($#$rec == WATCH_IO_FLAGS) ? $rec-> [WATCH_IO_FLAGS] : ()),
 		@{$self->{last}}
-	);
+	) if $rec-> [WATCH_CALLBACK];
+
+	_d_out if $DEBUG;
 	warn $self-> _msg('io') if $DEBUG;
 
 	unless ( @$in) {
@@ -222,10 +236,17 @@ sub lambda_handler
 	@$arr = grep { $_ != $rec } @$arr;
 	delete $EVENTS{"$lambda"} unless @$arr;
 
-	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
-		$self, 
-		@{$rec-> [WATCH_LAMBDA]-> {last}}
-	);
+	_d_in if $DEBUG;
+				
+	@{$self->{last}} = 
+		$rec-> [WATCH_CALLBACK] ? 
+			$rec-> [WATCH_CALLBACK]-> (
+				$self, 
+				@{$rec-> [WATCH_LAMBDA]-> {last}}
+			) : 
+			@{$rec-> [WATCH_LAMBDA]-> {last}};
+
+	_d_out if $DEBUG;
 	warn $self-> _msg('tail') if $DEBUG;
 
 	unless ( @$in) {
@@ -234,7 +255,7 @@ sub lambda_handler
 	}
 }
 
-# Removes all avents bound to the object, notified the interested objects.
+# Removes all avents bound to the object, notifies the interested objects.
 # The object becomes stopped, so no new events will be allowed to register.
 sub cancel_all_events
 {
@@ -285,8 +306,6 @@ sub start
 		if $self-> {start};
 	warn $self-> _msg('initial') if $DEBUG;
 
-	return if delete $self-> {restarted_hack};
-	
 	unless ( @{$self->{in}}) {
 		warn _d( $self, 'stopped') if $DEBUG;
 		$self-> {stopped} = 1;
@@ -329,10 +348,6 @@ sub drive
 	while ( $changed) {
 		$changed = 0;
 
-		# kickstart
-		$executed++, $_-> start
-			for grep { $_-> is_passive } @OBJECTS;
-
 		# dispatch
 		for my $rec ( map { @$_ } values %EVENTS) {
 			next unless $rec->[WATCH_LAMBDA]-> {stopped};
@@ -351,7 +366,10 @@ sub drive
 sub wait
 {
 	my $self = shift;
-	$self-> call(@_) if $self-> is_passive;
+	if ( $self-> is_passive) {
+		$self-> call(@_);
+		$self-> start;
+	}
 	while ( 1) {
 		my $n = drive;
 		last if $self-> {stopped};
@@ -365,6 +383,7 @@ sub wait_for_all
 {
 	my @objects = @_;
 	return unless @objects;
+	$_-> start for grep { $_-> is_passive } @objects;
 	my @ret;
 	while ( 1) {
 		my $n = drive;
@@ -382,7 +401,7 @@ sub wait_for_any
 {
 	my @objects = @_;
 	return unless @objects;
-	$_-> step for @objects;
+	$_-> start for grep { $_-> is_passive } @objects;
 	while ( 1) {
 		my $n = drive;
 		@objects = grep { $_-> {stopped} } @objects;
@@ -408,27 +427,26 @@ sub run
 #
 ################################################################
 
+sub _lambda_restart { die "lambda() is not restartable" }
 sub lambda(&)
 {
 	my $cb  = $_[0];
-	__PACKAGE__-> new( sub {
-		$THIS     = shift;
-		@CONTEXT  = ();
-		$CALLBACK = $cb;
-		$METHOD   = \&_lambda_restart;
+	my $l   = __PACKAGE__-> new( sub {
+		# initial lambda code is usually executed by tail/tails inside another lambda
+		local $THIS     = shift;
+		local @CONTEXT  = ();
+		local $CALLBACK = $cb;
+		local $METHOD   = \&_lambda_restart;
 		$cb ? $cb-> (@_) : @_;
 	});
-}
-sub _lambda_restart
-{
-	$THIS-> cancel_all_events;
-	delete $THIS-> {stopped};
-	$THIS-> {restarted_hack} = 1;
+	$l-> {caller} = join(':', (caller)[1,2]) if $DEBUG;
+	$l;
 }
 
 # restart latest state
 sub again
-{ 
+{
+	( $METHOD, $CALLBACK) = @_ if 2 == @_;
 	defined($METHOD) ? 
 		$METHOD-> ( $CALLBACK) : 
 		croak "again predicate outside of a restartable call" 
@@ -437,7 +455,7 @@ sub again
 # define context
 sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
-sub restart      { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
+sub this_frame   { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
 
 #
 # Predicates:
@@ -477,53 +495,6 @@ sub read(&)
 	)
 }
 
-# getline($handle,$buf_ptr,$deadline)
-sub getline(&)
-{
-	my ( $cb, $fh, $buf, $deadline) = ( shift, context);
-
-	my $bufsize;
-	croak "getline: buffer is required" unless $buf;
-	$$buf = '' unless defined $$buf;
-
-	# each time we're called, create a new lambda
-	# depending on whether there is something alredy in the buffer or not
-	my $lambda = ( $$buf =~ s/^([^\n]*\n)//) ?
-		# create lambda with constant value
-		IO::Lambda-> new-> call($1) : 
-		# create lambda that will read from handle
-		lambda {
-			context $fh, $deadline;
-			IO::Lambda::read {
-				# timeout? return nothing
-				$@ = 'timeout', return undef unless shift;
-				my $n = sysread $fh, $$buf, 1024, length($$buf);
-				# error? return undef
-				$@ = $!, return undef unless defined $n;
-				# closed handle?
-				unless ( $n) {
-					$@ = $!, return undef unless length $$buf;
-					# return whatever left in the buffer
-					my $x = $$buf;
-					$$buf = '';
-					return $x;
-				};
-				# got line? return it
-				return $1 if $$buf =~ s/^([^\n]*\n)//;
-				# otherwise, just wait for more data
-				again;
-			}
-		};
-	
-	# register the caller to wait for the lambda
-	this-> add_tail(
-		$cb,
-		\&getline,
-		$lambda,
-		$fh, $buf, $deadline
-	);
-}
-
 # handle($handle,$deadline)
 sub write(&)
 {
@@ -558,18 +529,27 @@ sub add_tail
 	my ($self, $cb, $method, $lambda, @ctx) = @_;
 	$self-> watch_lambda(
 		$lambda,
-		sub {
+		$cb ? sub {
 			$THIS     = shift;
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$cb ? $cb-> (@_) : @_;
-		},
+			$cb-> (@_);
+		} : undef,
 	);
 }
 
-# tail(@lambdas) -- wait for all lambdas to finish
+# tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
 sub tail(&)
+{
+	my ( $lambda, @param) = context;
+	$lambda-> reset if $lambda-> is_stopped;
+	$lambda-> call( @param);
+	$THIS-> add_tail( shift, \&tail, $lambda, $lambda, @param);
+}
+
+# tails(@lambdas) -- wait for all lambdas to finish
+sub tails(&)
 {
 	my $cb = $_[0];
 	my @lambdas = context;
@@ -577,21 +557,167 @@ sub tail(&)
 	croak "no tails" unless @lambdas;
 
 	my @ret;
-	my $watcher = sub {
+	my $watcher;
+	$watcher = sub {
 		$THIS     = shift;
 		push @ret, @_;
 		return if $n--;
 
 		@CONTEXT  = @lambdas;
-		$METHOD   = \&tail;
+		$METHOD   = \&tails;
 		$CALLBACK = $cb;
 		$cb ? $cb-> (@ret) : @ret;
 	};
-	$THIS-> watch_lambda( $_, $watcher) for @lambdas;
+	my $this = $THIS;
+	$this-> watch_lambda( $_, $watcher) for @lambdas;
 }
 
 #
-# Part III - Developer API for custom condvars and event loops
+# Part III - High order lambdas
+#
+################################################################
+
+# sysread lambda wrapper
+#
+# ioresult    :: ($result, $error)
+# sysreader() :: ($fh, $buf, $offset, $deadline) -> ioresult
+sub sysreader (){ lambda 
+{
+	my ( $fh, $buf, $length, $deadline) = @_;
+	$$buf = '' unless defined $$buf;
+
+	this-> watch_io( IO_READ, $fh, $deadline, sub {
+		return undef, 'timeout' unless shift;
+		my $n = sysread( $fh, $$buf, $length, length($$buf));
+		if ( $DEBUG) {
+			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
+			warn substr( $$buf, length($$buf) - $n) if $DEBUG > 2 and $n > 0;
+		}
+		return undef, $! unless defined $n;
+		return $n;
+	})
+}}
+
+# syswrite() lambda wrapper
+#
+# syswriter() :: ($fh, $buf, $length, $offset, $deadline) -> ioresult
+sub syswriter (){ lambda
+{
+	my ( $fh, $buf, $length, $offset, $deadline) = @_;
+
+	this-> watch_io( IO_WRITE, $fh, $deadline, sub {
+		return undef, 'timeout' unless shift;
+		my $n = syswrite( $fh, $$buf, $length, $offset);
+		if ( $DEBUG) {
+			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
+			warn substr( $$buf, $offset, $n) if $DEBUG > 2 and $n > 0;
+		}
+		return undef, $! unless defined $n;
+		return $n;
+	});
+}}
+
+sub _match 
+{
+	my ( $cond, $buf) = @_;
+
+	return unless defined $cond;
+
+	return ($$buf =~ /($cond)/)[0] if ref($cond) eq 'Regexp';
+	return $cond->($buf) if ref($cond) eq 'CODE';
+	return length($$buf) >= $cond;
+}
+
+# read from stream until condition is met
+#
+# readbuf($reader) :: ($fh, $buf, $cond, $deadline) -> ioresult
+sub readbuf
+{
+	my $reader = shift || sysreader;
+
+	lambda {
+		my ( $fh, $buf, $cond, $deadline) = @_;
+		
+		$$buf = "" unless defined $$buf;
+
+		my $match = _match( $cond, $buf);
+		return $match if $match;
+	
+		my ($maxbytes, $bufsize);
+		$maxbytes = $cond if defined($cond) and not ref($cond) and $cond > 0;
+		$bufsize = defined($maxbytes) ? $maxbytes : 65536;
+		
+		my $savepos = pos($$buf); # useful when $cond is a regexp
+
+		context $reader, $fh, $buf, $bufsize, $deadline;
+	tail {
+		pos($$buf) = $savepos;
+
+		my $bytes = shift;
+		return undef, shift unless defined $bytes;
+		
+		unless ( $bytes) {
+			return 1 unless defined $cond;
+			return undef, 'eof';
+		}
+		
+		# got line? return it
+		my $match = _match( $cond, $buf);
+		return $match if $match;
+		
+		# otherwise, just wait for more data
+		$bufsize -= $bytes if defined $maxbytes;
+
+		context $reader, $fh, $buf, $bufsize, $deadline;
+		again;
+	}}
+}
+
+# curry up readbuf
+#
+# getline($reader) :: ($fh, $buf, $deadline) -> ioresult
+sub getline
+{
+	my $reader = shift;
+	lambda {
+		my ( $fh, $buf, $deadline) = @_;
+		context readbuf($reader), $fh, $buf, qr/^[^\n]*\n/, $deadline;
+		&tail();
+	}
+}
+
+# write all buffer to the stream
+#
+# writebuf($writer) :: syswriter
+sub writebuf
+{
+	my $writer = shift || syswriter;
+
+	lambda {
+		my ( $fh, $buf, $len, $offs, $deadline) = @_;
+
+		$$buf = "" unless defined $$buf;
+		$offs = 0 unless defined $offs;
+		$len  = length $$buf unless defined $len;
+		my $written = 0;
+		
+		context $writer, $fh, $buf, $len, $offs, $deadline;
+	tail {
+		my $bytes = shift;
+		return undef, shift unless defined $bytes;
+
+		$offs    += $bytes;
+		$written += $bytes;
+		$len     -= $bytes;
+		return $written if $len <= 0;
+
+		context $writer, $fh, $buf, $len, $offs, $deadline;
+		again;
+	}}
+}
+
+#
+# Part IV - Developer API for custom condvars and event loops
 #
 ################################################################
 
@@ -678,7 +804,7 @@ programming with single-process, single-thread, non-blocking I/O.
 
 Prerequisite
 
-    use IO::Lambda qw(:all);
+    use IO::Lambda qw(:lambda);
 
 Create an empty IO::Lambda object
 
@@ -705,7 +831,7 @@ Create pipeline that waits for 2 lambdas
 
     $q = lambda {
         context lambda { 2 }, lambda { 3 };
-	tail { sort @_ }; # order is not guaranteed
+	tails { sort @_ }; # order is not guaranteed
     };
     print $q-> wait; # will print 23
 
@@ -753,7 +879,7 @@ Connect two parallel connections: by waiting for all
 
     $q = lambda {
         context talk($request1), talk($request2);
-	tail { print for @_ };
+	tails { print for @_ };
     };
     $q-> wait;
 
@@ -779,7 +905,7 @@ talk_redirect() will have exactly the same properties as talk() does
 =head2 Working example
 
     use strict;
-    use IO::Lambda qw(:all);
+    use IO::Lambda qw(:lambda);
     use IO::Socket::INET;
     my $q = lambda {
         my ( $socket, $url) = @_;
@@ -823,10 +949,11 @@ lambda will be executed:
     # not printed anything yet
     $q-> wait; # <- here will
 
-Lambdas are never started explicitly; C<wait> will start passive lambdas, and
-will wait for the caller lambda to finish. Lambda is finished when there are no
-more events to listen to. The example lambda above will finish right after
-C<print> statement.
+Lambdas are usually not started explicitly; the function that waits for a
+lambda, also starts it. C<wait>, the synchronous waiter, and C<tail>/C<tails>, the
+asynchronous ones, start passive lambdas when called. Lambda is finished when
+there are no more events to listen to. The example lambda above will finish
+right after C<print> statement.
 
 Lambda can listen to events by calling predicates, that internally subscribe
 the lambda object to corresponding file handles, timers, and other lambdas.
@@ -863,7 +990,7 @@ will print undeterminable number of ones.
 Each lambda callback (further on, merely lambda) executes in its own, private
 context. The context here means that all predicates register callbacks on an
 implicitly given lambda object, and keep the passed parameters on the context
-stack. The fact that context is preserved between states, help build terser
+stack. The fact that context is preserved between states, helps building terser
 code with series of IO calls:
 
     context \*SOCKET;
@@ -879,7 +1006,7 @@ is actually a shorter form for
     read {
     }}
 
-And as context is kept, the current lambda object is also, but in C<this>
+And as the context is kept, the current lambda object is also, in C<this>
 property. The code above is actually
 
     my $self = this;
@@ -904,9 +1031,9 @@ which means that explicitly setting C<this> will always clear the context.
 =head2 Data and execution flow
 
 Lambda is initially called with arguments passed from outside. These arguments
-can be stored using C<call> method; C<wait> also issues C<call> internally,
-thus replacing any previous data stored by C<call>. Inside the lambda
-these arguments are available as C<@_>.
+can be stored using C<call> method; C<wait> and C<tail> also issues C<call>
+internally, thus replacing any previous data stored by C<call>. Inside the
+lambda these arguments are available as C<@_>.
 
 Whatever is returned by a predicate callback (including C<lambda> predicate),
 will be passed as C<@_> to the next callback, or to outside, if the lambda is
@@ -967,18 +1094,18 @@ will simply be less precise, and will jitter plus-minus half a second.
 All predicates receive their parameters from the context stack, or simply the
 context. The only parameter passed to them by using perl call, is a callback
 itself.  Predicates can also be called without a callback, in which case, they
-will simply pass further data that otherwise would be passed as C<@_> to the
+will pass further data that otherwise would be passed as C<@_> to the
 callback. Thus, a predicate can be called either as
 
     read { .. code ... }
 
 or 
 
-    &read; # no callback
+    &read(); # no callback
 
-Predicates can either be used after explicit exporting of them by
+Predicates can either be used after explicit exporting
 
-   use IO::Lambda qw(:all);
+   use IO::Lambda qw(:lambda);
    lambda { ... }
 
 or by using the package syntax,
@@ -998,18 +1125,6 @@ Executes either when C<$filehandle> becomes readable, or after C<$deadline>.
 Passes one argument, which is either TRUE if the handle is readable, or FALSE
 if time is expired. If C<deadline> is C<undef>, then no timeout is registered,
 that means that it will never execute with FALSE.
-
-=item getline($filehandle, $$buffer, $deadline = undef)
-
-Executes either when a line can be read from C<$filehandle>, or after
-C<$deadline> if the latter is defined. On success, returns the line read.
-Otherwise, returns undef, and stores the error message in C<$@>, which can
-either C<timeout>, C<eof>, or C<$!> string value.
-
-Note: buffer must be shared for all C<$filehandle> operations.
-
-This predicate is a higher-level predicate, that operates on predicates itself.
-You're welcome to study its source code.
 
 =item write($filehandle, $deadline = undef)
 
@@ -1031,15 +1146,20 @@ C<deadline> is C<undef>, no timeout is registered, i.e. will never return 0.
 
 Executes after C<$deadline>. C<$deadline> cannot be C<undef>.
 
-=item tail(@lambdas)
+=item tail($lambda, @parameters)
+
+Issues C<< $lambda-> call(@parameters) >>, then waits for the C<$lambda>
+to complete.
+
+=item tails(@lambdas)
 
 Executes when all objects in C<@lambdas> are finished, returns the collected,
 unordered results of the objects.
 
-=item again()
+=item again(@frame = ())
 
 Restarts the current state with the current context. All the predicates above,
-including C<lambda>, are restartable. The code
+excluding C<lambda>, are restartable. The code
 
    context $obj1;
    tail {
@@ -1053,10 +1173,14 @@ is thus equivalent to
    context $obj1;
    tail {
        context $obj2;
-       &tail;
+       &tail();
    };
 
 C<again> passes the current context to the predicate.
+
+If C<@frame> is provided, then it is treated as result of previous C<this_frame> call.
+It contains data suffucient to restarting another call, instead of the current.
+See C<this_frame> for details.
 
 =item context @ctx
 
@@ -1080,13 +1204,128 @@ instead of
     my $q = lambda { ... };
     $q-> wait;
 
-=item restart $method, $callback
+=item this_frame(@frame)
 
-The predicate used for declaration of user-defined restartable predicates
-(it is not a requirement for a predicate to be restartable though).
+If called without parameters, returns the current callback frame, that
+can be later used in C<again>. Otherwise, replaces the internal frame
+variables, that doesn't afect anything immediately, but will be used by C<again>
+that is called without parameters.
 
-This predicate is mostly for internal use, and it is not really decided yet 
-if it will stay. See the module source code for details of the use.
+This property is only used when the predicate inside which C<this_frame> was
+fetched, is restartable. Since it is not a requirement for a user-defined
+predicate to be restartable, this property is not universally useful.
+
+Example:
+
+    context lambda { 1 };
+    tail {
+        return if 3 == shift;
+    	my @frame = this_frame;
+        context lambda { 2 };
+	tail {
+	   context lambda { 3 };
+	   again( @frame);
+	}
+    }
+
+The outermost tail callback will be called twice: first time in the normal course of event,
+and second time as a result of the C<again> call.
+
+=back
+
+=head2 Stream I/O
+
+The whole point of this module is to build complex protocols in clear,
+consequent programming style. Consider how perl's low-level C<sysread> and
+C<syswrite> relate to its higher-level C<readline>, where the latter not only
+does the buffering, but also recognizes C<$/> as input record separator. The
+section above described lower-level lambda I/O predicates, that are only useful
+for C<sysread> and C<syswrite>; this section tells about higher-level lambdas
+that relate to these as the said C<readline> to C<sysread>.
+
+All functions in this section return a lambda, that does the actual work.  Not
+unlike as a class' constructor returns a newly created class instance, these
+functions return newly created lambdas, that do the actual work. Therefore,
+these functions are documented here as having two inputs and one output, as
+for example a function C<sysreader> is a function that takes 0 parameters,
+always returns a new lambda, and this lambda, in turn, takes four parameters
+and returns two. Such function will be described as
+
+    # sysreader() :: ($fh,$buf,$length,$deadline) -> ($result,$error)
+
+Since all stream I/O lambdas return same set of scalars, the return type
+will be further on referred as C<ioresult>:
+
+    # ioresult    :: ($result, $error)
+    # sysreader() :: ($fh,$buf,$length,$deadline) -> ioresult
+
+C<ioresult>'s first scalar is defined on success, and is not otherwise.  In the
+latter case, the second scalar contains the error, usually either C<$!> or
+C<'timeout'> (if C<$deadline> was set).
+
+=over
+
+=item sysreader() :: ($fh, $buf, $length, $deadline) -> ioresult
+
+Creates lambda that will accept all the parameters used by C<sysread> (except
+C<$offset> though), plus C<$deadline>. The lambda tries to read C<$length>
+bytes from C<$fh> into C<$buf>, when C<$fh> becomes available for reading. If
+C<$deadline> expires, fails with C<'timeout'> error. On successful read,
+returns number of bytes read, or <$!> otherwise.
+
+=item syswriter() :: ($fh, $buf, $length, $offset, $deadline) -> ioresult
+
+Creates lambda that will accept all the parameters used by C<syswrite> plus
+C<$deadline>. The lambda tries to write C<$length> bytes to C<$fh> from C<$buf>
+from C<$offset>, when C<$fh> becomes available for writing. If C<$deadline>
+expires, fails with C<'timeout'> error. On successful write, returns number of
+bytes written, or <$!> otherwise.
+
+=item readbuf($reader = sysreader()) :: ($fh, $buf, $cond, $deadline) -> ioresult
+
+Creates a lambda that is able to perform buffered reads from C<$fh>, either
+using custom lambda C<reader>, or using one newly generated by C<sysreader>.
+The lambda when called, will read continually from C<$fh> into C<$buf>, and
+will either fail on timeout, I/O error, or end of file, or succeed if C<$cond>
+condition matches.
+
+The condition is a "smart match" of sorts, and can be one of:
+
+=over
+
+=item integer
+
+The lambda will succeed when exactly C<$cond> bytes are read from C<$fh>.
+
+=item regexp
+
+The lambda will succeed when exactly C<$cond> matches the content of C<$buf>.
+Note that C<readbuf> saves and restores value of C<pos($$buf)>, so use of
+C<\G> is encouraged here.
+
+=item coderef :: ($buf -> BOOL)
+
+The lambda will succeed if coderef called with C<$buf> returns true value.
+
+=item undef
+
+The lambda will succeed on end of file. Note that for all other conditions end
+of file is reported as an error.
+
+=back
+
+=item writebuf($writer) :: ($fh, $buf, $length, $offset, $deadline) -> ioresult
+
+Creates a lambda that is able to perform buffered writes to C<$fh>, either
+using custom lambda C<writer>, or using one newly generated by C<syswriter>.
+The lambda when called, will write continually C<$buf> (from C<$offset>,
+C<$length> bytes) and will either fail on timeout, I/O error, or end of file,
+or succeed when C<$length> bytes were written successfully.
+
+=item getline($reader) :: ($fh, $buf, $deadline) -> ioresult
+
+Same as C<readbuf>, but succeeds when a string of bytes ended by a newline
+is read.
 
 =back
 
@@ -1215,7 +1454,7 @@ L<Coro>, L<threads>, L<POE>.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (c) 2007 capmon ApS. All rights reserved.
+Copyright (c) 2008 capmon ApS. All rights reserved.
 
 This library is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

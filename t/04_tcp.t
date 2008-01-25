@@ -1,10 +1,10 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.8 2007/12/15 17:03:08 dk Exp $
+# $Id: 04_tcp.t,v 1.9 2008/01/25 13:46:04 dk Exp $
 
 use strict;
 use warnings;
 use Test::More tests => 6;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:lambda :stream);
 use Time::HiRes qw(time);
 use IO::Handle;
 use IO::Socket::INET;
@@ -61,6 +61,8 @@ my $server = lambda {
 	};
 };
 ok( $server-> is_passive, 'server is created' );
+$server-> start;
+ok( $server-> is_waiting, 'server is alive' );
 
 # prepare connection to the server
 sub sock
@@ -79,8 +81,7 @@ this lambda {
 	context sock;
 	write { "can write" };
 };
-ok(this-> wait eq 'can write', 'got write');
-ok( $server-> is_waiting, 'server is alive' );
+ok( this-> wait eq 'can write', 'got write');
 
 # test that we can write and can read response
 this lambda {
@@ -88,8 +89,8 @@ this lambda {
 	context $c;
 	write {
 		print $c "moo";
-		context $c, \(my $buf = '');
-		getline {
+		context getline, $c, \(my $buf = '');
+		tail {
 			$_ = shift;
 			chomp;
 			return $_;
@@ -118,7 +119,7 @@ sub conn
 }
 this lambda {
 	context map { conn $_ } (1,22,333,4444);
-	tail { join '+', map { m/(\d+)/ } @_ };
+	tails { join '+', map { m/(\d+)/ } @_ };
 };
 ok(this-> wait eq '4+5+6+7', 'parallel connections');
 
