@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.23 2008/01/25 13:46:04 dk Exp $
+# $Id: Lambda.pm,v 1.24 2008/01/25 13:58:36 dk Exp $
 
 package IO::Lambda;
 
@@ -255,7 +255,7 @@ sub lambda_handler
 	}
 }
 
-# Removes all avents bound to the object, notifies the interested objects.
+# Removes all events bound to the object, notifies the interested objects.
 # The object becomes stopped, so no new events will be allowed to register.
 sub cancel_all_events
 {
@@ -283,7 +283,7 @@ sub is_waiting  { not($_[0]->{stopped}) and @{$_[0]->{in}} }
 sub is_passive  { not($_[0]->{stopped}) and not(@{$_[0]->{in}}) }
 sub is_active   { $_[0]->{stopped} or @{$_[0]->{in}} }
 
-# resets the state machine
+# reset the state machine
 sub reset
 {
 	my $self = shift;
@@ -294,7 +294,7 @@ sub reset
 	warn _d( $self, 'reset') if $DEBUG;
 }
 
-# starts the state machine
+# start the state machine
 sub start
 {
 	my $self = shift;
@@ -338,8 +338,8 @@ sub terminate
 
 # synchronization
 
-# drives all objects until all of them
-# are either stopped, or in a blocking state
+# drives objects dependant on the other objects until all of them
+# are stopped
 sub drive
 {
 	my $changed = 1;
@@ -362,7 +362,7 @@ sub drive
 	return $executed;
 }
 
-# wait for all lambdas to stop
+# wait for one lambda to stop
 sub wait
 {
 	my $self = shift;
@@ -379,6 +379,7 @@ sub wait
 	return $self-> peek;
 }
 
+# wait for all lambdas to stop
 sub wait_for_all
 {
 	my @objects = @_;
@@ -396,7 +397,7 @@ sub wait_for_all
 	return @ret;
 }
 
-# wait for at least one lambda to stop, returns those that stopped
+# wait for at least one lambda to stop, return those that stopped
 sub wait_for_any
 {
 	my @objects = @_;
@@ -411,7 +412,7 @@ sub wait_for_any
 	}
 }
 
-# run the event loop until no lambdas are left in blocking state
+# run the event loop until no lambdas are left in the blocking state
 sub run
 {
 	while ( $LOOP) {
@@ -423,16 +424,17 @@ sub run
 }	
 
 #
-# Part II - Procedural interface to the lambda-style pogramming
+# Part II - Procedural interface to the lambda-style programming
 #
-################################################################
+#################################################################
 
 sub _lambda_restart { die "lambda() is not restartable" }
 sub lambda(&)
 {
 	my $cb  = $_[0];
 	my $l   = __PACKAGE__-> new( sub {
-		# initial lambda code is usually executed by tail/tails inside another lambda
+		# initial lambda code is usually executed by tail/tails inside another lambda,
+		# so protect the upper-level context
 		local $THIS     = shift;
 		local @CONTEXT  = ();
 		local $CALLBACK = $cb;
@@ -443,7 +445,7 @@ sub lambda(&)
 	$l;
 }
 
-# restart latest state
+# re-enter the latest (or other) frame
 sub again
 {
 	( $METHOD, $CALLBACK) = @_ if 2 == @_;
@@ -673,7 +675,7 @@ sub readbuf
 	}}
 }
 
-# curry up readbuf
+# curry readbuf()
 #
 # getline($reader) :: ($fh, $buf, $deadline) -> ioresult
 sub getline
@@ -686,7 +688,7 @@ sub getline
 	}
 }
 
-# write all buffer to the stream
+# write whole buffer to stream
 #
 # writebuf($writer) :: syswriter
 sub writebuf
