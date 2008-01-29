@@ -1,4 +1,4 @@
-# $Id: Prima.pm,v 1.1 2008/01/29 15:06:51 dk Exp $
+# $Id: Prima.pm,v 1.2 2008/01/29 15:53:47 dk Exp $
 
 package IO::Lambda::Loop::Prima;
 use strict;
@@ -39,7 +39,8 @@ sub reset_mask
 	}
 }
 
-my ( $in_yield, %masks);
+my @prima_events;
+sub io_filter    { push @prima_events, \@_; return 0 }
 sub on_read      { on_io($_[0], fe::Read)      }
 sub on_write     { on_io($_[0], fe::Write)     }
 sub on_exception { on_io($_[0], fe::Exception) }
@@ -52,24 +53,36 @@ sub on_io
 	my $fileno = fileno($obj-> file);
 	warn "event $fileno/$filenos{$fileno}->{mask} $flags\n" if $DEBUG;
 
-	%masks = () unless $in_yield;
-
-	exists ($masks{$fileno}) ? 
-		$masks{$fileno} |= $flags :
-		$masks{$fileno} = $flags;
-
-	$filenos{$fileno}-> {mask} &= ~$flags;
-	$obj-> mask( $filenos{$fileno}-> {mask} );
-
-	return if $in_yield;
-
-	# now wait (not select-wait, just wait for inner loop to finish), for all I/O events to arrive
-	$in_yield++;
+	# Read up all events sitting in the queue
+	#
+	# This is to collect all eventual IO events at once, and
+	# not to handle each other separately in callbacks. Needed in 
+	# situations when f.ex. a record listens for IO_READ|IO_WRITE --
+	# if callbacks to be called separately, it'll be even more mess
+	my $hook = Prima::Component-> event_hook;
+	@prima_events = ();
+	Prima::Component-> event_hook( \&io_filter);
 	$::application-> yield;
-	$in_yield = 0;
+	Prima::Component-> event_hook( $hook);
 
+	# create mapping fileno -> flags
+	my %files = ( map { ("$_->{object}" => 1) } ( values %filenos ));
 	my @ev;
 	my @xr;
+	my %masks;
+	for ( grep { exists $files{ $_->[0] }} @prima_events) {
+		my $lflags = 0;
+		$lflags |= IO_READ      if $_-> [1] eq 'Read';
+		$lflags |= IO_WRITE     if $_-> [1] eq 'Write';
+		$lflags |= IO_EXCEPTION if $_-> [1] eq 'Exception';
+
+		my $fileno = fileno($_->[0]-> file);
+		$masks{ $fileno } ||= 0;
+		$masks{ $fileno } |= $flags;
+	}
+	@prima_events = grep { not exists $files{ $_->[0] }} @prima_events;
+
+	# filter records based on %masks
 	while ( ( $fileno, $flags) = each %masks) {
 		my $f = $filenos{$fileno};
 		next unless $f;
@@ -110,6 +123,7 @@ sub on_io
 			for @ev;
 	}
 	$$_[WATCH_OBJ]-> io_handler( $_) for @ev;
+	Prima::Component::notify( @$_ ) for @prima_events;
 }
 
 sub watch
