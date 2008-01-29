@@ -7,6 +7,7 @@ lib/IO/Lambda/HTTP.pm
 lib/IO/Lambda/HTTPS.pm
 lib/IO/Lambda/SNMP.pm
 lib/IO/Lambda/Loop/Select.pm
+lib/IO/Lambda/Loop/Prima.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t
