@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.8 2007/12/28 17:32:28 dk Exp $
+# $Id: Select.pm,v 1.9 2008/01/29 15:08:38 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -205,10 +205,11 @@ IO::Lambda::Loop::Select - select(2)-based event loop for IO::Lambda
 
 =head1 DESCRIPTION
 
-This is the default implementation of event loop for IO::Lambda. IO::Lambda
-is designed to be agnostic of event loop choice, but currently there's only
-one implemented anyway. The module is not intended for direct use. The documentation
-declares the event loop interface rather than explains specificities of the module.
+This is the default implementation of event loop for IO::Lambda. IO::Lambda is
+designed to be agnostic of event loop choice, but this one is the default,
+reference implementation. The module is not intended for direct use. The
+documentation declares the event loop interface rather than explains
+specificities of the module.
 
 =head1 SYNOPSIS
 
