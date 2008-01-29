@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.9 2008/01/25 13:46:04 dk Exp $
+# $Id: 04_tcp.t,v 1.10 2008/01/29 15:06:04 dk Exp $
 
 use strict;
 use warnings;
@@ -117,13 +117,14 @@ sub conn
 		}
 	};
 }
+
 this lambda {
 	context map { conn $_ } (1,22,333,4444);
-	tails { join '+', map { m/(\d+)/ } @_ };
+	tails { join '+', sort map { m/(\d+)/ } @_ };
 };
 ok(this-> wait eq '4+5+6+7', 'parallel connections');
-
 # finally test the timeout
+
 this lambda {
 	my $c = sock;
 	context $c             and write {
