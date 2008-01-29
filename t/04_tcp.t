@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.10 2008/01/29 15:06:04 dk Exp $
+# $Id: 04_tcp.t,v 1.11 2008/01/29 20:34:19 dk Exp $
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use Time::HiRes qw(time);
 use IO::Handle;
 use IO::Socket::INET;
 
-#$IO::Lambda::DEBUG = 2;
+alarm(10);
 
 my $port      = $ENV{TESTPORT} || 29876;
 my $serv_sock = IO::Socket::INET-> new(
