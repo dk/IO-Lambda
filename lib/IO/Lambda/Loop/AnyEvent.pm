@@ -1,4 +1,4 @@
-# $Id: AnyEvent.pm,v 1.2 2008/01/30 21:14:55 dk Exp $
+# $Id: AnyEvent.pm,v 1.3 2008/01/30 21:17:42 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
@@ -57,8 +57,10 @@ sub watch
 	);
 
 	if ( defined $rec->[WATCH_DEADLINE]) {
+		my $time = $rec-> [WATCH_DEADLINE] - time;
+		$time = 0 if $time < 0;
 		push @$rec, AnyEvent-> timer(
-			after  => $rec-> [WATCH_DEADLINE] - time,
+			after  => $time,
 			cb     => sub {
 				my $nr = @records;
 				@records = grep { $_ != $rec } @records;
@@ -82,9 +84,11 @@ sub after
 {
 	my ( $self, $rec) = @_;
 
+	my $time = $rec-> [WATCH_DEADLINE] - time;
+	$time = 0 if $time < 0;
 	push @records, $rec;
 	push @$rec, AnyEvent-> timer(
-		after  => $rec-> [WATCH_DEADLINE] - time,
+		after  => $time,
 		cb     => sub {
 			my $nr = @records;
 			@records = grep { $_ != $rec } @records;
