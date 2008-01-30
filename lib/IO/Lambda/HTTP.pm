@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.18 2008/01/30 12:01:42 dk Exp $
+# $Id: HTTP.pm,v 1.19 2008/01/30 13:20:09 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -154,7 +154,7 @@ sub handle_connection
 		my $err = unpack('i', getsockopt($sock, SOL_SOCKET, SO_ERROR));
 		if ( $err) {
 			$! = $err;
-			return "$!";
+			return "connect: $!";
 		}
 
 		$self-> {buf}    = '';
