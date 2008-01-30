@@ -1,4 +1,4 @@
-# $Id: Prima.pm,v 1.2 2008/01/29 15:53:47 dk Exp $
+# $Id: Prima.pm,v 1.3 2008/01/30 21:13:14 dk Exp $
 
 package IO::Lambda::Loop::Prima;
 use strict;
@@ -69,7 +69,11 @@ sub on_io
 	my %files = ( map { ("$_->{object}" => 1) } ( values %filenos ));
 	my @ev;
 	my @xr;
-	my %masks;
+	my %masks = ( $fileno => 0 |
+		(( $flags & fe::Read)      ? IO_READ      : 0) |
+		(( $flags & fe::Write)     ? IO_WRITE     : 0) |
+		(( $flags & fe::Exception) ? IO_EXCEPTION : 0)
+	);
 	for ( grep { exists $files{ $_->[0] }} @prima_events) {
 		my $lflags = 0;
 		$lflags |= IO_READ      if $_-> [1] eq 'Read';
@@ -78,7 +82,7 @@ sub on_io
 
 		my $fileno = fileno($_->[0]-> file);
 		$masks{ $fileno } ||= 0;
-		$masks{ $fileno } |= $flags;
+		$masks{ $fileno } |= $lflags;
 	}
 	@prima_events = grep { not exists $files{ $_->[0] }} @prima_events;
 
@@ -88,14 +92,9 @@ sub on_io
 		next unless $f;
 		my @xr;
 
-		my $lflags = 0;
-		$lflags |= IO_READ      if $flags & fe::Read; 
-		$lflags |= IO_WRITE     if $flags & fe::Write; 
-		$lflags |= IO_EXCEPTION if $flags & fe::Exception; 
-	
 		for my $r ( @{$f-> {rec}}) {
-			if ( $r-> [WATCH_IO_FLAGS] & $lflags) {
-				$r-> [WATCH_IO_FLAGS] &= $lflags;
+			if ( $r-> [WATCH_IO_FLAGS] & $flags) {
+				$r-> [WATCH_IO_FLAGS] &= $flags;
 				push @ev, $r;
 			} else {
 				push @xr, $r;
@@ -119,6 +118,7 @@ sub on_io
 		reset_timer();
 	}
 	if ( $DEBUG) {
+		warn "prima events: ", scalar(@prima_events), "\n";
 		warn "io dispatch ", join(' ', map { defined($_) ? $_ : 'undef' } @$_), "\n"
 			for @ev;
 	}
@@ -132,7 +132,7 @@ sub watch
 	my $fileno = fileno $rec->[WATCH_IO_HANDLE]; 
 	die "Invalid filehandle" unless defined $fileno;
 
-	my $flags  = $rec->[WATCH_IO_FLAGS];
+	my $flags = $rec->[WATCH_IO_FLAGS];
 
 	unless ( $filenos{$fileno}) {
 		my $f = Prima::File-> new(
