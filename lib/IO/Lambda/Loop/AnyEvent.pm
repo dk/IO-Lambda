@@ -1,4 +1,4 @@
-# $Id $
+# $Id: AnyEvent.pm,v 1.2 2008/01/30 21:14:55 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
