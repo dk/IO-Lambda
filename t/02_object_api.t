@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.6 2008/01/25 13:46:04 dk Exp $
+# $Id: 02_object_api.t,v 1.7 2008/01/30 19:35:39 dk Exp $
 
 use strict;
 use warnings;
@@ -70,18 +70,18 @@ SKIP: {
 	skip "cannot open $0:$!", 3 unless open FH, '<', $0;
 
 	$m-> reset;
-	$m-> watch_io( IO_READ, \*FH, time, sub { @x = @_ });
+	$m-> watch_io( IO_READ, \*FH, time + 0.1, sub { @x = @_ });
 	$m-> wait;
 	ok(( 2 == @x and $x[1] == IO_READ), 'io read');
 	
 	$m-> reset;
-	$m-> watch_io( IO_READ|IO_EXCEPTION, \*FH, time, sub { @x = @_ });
+	$m-> watch_io( IO_READ|IO_EXCEPTION, \*FH, time + 0.1, sub { @x = @_ });
 	$m-> wait;
 	ok(( 2 == @x and $x[1] == IO_READ), 'io read/exception');
 	
 	$l-> reset;
 	$m-> reset;
-	$m-> watch_io( IO_READ, \*FH, time, sub { 42 });
+	$m-> watch_io( IO_READ, \*FH, time + 0.1, sub { 42 });
 	$l-> watch_lambda( $m, sub { @x = @_ });
 	$l-> wait;
 	ok(( 2 == @x and $x[1] == 42), 'io propagate');
