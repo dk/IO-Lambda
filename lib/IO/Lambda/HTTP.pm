@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.17 2008/01/25 13:46:04 dk Exp $
+# $Id: HTTP.pm,v 1.18 2008/01/30 12:01:42 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -29,6 +29,7 @@ sub new
 
 	my $self = bless {}, $class;
 
+	$self-> {timeout}      = $options{deadline}       if defined $options{deadline};
 	$self-> {deadline}     = $options{timeout} + time if defined $options{timeout};
 	$self-> {max_redirect} = defined($options{max_redirect}) ? $options{max_redirect} : 7;
 	$self-> {conn_cache}   = $options{conn_cache};
