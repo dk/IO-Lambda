@@ -19,3 +19,7 @@
 0.08 - Fri Jan 25 2008
 	add stream I/O
 	rewrite insides of http protocol in lambda style
+
+0.09 - Fri 1 Feb 2008
+	add Prima and AnyEvent event loops
+	rewrite SNMP support to work with these
