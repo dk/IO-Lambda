@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.5 2008/02/01 12:47:46 dk Exp $
+# $Id: SNMP.pm,v 1.6 2008/02/01 12:49:18 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -91,7 +91,6 @@ sub reshuffle_fds
 		$IO::Lambda::LOOP-> watch( $ACTIVE_FDS{$passive} = $PASSIVE_FDS{$passive} );
 		warn "snmp.resubmit: $passive\n" if $DEBUG;
 	}
-	warn "snmp.do not resubmit: [", join(' ', sort keys %PASSIVE_FDS), "]\n" if $DEBUG;
 	%PASSIVE_FDS = ();
 
 	# register new handles
