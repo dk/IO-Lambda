@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.24 2008/01/25 13:58:36 dk Exp $
+# $Id: Lambda.pm,v 1.25 2008/02/01 10:48:30 dk Exp $
 
 package IO::Lambda;
 
@@ -69,7 +69,7 @@ my  $_doffs = 0;
 sub _d_in  { $_doffs++ }
 sub _d_out { $_doffs-- if $_doffs }
 sub _d     { ('  ' x $_doffs), _obj(shift), ': ', @_, "\n" }
-sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1).$_[0]->{caller}" }
+sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1)." . ( $_[0]->{caller} || '()' ) }
 sub _t     { defined($_[0]) ? ( "time(", $_[0]-time, ")" ) : () }
 sub _ev
 {
@@ -136,6 +136,8 @@ sub watch_io
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
 
 	$LOOP-> watch( $rec );
+
+	return $rec;
 }
 
 # register a timeout
@@ -156,6 +158,8 @@ sub watch_timer
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
 
 	$LOOP-> after( $rec);
+	
+	return $rec;
 }
 
 # register a callback when another lambda exits
@@ -182,6 +186,8 @@ sub watch_lambda
 	$lambda-> start if $lambda-> is_passive;
 
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
+
+	return $rec;
 }
 
 # handle incoming asynchronous events
@@ -278,6 +284,20 @@ sub cancel_all_events
 	}
 }
 
+# Removes one event from queue; if that was the last event, triggers listening
+# lambdas
+sub cancel_event
+{
+	my ( $self, $rec) = @_;
+
+	return unless @{$self-> {in}};
+
+	$LOOP-> remove_event($self, $rec) if $LOOP;
+	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
+
+	$self-> cancel_all_events unless @{$self-> {in}};
+}
+
 sub is_stopped  { $_[0]-> {stopped}  }
 sub is_waiting  { not($_[0]->{stopped}) and @{$_[0]->{in}} }
 sub is_passive  { not($_[0]->{stopped}) and not(@{$_[0]->{in}}) }
@@ -370,10 +390,13 @@ sub wait
 		$self-> call(@_);
 		$self-> start;
 	}
-	while ( 1) {
-		my $n = drive;
+	LOOP: while ( 1) {
+		drive;
 		last if $self-> {stopped};
-		$_-> yield for @LOOPS;
+
+		for ( @LOOPS) {
+			next LOOP if $_-> yield;
+		}
 		$LOOP-> yield;
 	}
 	return $self-> peek;
@@ -386,12 +409,15 @@ sub wait_for_all
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
 	my @ret;
-	while ( 1) {
-		my $n = drive;
+	LOOP: while ( 1) {
+		drive;
 		push @ret, map { $_-> peek } grep { $_-> {stopped} } @objects;
 		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
-		$_-> yield for @LOOPS;
+
+		for ( @LOOPS) {
+			next LOOP if $_-> yield;
+		}
 		$LOOP-> yield;
 	}
 	return @ret;
@@ -403,11 +429,14 @@ sub wait_for_any
 	my @objects = @_;
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
-	while ( 1) {
-		my $n = drive;
+	LOOP: while ( 1) {
+		drive;
 		@objects = grep { $_-> {stopped} } @objects;
 		return @objects if @objects;
-		$_-> yield for @LOOPS;
+
+		for ( @LOOPS) {
+			next LOOP if $_-> yield;
+		}
 		$LOOP-> yield;
 	}
 }
@@ -415,9 +444,12 @@ sub wait_for_any
 # run the event loop until no lambdas are left in the blocking state
 sub run
 {
-	while ( $LOOP) {
+	LOOP: while ( $LOOP) {
 		drive;
-		$_-> yield for @LOOPS;
+		for ( @LOOPS) {
+			next LOOP if $_-> yield;
+		}
+
 		last if $LOOP-> empty;
 		$LOOP-> yield;
 	}

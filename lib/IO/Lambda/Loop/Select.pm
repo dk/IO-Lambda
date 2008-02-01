@@ -1,9 +1,8 @@
-# $Id: Select.pm,v 1.9 2008/01/29 15:08:38 dk Exp $
+# $Id: Select.pm,v 1.10 2008/02/01 10:48:30 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
-use vars qw($SELECT $GETNUMFDS);
 use IO::Lambda qw(:constants);
 use Time::HiRes qw(time);
 
@@ -26,8 +25,7 @@ sub empty
 	my $self = shift;
 	return (
 		@{$self->{timers}} + 
-		keys(%{$self-> {items}}) + 
-		($GETNUMFDS ? $GETNUMFDS-> () : 0)
+		keys(%{$self-> {items}})
 	) ? 0 : 1;
 }
 
@@ -68,9 +66,7 @@ sub yield
 	}
 
 	# do select
-	my $n  = $SELECT ?
-		$SELECT->(\$R, \$W, \$E, $t) :
-		select( $R, $W, $E, $t);
+	my $n = select( $R, $W, $E, $t);
 	die "select() error:$!$^E" if $n < 0;
 	
 	# expired timers
@@ -177,6 +173,24 @@ sub remove
 	$self-> rebuild_vectors;
 }
 
+sub remove_event
+{
+	my ($self, $rec) = @_;
+	
+	@{$self-> {timers}} = grep { $_ != $rec } @{$self-> {timers}};
+
+	my @kill;
+	while ( my ( $fileno, $bucket) = each %{$self->{items}}) {
+		@$bucket = grep { $_ != $rec } @$bucket;
+		next if @$bucket;
+		push @kill, $fileno;
+	}
+	delete @{$self->{items}}{@kill};
+
+	$self-> rebuild_vectors;
+
+}
+
 sub rebuild_vectors
 {
 	my $self = $_[0];
@@ -237,6 +251,10 @@ Returns TRUE if there are no records in the loop, FALSE otherwise.
 =item remove $OBJECT
 
 Removes all records associated with C<$OBJECT>.
+
+=item remove_event $EVENT
+
+Removes a single events
 
 =item watch $RECORD
 

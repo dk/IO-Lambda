@@ -1,4 +1,4 @@
-# $Id: Prima.pm,v 1.4 2008/02/01 08:27:36 dk Exp $
+# $Id: Prima.pm,v 1.5 2008/02/01 10:48:30 dk Exp $
 
 package IO::Lambda::Loop::Prima;
 use strict;
@@ -274,6 +274,33 @@ sub remove
 	my @kill;
 	while ( my ( $fileno, $r) = each %filenos) {
 		my @xr = grep { defined($_-> [WATCH_OBJ]) and $_-> [WATCH_OBJ] != $obj } @{$r->{rec}};
+		next if @xr == @{$r->{rec}};
+		if ( @xr) {
+			$r-> {rec} = \@xr;
+			reset_mask( $r);
+		} else {
+			push @kill, $fileno;
+		}
+	}
+	for ( @kill) {
+		warn "$_ object destroyed\n" if $DEBUG;
+		$filenos{$_}-> {object}-> destroy
+			 if $filenos{$_}-> {object};
+		delete $filenos{$_};
+	}
+}
+
+sub remove_event
+{
+	my ($self, $rec) = @_;
+
+	my $t = @timers;
+	@timers = grep { $_ != $rec } @timers;
+	reset_timer if $t != @timers;
+
+	my @kill;
+	while ( my ( $fileno, $r) = each %filenos) {
+		my @xr = grep { $_ != $rec } @{$r->{rec}};
 		next if @xr == @{$r->{rec}};
 		if ( @xr) {
 			$r-> {rec} = \@xr;

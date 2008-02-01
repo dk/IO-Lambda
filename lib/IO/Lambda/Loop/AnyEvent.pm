@@ -1,4 +1,4 @@
-# $Id: AnyEvent.pm,v 1.4 2008/02/01 08:27:36 dk Exp $
+# $Id: AnyEvent.pm,v 1.5 2008/02/01 10:48:30 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
@@ -121,6 +121,25 @@ sub remove
 		}
 	}
 
+	return if @r == @records;
+	@records = @r;
+}
+
+sub remove_event
+{
+	my ($self, $rec) = @_;
+
+	my @r;
+	for ( @records) {
+		if ( $_ == $rec) {
+			my $nr = pop @$_;
+			pop @$_ while $nr--;
+		} else {
+			push @r, $_;
+		}
+	}
+
+	return if @r == @records;
 	@records = @r;
 }
 
