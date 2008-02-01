@@ -1,4 +1,4 @@
-# $Id: AnyEvent.pm,v 1.3 2008/01/30 21:17:42 dk Exp $
+# $Id: AnyEvent.pm,v 1.4 2008/02/01 08:27:36 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
@@ -22,20 +22,7 @@ sub watch
 	my $poll = '';
 	$poll .= 'r' if $flags & IO_READ;
 	$poll .= 'w' if $flags & IO_WRITE;
-	
-	if ( $flags & IO_EXCEPTION) {
-		warn "** warning: AnyEvent doesn't support IO_EXCEPTION\n";
-
-		unless ( length $poll) {
-			# emulate IO_EXCEPTION that will eventually expire
-			return $self-> after( $rec) 
-				if defined $rec-> [WATCH_DEADLINE];
-			# emulate IO_EXCEPTION that will never come
-			push @$rec, 0;
-			push @records, $rec;
-			return;
-		}
-	}
+	$poll .= 'e' if $flags & IO_EXCEPTION;
 	
 	push @records, $rec;
 	
@@ -50,7 +37,18 @@ sub watch
 			$nr = pop @$rec;
 			pop @$rec while $nr--;
 
-			$rec-> [WATCH_IO_FLAGS] = ( $_[0] eq 'r') ? IO_READ : IO_WRITE;
+			if ( length($poll) > 1) {
+				# check for fh availability
+				my $o = '';
+				vec( $o, fileno( $rec-> [WATCH_IO_HANDLE]), 1) = 1;
+				my ( $r, $w, $e) = ($o, $o, $o);
+				my $n = select( $r, $w, $e, 0);
+				$rec->[WATCH_IO_FLAGS] &=
+					(( $r eq $o) ? IO_READ      : 0) | 
+					(( $w eq $o) ? IO_WRITE     : 0) | 
+					(( $e eq $o) ? IO_EXCEPTION : 0)
+				;
+			}
 			$rec-> [WATCH_OBJ]-> io_handler($rec)
 				if $rec->[WATCH_OBJ];
 		}
@@ -127,3 +125,35 @@ sub remove
 }
 
 1;
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+IO::Lambda::Loop::AnyEvent - Prima-based event loop for IO::Lambda
+
+=head1 DESCRIPTION
+
+This is the implementation of event loop for IO::Lambda based on AnyEvent event
+loop.  The module is not intended for direct use.
+
+=head1 LIMITATIONS
+
+Note that L<AnyEvent> is also a proxy event loop itself, and depending on the
+actual event loop module it uses, functionality of C<IO::Lambda> can be
+limited. Of the found deficiencies, all but C<Event> interfaces don't support
+C<IO_EXCEPTION>. Also, interface to C<Tk> fails to work when more than one
+listener to the same filehandle is registered. See L<AnyEvent> for more 
+specific description.
+
+=head1 SYNOPSIS
+
+  use AnyEvent;
+  use IO::Lambda::Loop::AnyEvent; # explicitly select the event loop module
+  use IO::Lambda;
+
+=head1 SEE ALSO
+
+  L<AnyEvent>

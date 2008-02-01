@@ -1,4 +1,4 @@
-# $Id: Prima.pm,v 1.3 2008/01/30 21:13:14 dk Exp $
+# $Id: Prima.pm,v 1.4 2008/02/01 08:27:36 dk Exp $
 
 package IO::Lambda::Loop::Prima;
 use strict;
@@ -291,3 +291,26 @@ sub remove
 }
 
 1;
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+IO::Lambda::Loop::Prima - Prima-based event loop for IO::Lambda
+
+=head1 DESCRIPTION
+
+This is the implementation of event loop for IO::Lambda based on Prima event
+loop.  The module is not intended for direct use.
+
+=head1 SYNOPSIS
+
+  use Prima;
+  use IO::Lambda::Loop::Prima; # explicitly select the event loop module
+  use IO::Lambda;
+
+=head1 SEE ALSO
+
+  L<Prima>
