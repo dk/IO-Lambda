@@ -1,4 +1,4 @@
-# $Id: AnyEvent.pm,v 1.5 2008/02/01 10:48:30 dk Exp $
+# $Id: AnyEvent.pm,v 1.6 2008/02/01 12:15:24 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
@@ -151,7 +151,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Loop::AnyEvent - Prima-based event loop for IO::Lambda
+IO::Lambda::Loop::AnyEvent - AnyEvent event loop for IO::Lambda
 
 =head1 DESCRIPTION
 
