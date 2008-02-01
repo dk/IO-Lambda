@@ -1,4 +1,4 @@
-# $Id: AnyEvent.pm,v 1.6 2008/02/01 12:15:24 dk Exp $
+# $Id: AnyEvent.pm,v 1.7 2008/02/01 12:15:57 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
@@ -175,4 +175,4 @@ specific description.
 
 =head1 SEE ALSO
 
-  L<AnyEvent>
+L<AnyEvent>
