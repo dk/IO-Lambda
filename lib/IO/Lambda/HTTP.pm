@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.19 2008/01/30 13:20:09 dk Exp $
+# $Id: HTTP.pm,v 1.20 2008/02/01 12:40:44 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -40,7 +40,7 @@ sub new
 	return $self-> handle_redirect( $req);
 }
 
-# reissue the request if it request returns 30X code
+# reissue the request if it returns 30X code
 sub handle_redirect
 {
 	my ( $self, $req) = @_;
