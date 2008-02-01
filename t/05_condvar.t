@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 05_condvar.t,v 1.3 2008/01/25 13:46:04 dk Exp $
+# $Id: 05_condvar.t,v 1.4 2008/02/01 12:25:20 dk Exp $
 
 use strict;
 use warnings;
@@ -9,7 +9,7 @@ use IO::Lambda qw(:lambda);
 
 package PseudoLoop;
 
-sub yield  {}
+sub yield  { 0 }
 sub remove { $_[0]-> {q} = $_[1] }
 sub new    { bless {}, shift  }
 
