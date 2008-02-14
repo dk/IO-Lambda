@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.20 2008/02/01 12:40:44 dk Exp $
+# $Id: HTTP.pm,v 1.21 2008/02/14 10:07:32 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -240,7 +240,7 @@ sub handle_request
 			if $self-> {chunked} = $te =~ /^chunked\s*$/i;
 	
 		# just read as much as possible then
-		return $self-> http_tail;
+		return $self-> http_tail if $proto < 1.1;
 	}}}}}
 }
 
