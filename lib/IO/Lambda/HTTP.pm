@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.21 2008/02/14 10:07:32 dk Exp $
+# $Id: HTTP.pm,v 1.22 2008/02/15 19:05:40 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -61,7 +61,7 @@ sub handle_redirect
 		$req-> uri( $response-> header('Location'));
 		$req-> headers-> header( Host => $req-> uri-> host);
 
-		context $self-> handle_request( $req);
+		context $self-> handle_connection( $req);
 		again;
 	}};
 }
