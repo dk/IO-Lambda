@@ -21,3 +21,4 @@ eg/sequential.pl
 eg/parallel.pl
 eg/http-redirect.pl
 eg/snmp.pl
+eg/loop.pl
