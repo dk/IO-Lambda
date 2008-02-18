@@ -23,3 +23,6 @@
 0.09 - Fri 1 Feb 2008
 	add Prima and AnyEvent event loops
 	rewrite SNMP support to work with these
+
+0.09 - Mon 18 Feb 2008
+	minor fixes to http
