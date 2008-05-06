@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.1 2008/05/06 14:19:12 dk Exp $
+# $Id: DNS.pm,v 1.2 2008/05/06 17:06:29 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -7,6 +7,7 @@ use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 $TIMEOUT = 4.0; # seconds
 $RETRIES = 4;   # times
 
+use Socket;
 use Time::HiRes;
 use Net::DNS::Resolver;
 use IO::Lambda qw(:all);
