@@ -6,6 +6,7 @@ lib/IO/Lambda.pm
 lib/IO/Lambda/HTTP.pm
 lib/IO/Lambda/HTTPS.pm
 lib/IO/Lambda/SNMP.pm
+lib/IO/Lambda/DNS.pm
 lib/IO/Lambda/Loop/Select.pm
 lib/IO/Lambda/Loop/Prima.pm
 lib/IO/Lambda/Loop/AnyEvent.pm
@@ -22,3 +23,4 @@ eg/parallel.pl
 eg/http-redirect.pl
 eg/snmp.pl
 eg/loop.pl
+eg/dns.pl

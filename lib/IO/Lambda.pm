@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.28 2008/02/18 10:49:07 dk Exp $
+# $Id: Lambda.pm,v 1.29 2008/05/06 14:19:12 dk Exp $
 
 package IO::Lambda;
 
@@ -1480,11 +1480,25 @@ the stops.
 Note that C<resolve> doesn't call provide any means to call associated
 callbacks, which is intentional.
 
-=back
-
 =head1 SEE ALSO
 
 L<Coro>, L<threads>, L<POE>.
+
+The package contains backends for other libraries that benefit from 
+asynchronous I/O, but doesn't mark them as explicit dependencies.
+If you need to use them, install these separately:
+
+=over
+
+=item *
+
+L<IO::Lambda::SNMP> requires L<SNMP>.
+
+=item *
+
+L<IO::Lambda::DNS> requires L<Net::DNS>.
+
+=back
 
 =head1 LICENSE AND COPYRIGHT
 
