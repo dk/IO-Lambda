@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.30 2008/05/06 20:41:33 dk Exp $
+# $Id: Lambda.pm,v 1.31 2008/05/06 20:47:57 dk Exp $
 
 package IO::Lambda;
 
@@ -1477,7 +1477,7 @@ Removes C<$event> from the internal waiting list. If lambda has no more
 events to wait, notifies eventual lambdas that wait to the objects, and
 the stops.
 
-Note that C<resolve> doesn't call provide any means to call associated
+Note that C<resolve> doesn't provide any means to call associated
 callbacks, which is intentional.
 
 =back
