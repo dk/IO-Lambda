@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.29 2008/05/06 14:19:12 dk Exp $
+# $Id: Lambda.pm,v 1.30 2008/05/06 20:41:33 dk Exp $
 
 package IO::Lambda;
 
@@ -13,7 +13,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.10';
+$VERSION     = '0.11';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -1479,6 +1479,8 @@ the stops.
 
 Note that C<resolve> doesn't call provide any means to call associated
 callbacks, which is intentional.
+
+=back
 
 =head1 SEE ALSO
 

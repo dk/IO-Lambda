@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: http-redirect.pl,v 1.6 2008/01/25 13:46:04 dk Exp $
+# $Id: http-redirect.pl,v 1.7 2008/05/06 20:41:33 dk Exp $
 
 use strict;
 use HTTP::Request;
@@ -63,7 +63,7 @@ $r-> headers-> header( Host => $r-> uri-> host);
 $r-> headers-> header( Connection => 'close'); 
 
 this http_redirect_request( $r);
-my $r = this-> wait;
+$r = this-> wait;
 unless ( ref($r)) {
 	print "some error:$r\n";
 } else {

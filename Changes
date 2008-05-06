@@ -1,28 +1,31 @@
-0.01 - Tue Dec 11 2007
+0.01 - Dec 11 2007
 	initial
 
-0.02 - Thu Dec 13 2007
+0.02 - Dec 13 2007
 	cleaned up the concept
 
-0.03 - Fri Dec 14 2007
+0.03 - Dec 14 2007
 	document everything
 
-0.04 - Sat Dec 15 2007
+0.04 - Dec 15 2007
 	add condvars and interfaces for additional event loops
 
-0.06 - Fri Dec 28 2007
+0.06 - Dec 28 2007
 	add some documentation
 
-0.07 - Fri Jan 09 2008
+0.07 - Jan 09 2008
 	improve http handler versatility
 
-0.08 - Fri Jan 25 2008
+0.08 - Jan 25 2008
 	add stream I/O
 	rewrite insides of http protocol in lambda style
 
-0.09 - Fri 1 Feb 2008
+0.09 - 1 Feb 2008
 	add Prima and AnyEvent event loops
 	rewrite SNMP support to work with these
 
-0.09 - Mon 18 Feb 2008
+0.10 - 18 Feb 2008
 	minor fixes to http
+
+0.11 - 6 May 2008
+	add asynchronous dns

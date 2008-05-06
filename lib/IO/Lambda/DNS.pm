@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.2 2008/05/06 17:06:29 dk Exp $
+# $Id: DNS.pm,v 1.3 2008/05/06 20:41:33 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -7,6 +7,7 @@ use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 $TIMEOUT = 4.0; # seconds
 $RETRIES = 4;   # times
 
+use strict;
 use Socket;
 use Time::HiRes;
 use Net::DNS::Resolver;
@@ -42,6 +43,8 @@ sub dns_lambda
 		}
 	}
 
+	my $simple_query = (( 1 == @ctx) and not ref($ctx[0]));
+
 	# proceed
 	lambda {
 		my $obj  = Net::DNS::Resolver-> new( %opt);
@@ -66,6 +69,14 @@ sub dns_lambda
 		undef $sock;
 		
 		return "recv error: " . $obj-> errorstring unless $packet;
+
+		if ( $simple_query) {
+			# behave like inet_aton, return single IP address
+			for ( $packet-> answer) {
+				return $_-> address if $_-> type eq 'A';
+			}
+			return 'response doesn\'t contain an IP address';
+		}
 
 		return $packet;
 	}};
@@ -103,9 +114,9 @@ and lambda-style C<dns_lambda>.
    use IO::Lambda::DNS qw(:all);
    use IO::Lambda qw(:all);
 
-   # single async query
+   # simple async query
    my $reply = dns_lambda( "www.site.com" )-> wait;
-   print ref($reply) ? $reply-> string : "Error: $reply\n";
+   print (($reply =~ /^\d/) ? "Resolved to $reply\n" : "Error: $reply\n");
 
    # parallel async queries -- create many lambdas, wait with tails() for them all
    my @replies = lambda {
@@ -117,15 +128,48 @@ and lambda-style C<dns_lambda>.
 
    # again parallel async queries -- within single lambda, fire-and-forget
    for my $site ( map { "www.$_.com" } qw(google yahoo perl)) {
-        context $site, nameservers => ['127.0.0.1'], timeout => 0.25;
+        context $site, 'MX', nameservers => ['127.0.0.1'], timeout => 0.25;
    	dns_query { print shift-> string if ref($_[0]) }
    }
+
 
 =head2 OPTIONS
 
 Accepted options specific to the module are C<timeout> (in seconds) and C<retry> (in times).
 All other options, such as C<nameservers>, C<dnssec> etc etc are passed as is
 to the C<Net::DNS::Resolver> constructor. See its man page for details.
+
+=head2 USAGE
+
+=over
+
+=item dns_lambda
+
+C<dns_lambda> accepts Net::DNS-specific options (see L<OPTIONS> above) and
+query, and returns a lambda. The lambda accepts no parameters, return either IP
+address or response object, depending on the call, or an error string.
+
+   dns_lambda (%OPTIONS, $HOSTNAME) :: () -> $IP_ADDRESS|$ERROR
+
+In simple case, accepts C<$HOSTNAME> string, and returns a string, either
+IP address or an error. To distinguish between these use C< /^\d/ > regexp,
+because it is guaranteed that no error message will begin with digit, and no
+IP address will begin with anything other than digit.
+
+   dns_lambda (%OPTIONS, ($PACKET | $HOSTNAME $TYPE)) :: () -> $RESPONSE|$ERROR
+
+In complex case, accepts either C<$HOSTNAME> string and C<$TYPE> string, where
+the latter is C<A>, C<MX>, etc DNS query type. See L<Net::DNS::Resolver/new>.
+Returns either C<Net::DNS::RR> object or error string.
+
+=item dns_query
+
+Predicate wrapper over C<dns_lambda>.
+
+   dns_query (%OPTIONS, $HOSTNAME) -> $IP_ADDRESS|$ERROR
+   dns_query (%OPTIONS, ($PACKET | $HOSTNAME $TYPE)) -> $RESPONSE|$ERROR
+
+=back
 
 =head1 SEE ALSO
 

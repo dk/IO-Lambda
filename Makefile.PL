@@ -1,15 +1,41 @@
-# $Id: Makefile.PL,v 1.1 2007/12/11 14:48:38 dk Exp $
+# $Id: Makefile.PL,v 1.2 2008/05/06 20:41:33 dk Exp $
 use ExtUtils::MakeMaker;
+use IO::Socket::INET;
+
+my $online_tests;
+my $s = IO::Socket::INET->new(
+	PeerAddr => "www.google.com:80",
+	Timeout  => 10,
+);
+	
+if ($s) {
+	close($s);
+	
+	print <<EOT;
+	
+You appear to be directly connected to the Internet.  I have some tests
+that try to query live nameservers.
+	
+EOT
+	
+	$online_tests = prompt("Do you want to enable these tests?", "y") =~ /^y/i ? 1 : 0;
+}
+
+if ($online_tests) {
+	open(ENABLED, ">t/online.enabled") || die "Can't touch ./t/online.enabled $!";
+	close(ENABLED)                     || die "Can't touch ./t/online.enabled $!";
+}
+
 WriteMakefile(
 	NAME          => 'IO::Lambda',
 	AUTHOR        => 'Dmitry Karasik <dmitry@karasik.eu.org>',
 	ABSTRACT_FROM => 'lib/IO/Lambda.pm',
 	VERSION_FROM  => 'lib/IO/Lambda.pm',
-#
-## Yes, I know the library has IO::Lambda::HTTP and IO::Lambda::HTTPS, and
-## I can add LWP as a dependency, but what happens when I add IO::Lambda::SNMP
-## and IO::Lambda::Loop::AnyEvent or whatever? That is the question.
-#	PREREQ_PM     => {
-#		
-#	},
+	PREREQ_PM     => {
+		'Net::DNS'          => 0,
+		# 'IO::Socket::SSL' => 0,  # for HTTPS
+		# 'SNMP'            => 0,  # for IO::Lambda::SNMP
+		# 'AnyEvent'        => 0,  # for alternative event loop
+	},
+	clean         => { FILES => 't/online.enabled' },
 );

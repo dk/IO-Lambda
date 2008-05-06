@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.22 2008/02/15 19:05:40 dk Exp $
+# $Id: HTTP.pm,v 1.23 2008/05/06 20:41:33 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -33,6 +33,9 @@ sub new
 	$self-> {deadline}     = $options{timeout} + time if defined $options{timeout};
 	$self-> {max_redirect} = defined($options{max_redirect}) ? $options{max_redirect} : 7;
 	$self-> {conn_cache}   = $options{conn_cache};
+	$self-> {async_dns}    = $options{async_dns};
+
+	require IO::Lambda::DNS if $self-> {async_dns};
 		
 	$req-> headers-> header( 'User-Agent' => "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION")
 		unless defined $req-> headers-> header('User-Agent');
@@ -73,7 +76,9 @@ sub prepare_transport
 	my ( $self, $req) = @_;
 	my $scheme = $req-> uri-> scheme;
 
-	if ( $scheme eq 'https') {
+	unless ( defined $scheme) {
+		return "bad URI: " . $req-> uri-> as_string;
+	} elsif ( $scheme eq 'https') {
 		unless ( $got_https) {
 			eval { require IO::Lambda::HTTPS; };
 			return  "https not supported: $@" if $@;
@@ -124,16 +129,30 @@ sub handle_connection
 
 	# have a chance to load eventual modules early
 	my $err = $self-> prepare_transport( $req);
+	return lambda { $err } if defined $err;
+
+	my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
 	
 	lambda {
-		return $err if defined $err;
+		# resolve hostname
+		if (
+			$self-> {async_dns} and
+			$host !~ /^(\d{1,3}\.){3}(\d{1,3})$/
+		) {
+			context $host;
+			return IO::Lambda::DNS::dns_query( sub {
+				$host = shift;
+				return $host unless $host =~ /^\d/; # error
+				return this-> start; # restart the lambda with different $host
+			});
+		}
 
 		delete $self-> {close_connection};
-
-		# get cached socket?
+		
+		# got cached socket?
 		my ( $sock, $cached);
 		my $cc = $self-> {conn_cache};
-		my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
+
 		if ( $cc) {
 			$sock = $cc-> withdraw( __PACKAGE__, "$host:$port");
 			if ( $sock) {
@@ -183,8 +202,8 @@ sub handle_connection
 
 # Execute single http request over an established connection.
 # Returns 2 parameters, readbuf-style, where actually only the 2nd matters,
-# and signals error if defined. 2 parameters are there for readbuf compatibility,
-# so protocol handler can easily fall back to readbuf itself.
+# and signals error if defined. 2 parameters are there for readbuf() compatibility,
+# so that the protocol handler can easily fall back to readbuf() itself.
 sub handle_request
 {
 	my ( $self, $req) = @_;
@@ -354,6 +373,14 @@ string otherwise.
 =head1 OPTIONS
 
 =over
+
+=item async_dns BOOLEAN
+
+If set, hostname will be resolved with L<IO::Lambda::DNS> using asynhronous
+L<Net::DNS>. Note that this method won't be able to account for non-DNS
+(/etc/hosts, NIS) host names.
+
+If unset (default), hostnames will be resolved in a blocking manner.
 
 =item timeout SECONDS = undef
 
