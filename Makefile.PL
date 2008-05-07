@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.2 2008/05/06 20:41:33 dk Exp $
+# $Id: Makefile.PL,v 1.3 2008/05/07 19:47:26 dk Exp $
 use ExtUtils::MakeMaker;
 use IO::Socket::INET;
 
@@ -33,6 +33,7 @@ WriteMakefile(
 	VERSION_FROM  => 'lib/IO/Lambda.pm',
 	PREREQ_PM     => {
 		'Net::DNS'          => 0,
+		'LWP'               => 0,
 		# 'IO::Socket::SSL' => 0,  # for HTTPS
 		# 'SNMP'            => 0,  # for IO::Lambda::SNMP
 		# 'AnyEvent'        => 0,  # for alternative event loop
