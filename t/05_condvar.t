@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 05_condvar.t,v 1.4 2008/02/01 12:25:20 dk Exp $
+# $Id: 05_condvar.t,v 1.5 2008/05/07 11:07:06 dk Exp $
 
 use strict;
 use warnings;
@@ -18,7 +18,7 @@ package main;
 my $q    = IO::Lambda-> new;
 my $cond = $q-> bind;
 my $q2   = lambda {
-	context time + 0.1;
+	context 0.1;
 	ok( not( $q-> is_stopped), 'bind');
 	sleep { $q-> resolve($cond) }
 };

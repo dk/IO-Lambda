@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.11 2008/01/29 20:34:19 dk Exp $
+# $Id: 04_tcp.t,v 1.12 2008/05/07 11:07:06 dk Exp $
 
 use strict;
 use warnings;
@@ -26,7 +26,7 @@ sub session
 	my $conn = shift;
 	lambda {
 		my $buf  = '';
-		context $conn, time + 0.3;
+		context $conn, 0.3;
 	read {
 		unless ( shift) {
 			print $conn "timeout\n";
@@ -127,9 +127,9 @@ ok(this-> wait eq '4+5+6+7', 'parallel connections');
 
 this lambda {
 	my $c = sock;
-	context $c             and write {
-	context time + 0.5     and sleep {
-	context $c             and read  {
+	context $c      and write {
+	context 0.5     and sleep {
+	context $c      and read  {
 	my $resp = <$c>;
 	chomp $resp;
 	close $c;

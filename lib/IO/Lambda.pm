@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.31 2008/05/06 20:47:57 dk Exp $
+# $Id: Lambda.pm,v 1.32 2008/05/07 11:07:06 dk Exp $
 
 package IO::Lambda;
 
@@ -6,6 +6,7 @@ use Carp;
 use strict;
 use warnings;
 use Exporter;
+use Time::HiRes qw(time);
 use vars qw(
 	$LOOP %EVENTS @LOOPS
 	$VERSION @ISA
@@ -70,7 +71,7 @@ sub _d_in  { $_doffs++ }
 sub _d_out { $_doffs-- if $_doffs }
 sub _d     { ('  ' x $_doffs), _obj(shift), ': ', @_, "\n" }
 sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1)." . ( $_[0]->{caller} || '()' ) }
-sub _t     { defined($_[0]) ? ( "time(", $_[0]-time, ")" ) : () }
+sub _t     { defined($_[0]) ? ( "time(", $_[0]-time(), ")" ) : () }
 sub _ev
 {
 	$_[0] =~ /0x([\w]+)/;
@@ -124,6 +125,8 @@ sub watch_io
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
 
+	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
+
 	my $rec = [
 		$self,
 		$deadline,
@@ -147,7 +150,8 @@ sub watch_timer
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "$self: time is undefined" unless defined $deadline;
-
+	
+	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
 	my $rec = [
 		$self,
 		$deadline,
@@ -1097,11 +1101,11 @@ objects as soon as possible.
 
 =head2 Time
 
-Timers and I/O timeouts are given not in the timeout values, as it usually is
-in event libraries, but as deadlines in (fractional) seconds since epoch. This
-decision, strange at first sight, actually helps a lot when total execution
-time is to be tracked. For example, the following code reads as many bytes from
-a socket within 5 seconds:
+Timers and I/O timeouts can be given not only in the timeout values, as it
+usually is in event libraries, but also as deadlines in (fractional) seconds
+since epoch. This decision, strange at first sight, actually helps a lot when
+total execution time is to be tracked. For example, the following code reads as
+many bytes from a socket within 5 seconds:
 
    lambda {
        my $buf = '';
@@ -1116,8 +1120,34 @@ a socket within 5 seconds:
        }
    };
 
-Rewriting it with C<read> semantics that accepts time as timeout instead, is
-left as an exercise to the reader.
+Rewriting the same code with C<read> semantics that accepts time as timeout instead, 
+would be not that elegant:
+   
+   lambda {
+       my $buf = '';
+       my $time_left = 5;
+       my $now = time;
+       context $socket, $time_left;
+       read {
+           if ( shift ) {
+	       if (sysread $socket, $buf, 1024, length($buf)) {
+	           $time_left -= (time - $now);
+		   $now = time;
+		   context $socket, $time_left;
+	           return again;
+	       }
+	   } else {
+	       print "oops! a timeout\n";
+	   }
+	   $buf;
+       }
+   };
+
+However, the exact opposite is true for C<sleep>. The following two lines
+both sleep 5 seconds:
+
+   lambda { context 5;        sleep {} }
+   lambda { context time + 5; sleep {} }
 
 Internally, timers use C<Time::HiRes::time> that gives fractional number of
 seconds. This however is not required for the caller, in which case timeouts

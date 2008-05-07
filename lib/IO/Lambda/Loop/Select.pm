@@ -1,8 +1,9 @@
-# $Id: Select.pm,v 1.10 2008/02/01 10:48:30 dk Exp $
+# $Id: Select.pm,v 1.11 2008/05/07 11:07:06 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
+use Errno qw(EINTR);
 use IO::Lambda qw(:constants);
 use Time::HiRes qw(time);
 
@@ -67,7 +68,13 @@ sub yield
 
 	# do select
 	my $n = select( $R, $W, $E, $t);
-	die "select() error:$!$^E" if $n < 0;
+	if ( $n < 0) {
+		if ( $! == EINTR) {
+			# ignore
+		} else {
+			die "select() error:$!$^E" if $n < 0;
+		}
+	}
 	
 	# expired timers
 	my ( @kill, @expired);

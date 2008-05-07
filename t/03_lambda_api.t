@@ -1,9 +1,8 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.6 2008/01/25 13:46:04 dk Exp $
+# $Id: 03_lambda_api.t,v 1.7 2008/05/07 11:07:06 dk Exp $
 
 use strict;
 use warnings;
-use Time::HiRes qw(time);
 use Test::More tests => 12;
 use IO::Lambda qw(:lambda);
 
@@ -33,7 +32,7 @@ this-> reset;
 ok( 47 == this-> wait, 'rerun lambda');
 
 this lambda {
-	context time + 0.01;
+	context 0.01;
 	sleep { 'moo' };
 };
 ok( 'moo' eq this-> wait, 'sleep');
@@ -41,7 +40,7 @@ ok( 'moo' eq this-> wait, 'sleep');
 this lambda {
 	context lambda {};
 	tail {
-		context time + 0.01;
+		context 0.01;
 		sleep { 'moo' };
 	};
 };
@@ -49,7 +48,7 @@ ok( 'moo' eq this-> wait, 'tail sleep');
 
 $i = 2;
 this lambda {
-	context time + 0.01;
+	context 0.01;
 	sleep { $i-- ? again : 'moo' };
 };
 ok(( 'moo' eq this-> wait && $i == -1), 'restart sleep');
