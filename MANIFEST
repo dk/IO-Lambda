@@ -7,6 +7,7 @@ lib/IO/Lambda/HTTP.pm
 lib/IO/Lambda/HTTPS.pm
 lib/IO/Lambda/SNMP.pm
 lib/IO/Lambda/DNS.pm
+lib/IO/Lambda/Signal.pm
 lib/IO/Lambda/Loop/Select.pm
 lib/IO/Lambda/Loop/Prima.pm
 lib/IO/Lambda/Loop/AnyEvent.pm
@@ -18,6 +19,7 @@ t/05_condvar.t
 t/06_stream.t
 t/07_dns.t
 t/08_http.t
+t/09_signal.t
 t/98_pod.t
 t/99_pod_coverage.t
 eg/sequential.pl

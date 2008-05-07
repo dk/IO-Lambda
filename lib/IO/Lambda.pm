@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.32 2008/05/07 11:07:06 dk Exp $
+# $Id: Lambda.pm,v 1.33 2008/05/07 11:15:42 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.11';
+$VERSION     = '0.12';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -1517,18 +1517,22 @@ callbacks, which is intentional.
 L<Coro>, L<threads>, L<POE>.
 
 The package contains backends for other libraries that benefit from 
-asynchronous I/O, but doesn't mark them as explicit dependencies.
-If you need to use them, install these separately:
+asynchronous I/O, but may or may not list them as explicit dependency.
+If you need to use these, install these separately:
 
 =over
 
 =item *
 
-L<IO::Lambda::SNMP> requires L<SNMP>.
+L<IO::Lambda::SNMP> requires L<SNMP> (not a prerequisite).
 
 =item *
 
 L<IO::Lambda::DNS> requires L<Net::DNS>.
+
+=item *
+
+L<IO::Lambda::Signal> requires functioning C<POSIX::waitpid>.
 
 =back
 
