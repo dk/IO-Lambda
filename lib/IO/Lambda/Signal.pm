@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.1 2008/05/07 11:15:42 dk Exp $
+# $Id: Signal.pm,v 1.2 2008/05/07 11:59:32 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -31,15 +31,17 @@ sub unwatch_signal
 
 	return unless exists $SIGDATA{$id};
 
-	my $a = @{ $SIGDATA{$id}-> {lambdas} };
 	@{ $SIGDATA{$id}-> {lambdas} } = 
 		grep { $$_[0] != $lambda } 
 		@{ $SIGDATA{$id}-> {lambdas} };
-	my $b = @{ $SIGDATA{$id}-> {lambdas} };
 	
 	return if @{ $SIGDATA{$id}-> {lambdas} };
 
-	defined($SIGDATA{$id}-> {save}) ? $SIG{$id} = $SIGDATA{$id}-> {save} : delete $SIG{$id};
+	if (defined($SIGDATA{$id}-> {save})) {
+		SIG{$id} = $SIGDATA{$id}-> {save};
+	} else {
+		delete $SIG{$id};
+	}
 	delete $SIGDATA{$id};
 }
 
