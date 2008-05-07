@@ -1,9 +1,10 @@
 #! /usr/bin/perl
-# $Id: 09_signal.t,v 1.2 2008/05/07 11:59:32 dk Exp $
+# $Id: 09_signal.t,v 1.3 2008/05/07 12:01:09 dk Exp $
 
 use strict;
 use warnings;
 
+use Time::HiRes;
 use Test::More tests => 2;
 use IO::Lambda qw(:all);
 use IO::Lambda::Signal qw(:all);
@@ -23,7 +24,7 @@ ok( not(this-> wait), 'signal timed out');
 SKIP: {
 	skip "SIGALRM doesn't break select() on win32", 1 if $^O =~ /win32/i;
 	this lambda {
-		alarm(0.1);
+		Time::HiRes::alarm(0.1);
 		context 'ALRM', 0.5;
 		signal {
 			alarm(0) unless $_[0];
