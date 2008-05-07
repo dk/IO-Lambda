@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.34 2008/05/07 12:38:11 dk Exp $
+# $Id: Lambda.pm,v 1.35 2008/05/07 13:25:12 dk Exp $
 
 package IO::Lambda;
 
@@ -1344,7 +1344,7 @@ Creates lambda that will accept all the parameters used by C<syswrite> plus
 C<$deadline>. The lambda tries to write C<$length> bytes to C<$fh> from C<$buf>
 from C<$offset>, when C<$fh> becomes available for writing. If C<$deadline>
 expires, fails with C<'timeout'> error. On successful write, returns number of
-bytes written, or <$!> otherwise.
+bytes written, or C<$!> otherwise.
 
 =item readbuf($reader = sysreader()) :: ($fh, $buf, $cond, $deadline) -> ioresult
 
