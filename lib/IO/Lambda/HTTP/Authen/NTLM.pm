@@ -1,4 +1,4 @@
-# $Id: NTLM.pm,v 1.1 2008/05/09 18:59:17 dk Exp $
+# $Id: NTLM.pm,v 1.2 2008/05/09 19:14:41 dk Exp $
 
 package IO::Lambda::HTTP::Authen::NTLM;
 
@@ -86,8 +86,8 @@ IO::Lambda::HTTP::Authen::NTLM - Library for enabling NTLM authentication (Micro
 
 =head1 DESCRIPTION
 
-LWP::Authen::Ntlm allows LWP to authenticate against servers that are using the
-NTLM authentication scheme popularized by Microsoft. This type of
+IO::Lambda::HTTP::Authen::NTLM allows to authenticate against servers that are
+using the NTLM authentication scheme popularized by Microsoft. This type of
 authentication is common on intranets of Microsoft-centric organizations.
 
 The module takes advantage of the Authen::NTLM module by Mark Bush. Since there
