@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.27 2008/05/09 19:11:31 dk Exp $
+# $Id: HTTP.pm,v 1.28 2008/05/09 20:18:57 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -99,7 +99,12 @@ sub handle_redirect
 			warn "redirect to " . $req-> uri . "\n" if $DEBUG;
 
 			this-> start; 
-		} elsif ( not($was_failed_auth) and $response-> code eq '401') {
+		} elsif ( 
+			not($was_failed_auth) and 
+			$response-> code eq '401' and
+			defined($self-> {username}) and
+			defined($self-> {password})
+		) {
 			$was_failed_auth++;
 			$method = $self-> get_authenticator( $req, $response);
 			context $method;
