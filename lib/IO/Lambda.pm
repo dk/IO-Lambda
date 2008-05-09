@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.35 2008/05/07 13:25:12 dk Exp $
+# $Id: Lambda.pm,v 1.36 2008/05/09 13:20:28 dk Exp $
 
 package IO::Lambda;
 
@@ -1542,6 +1542,10 @@ L<IO::Lambda::DNS> requires L<Net::DNS>.
 =item *
 
 L<IO::Lambda::Signal> requires functioning C<POSIX::waitpid>.
+
+=item *
+
+L<IO::Lambda::HTTP::Authen::NTLM> requires functioning L<Authen::NTLM>.
 
 =back
 

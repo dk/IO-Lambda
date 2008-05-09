@@ -11,6 +11,7 @@ lib/IO/Lambda/Signal.pm
 lib/IO/Lambda/Loop/Select.pm
 lib/IO/Lambda/Loop/Prima.pm
 lib/IO/Lambda/Loop/AnyEvent.pm
+lib/IO/Lambda/HTTP/Authen/NTLM.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t

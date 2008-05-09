@@ -1,8 +1,10 @@
-# $Id: HTTP.pm,v 1.23 2008/05/06 20:41:33 dk Exp $
+# $Id: HTTP.pm,v 1.24 2008/05/09 13:20:28 dk Exp $
 package IO::Lambda::HTTP;
-use vars qw(@ISA @EXPORT_OK);
+use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(http_request);
+
+$DEBUG = $ENV{IO_HTTP_DEBUG};
 
 use strict;
 use warnings;
@@ -32,8 +34,13 @@ sub new
 	$self-> {timeout}      = $options{deadline}       if defined $options{deadline};
 	$self-> {deadline}     = $options{timeout} + time if defined $options{timeout};
 	$self-> {max_redirect} = defined($options{max_redirect}) ? $options{max_redirect} : 7;
-	$self-> {conn_cache}   = $options{conn_cache};
-	$self-> {async_dns}    = $options{async_dns};
+	$self-> {$_} = $options{$_} for qw(async_dns conn_cache username password domain
+		auth keep_alive preferred_auth);
+
+	if ( $self-> {keep_alive} and not $self-> {conn_cache}) {
+		require LWP::ConnCache;
+		$self-> {conn_cache} = LWP::ConnCache-> new;
+	}
 
 	require IO::Lambda::DNS if $self-> {async_dns};
 		
@@ -43,31 +50,110 @@ sub new
 	return $self-> handle_redirect( $req);
 }
 
-# reissue the request if it returns 30X code
+# reissue the request, if necessary, because of 30X or 401 errors
 sub handle_redirect
 {
 	my ( $self, $req) = @_;
 		
 	my $was_redirected = 0;
+	my $was_failed_auth = 0;
+
+	my $auth = $self-> {auth};
 
 	lambda {
-		context $self-> handle_connection( $req);
+		my $method;
+		if ( $auth) {
+			# create fake response for protocol initiation, -- but just once
+			my $x = HTTP::Response-> new;
+			$x-> headers-> header('WWW-Authenticate', split(',', $auth));
+			$method = $self-> get_authenticator( $req, $x);
+			undef $auth;
+		}
+		context $method || $self-> handle_connection( $req);
 	tail   {
 		# request is finished
 		my $response = shift;
 		return $response unless ref($response);
 
-		return $response unless $response-> code =~ /^3/;
-		return 'too many redirects' 
-			if ++$was_redirected > $self-> {max_redirect};
-		
-		$req-> uri( $response-> header('Location'));
-		$req-> headers-> header( Host => $req-> uri-> host);
+		if ( $response-> code =~ /^3/) {
+			$was_failed_auth = 0;
+			return 'too many redirects' 
+				if ++$was_redirected > $self-> {max_redirect};
+			
+			$req-> uri( $response-> header('Location'));
+			$req-> headers-> header( Host => $req-> uri-> host);
 
-		context $self-> handle_connection( $req);
-		again;
+			warn "redirect to " . $req-> uri . "\n" if $DEBUG;
+
+			this-> start; 
+		} elsif ( not($was_failed_auth) and $response-> code eq '401') {
+			$was_failed_auth++;
+			$method = $self-> get_authenticator( $req, $response);
+			context $method;
+			return $method ? tail {
+				my $r = shift;
+				return $r unless $r;
+
+				# start from beginning, from handle_connection;
+				this-> start; 
+			} : $response;
+		} else {
+			return $response;
+		}
 	}};
 }
+
+# if request needs authentication, and we can do anything about it, create 
+# a lambda that handles the authentication
+sub get_authenticator
+{
+	my ( $self, $req, $response) = @_;
+
+	# supports authentication?
+	my %auth;
+	for my $auth ( $response-> header('WWW-Authenticate')) {
+		$auth =~ s/\s.*$//;
+		$auth{$auth}++;
+	}
+
+	my %preferred = defined($self-> {preferred_auth}) ? (
+		ref($self-> {preferred_auth}) ? 
+			%{ $self-> {preferred_auth} } :
+			( $self-> {preferred_auth} => 1 )
+		) : ();
+	
+	my @auth = sort {
+			($preferred{$b} || 0) <=> ($preferred{$a} || 0)
+		} grep {
+			not exists($preferred{$_}) or $preferred{$_} >= 0;
+		} keys %auth;
+
+	my $compilation_errors = '';
+	for my $auth ( @auth) {
+		if ( $auth eq 'Basic') {
+			# always
+			warn "trying basic authentication\n" if $DEBUG;
+			$req-> authorization_basic( $self-> {username}, $self-> {password});
+			return $self-> handle_connection( $req);
+		}
+
+		eval { require "IO/Lambda/HTTP/Authen/$auth.pm" };
+		$compilation_errors .= "$@\n"
+			if $@ and ($@ !~ m{^Can't locate IO/Lambda/HTTP/Authen/$auth});
+		next if $@;
+		
+		my $lambda = "IO::Lambda::HTTP::Authen::$auth"-> 
+			authenticate( $self, $req, $response);
+		warn "trying authentication with '$auth'\n" if $DEBUG and $lambda;
+		return $lambda if $lambda;
+	}
+	
+	# XXX Propagate compilation errors as http errors. Doubtful.
+	return lambda { $compilation_errors } if length $compilation_errors;
+
+	return undef;
+}
+
 
 # get scheme and eventually load module
 my $got_https;
@@ -134,20 +220,31 @@ sub handle_connection
 	my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
 	
 	lambda {
+		# keep-alive?
+		if ( $self-> {keep_alive} and not($req-> protocol)) {
+			$req-> protocol('HTTP/1.1');
+			$req-> headers-> header('Host' => $host)
+				unless defined $req-> headers-> header('Host');
+		}
+
 		# resolve hostname
 		if (
 			$self-> {async_dns} and
 			$host !~ /^(\d{1,3}\.){3}(\d{1,3})$/
 		) {
 			context $host;
+			warn "resolving $host\n" if $DEBUG;
 			return IO::Lambda::DNS::dns_query( sub {
 				$host = shift;
 				return $host unless $host =~ /^\d/; # error
+				warn "resolved to $host\n" if $DEBUG;
 				return this-> start; # restart the lambda with different $host
 			});
 		}
 
 		delete $self-> {close_connection};
+		$self-> {close_connection}++ 
+			if ( $req-> header('Connection') || '') =~ /^close/i;
 		
 		# got cached socket?
 		my ( $sock, $cached);
@@ -158,11 +255,13 @@ sub handle_connection
 			if ( $sock) {
 				my $err = unpack('i', getsockopt( $sock, SOL_SOCKET, SO_ERROR));
 				$err ? undef $sock : $cached++;
+				warn "reused socket is ".($err ? "bad" : "ok")."\n" if $DEBUG;
 			}
 		}
 
 		# connect
 		my $err;
+		warn "connecting\n" if $DEBUG and not($sock);
 		( $sock, $err) = $self-> connect( $host, $port) unless $sock;
 		return $err unless $sock;
 		context( $sock, $self-> {deadline});
@@ -176,7 +275,6 @@ sub handle_connection
 			return "connect: $!";
 		}
 
-		$self-> {buf}    = '';
 		$self-> {socket} = $sock;
 		$self-> {reader} = readbuf ( $self-> {reader});
 		$self-> {writer} = $self-> {writer}-> ($cached) if $self-> {writer}; 
@@ -184,27 +282,45 @@ sub handle_connection
 
 		context $self-> handle_request( $req);
 	tail {
-		my ( undef, $error) = @_; # readbuf style
+		my $response = shift;
 		
-		# protocol is finished
-		my $ret = defined($error) ? $error : $self-> parse( \ $self-> {buf} );
-		delete @{$self}{qw(close_connection socket buf writer reader)};
-
 		# put back the connection, if possible
 		if ( $cc and not $self-> {close_connection}) {
 			my $err = unpack('i', getsockopt( $sock, SOL_SOCKET, SO_ERROR));
+			warn "deposited socket back\n" if $DEBUG and not($err);
 			$cc-> deposit( __PACKAGE__, "$host:$port", $sock)
 				unless $err;
 		}
-		return $ret;
+			
+		warn "connection:close\n" if $DEBUG and $self-> {close_connection};
+
+		delete @{$self}{qw(close_connection socket buf writer reader)};
+		
+		return $response;
 	}}}
+}
+
+# Execute single http request over an established connection.
+# Returns either HTTP::Response object, or error string
+sub handle_request
+{
+	my ( $self, $req) = @_;
+	lambda {
+		$self-> {buf} = '';
+		context $self-> handle_request_in_buffer( $req);
+		warn "request: " . $req-> as_string . "\n" if $DEBUG;
+	tail {
+		my ( undef, $error) = @_; # readbuf style
+		warn "response: " . ( $error ? $error : $self-> {buf}) . "\n" if $DEBUG;
+		return defined($error) ? $error : $self-> parse( \ $self-> {buf} );
+	}}
 }
 
 # Execute single http request over an established connection.
 # Returns 2 parameters, readbuf-style, where actually only the 2nd matters,
 # and signals error if defined. 2 parameters are there for readbuf() compatibility,
 # so that the protocol handler can easily fall back to readbuf() itself.
-sub handle_request
+sub handle_request_in_buffer
 {
 	my ( $self, $req) = @_;
 
@@ -228,7 +344,12 @@ sub handle_request
 		context $self-> http_read(qr/^.*?\n/);
 	tail {
 		my $line = shift;
-		return undef, shift unless defined $line;
+		unless ( defined $line) {
+			my $error = shift;
+			# remote closed connection and content is single-line HTTP/1.0
+			return (undef, $error) if $error ne 'eof';
+			return (undef, undef);
+		}
 
 		# no headers? 
 		return $self-> http_tail
@@ -382,18 +503,54 @@ L<Net::DNS>. Note that this method won't be able to account for non-DNS
 
 If unset (default), hostnames will be resolved in a blocking manner.
 
-=item timeout SECONDS = undef
+=item conn_cache $LWP::ConnCache = undef
 
-Maximum allowed time the request can take. If undef, no timeouts occur.
+Can optionally use a C<LWP::ConnCache> object to reuse connections on per-host per-port basis.
+Required for NTLM authentication.
+See L<LWP::ConnCache> for details.
+
+=item auth $AUTH
+
+Normally, a request is sent without any authentication, and a 401 error is returned,
+the next step is to try authentication methods. To avoid this first stage, and
+send the authentication to the remote, C<auth> can be used.
+     
+   username => 'user',
+   password => 'pass',
+   auth     => 'Basic',
+
+=item keep_alive BOOLEAN
+
+If set, all incoming requests are silently converted to use HTTP/1.1, and connections
+are reused. Same as combined effect of explicitly setting
+
+   $req-> protocol('HTTP/1.1');
+   $req-> headers-> header( Host => $req-> uri-> host);
+   new( $req, conn_cache => LWP::ConnCache-> new);
 
 =item max_redirect NUM = 7
 
 Maximum allowed redirects. If 1, no redirection attemps are made.
 
-=item conn_cache $LWP::ConnCache = undef
+=item preferred_auth $AUTH|%AUTH
 
-Can optionally use a C<LWP::ConnCache> object to reuse connections on per-host per-port basis.
-See L<LWP::ConnCache> for details.
+List of preferred authentication methods, where many are supported by the server.
+When a single string, this method is tried first, then all available methods.
+When a hash, its values are treated as weight factors, -- the method with greatest
+factor is tried first. Negative values exclude corresponding methods from trying.
+
+     # try basic and whatever else
+     preferred_auth => 'Basic',
+
+     # try basic and never ntlm
+     preferred_auth => {
+         Basic => 1,
+	 NTLM  => -1,
+     },
+
+=item timeout SECONDS = undef
+
+Maximum allowed time the request can take. If undef, no timeouts occur.
 
 =back
 
