@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.4 2008/05/09 13:20:28 dk Exp $
+# $Id: Makefile.PL,v 1.5 2008/05/09 19:15:20 dk Exp $
 use ExtUtils::MakeMaker;
 use IO::Socket::INET;
 
@@ -14,7 +14,7 @@ if ($s) {
 	print <<EOT;
 	
 You appear to be directly connected to the Internet.  I have some tests
-that try to query live nameservers.
+that try to query live nameservers and google.
 	
 EOT
 	
