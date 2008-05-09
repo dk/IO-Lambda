@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.24 2008/05/09 13:20:28 dk Exp $
+# $Id: HTTP.pm,v 1.25 2008/05/09 13:26:18 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -37,15 +37,29 @@ sub new
 	$self-> {$_} = $options{$_} for qw(async_dns conn_cache username password domain
 		auth keep_alive preferred_auth);
 
-	if ( $self-> {keep_alive} and not $self-> {conn_cache}) {
-		require LWP::ConnCache;
-		$self-> {conn_cache} = LWP::ConnCache-> new;
+	my %headers;
+	$headers{'User-Agent'} = "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION";
+
+	if ( $self-> {keep_alive}) {
+		unless ( $self-> {conn_cache}) {
+			require LWP::ConnCache;
+			$self-> {conn_cache} = LWP::ConnCache-> new;
+		}
+		unless ( $req-> protocol) {
+			$req-> protocol('HTTP/1.1');
+		}
+		$headers{Host}         = $req-> uri-> host;
+		$headers{Connection}   = 'Keep-Alive';
+		$headers{'Keep-Alive'} = 300;
 	}
 
+
 	require IO::Lambda::DNS if $self-> {async_dns};
-		
-	$req-> headers-> header( 'User-Agent' => "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION")
-		unless defined $req-> headers-> header('User-Agent');
+	
+	my $h = $req-> headers;
+	while ( my ($k, $v) = each %headers) {
+		$h-> header($k, $v) unless defined $h-> header($k);
+	}
 
 	return $self-> handle_redirect( $req);
 }
@@ -220,13 +234,6 @@ sub handle_connection
 	my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
 	
 	lambda {
-		# keep-alive?
-		if ( $self-> {keep_alive} and not($req-> protocol)) {
-			$req-> protocol('HTTP/1.1');
-			$req-> headers-> header('Host' => $host)
-				unless defined $req-> headers-> header('Host');
-		}
-
 		# resolve hostname
 		if (
 			$self-> {async_dns} and
