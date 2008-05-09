@@ -32,3 +32,6 @@
 
 0.12 - 7 May 2008
 	add signal handling
+
+0.13 - 9 May 2008
+	add http authentication
