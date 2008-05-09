@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.25 2008/05/09 13:26:18 dk Exp $
+# $Id: HTTP.pm,v 1.26 2008/05/09 13:26:29 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -52,7 +52,6 @@ sub new
 		$headers{Connection}   = 'Keep-Alive';
 		$headers{'Keep-Alive'} = 300;
 	}
-
 
 	require IO::Lambda::DNS if $self-> {async_dns};
 	
