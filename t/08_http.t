@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 08_http.t,v 1.1 2008/05/06 20:41:33 dk Exp $
+# $Id: 08_http.t,v 1.2 2008/05/09 19:11:31 dk Exp $
 
 use strict;
 use warnings;
@@ -21,7 +21,8 @@ SKIP: {
 	skip "online tests disabled", 2 unless -e 't/online.enabled';
 
 	# single
-	ok( ref(http_lambda('www.google.com')-> wait), "http_get(google)");
+	my $r = http_lambda('www.google.com')-> wait;
+	ref($r) ? ok(1,"http_get(google)") : ok(0,"http_get(google):$r");
 
 	# many
 	lambda {

@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.26 2008/05/09 13:26:29 dk Exp $
+# $Id: HTTP.pm,v 1.27 2008/05/09 19:11:31 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -212,12 +212,13 @@ sub connect
 {
 	my ( $self, $host, $port) = @_;
 
-	return IO::Socket::INET-> new(
+	my $sock = IO::Socket::INET-> new(
 		PeerAddr => $host,
 		PeerPort => $port,
 		Proto    => 'tcp',
 		Blocking => 0,
-	), $!;
+	);
+	return $sock, ( $sock ? undef : "connect: $!");
 }
 
 # Connect to the remote, wait for protocol to finish, and
