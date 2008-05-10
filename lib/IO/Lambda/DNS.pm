@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.3 2008/05/06 20:41:33 dk Exp $
+# $Id: DNS.pm,v 1.4 2008/05/10 23:14:49 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -9,7 +9,6 @@ $RETRIES = 4;   # times
 
 use strict;
 use Socket;
-use Time::HiRes;
 use Net::DNS::Resolver;
 use IO::Lambda qw(:all);
 
@@ -26,7 +25,7 @@ sub dns_lambda
 		if ( $i == 0 or $i == $#_ or not defined($_[$i])) {
 			# first or last or undef parameter in no way can be an option
 			push @ctx, $_[$i];
-		} elsif ( $_[$i] eq 'timeout') {
+		} elsif ( $_[$i] =~ /^(timeout|deadline)$/) {
 			$timeout  = $_[++$i];
 		} elsif ( $_[$i] eq 'retry') {
 			$retries  = $_[++$i];
@@ -51,7 +50,7 @@ sub dns_lambda
 		my $sock = $obj-> bgsend( @ctx);
 		return "send error: " . $obj-> errorstring unless $sock;
 
-		context $sock, defined($timeout) ? time + $timeout : undef;
+		context $sock, $timeout;
 	read {
 		unless ( shift) {
 			return 'connect timeout' if $retries-- <= 0;
@@ -135,9 +134,10 @@ and lambda-style C<dns_lambda>.
 
 =head2 OPTIONS
 
-Accepted options specific to the module are C<timeout> (in seconds) and C<retry> (in times).
-All other options, such as C<nameservers>, C<dnssec> etc etc are passed as is
-to the C<Net::DNS::Resolver> constructor. See its man page for details.
+Accepted options specific to the module are C<timeout> or C<deadline> (in
+seconds) and C<retry> (in times).  All other options, such as C<nameservers>,
+C<dnssec> etc etc are passed as is to the C<Net::DNS::Resolver> constructor.
+See its man page for details.
 
 =head2 USAGE
 

@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.28 2008/05/09 20:18:57 dk Exp $
+# $Id: HTTP.pm,v 1.29 2008/05/10 23:14:49 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -244,7 +244,8 @@ sub handle_connection
 			$self-> {async_dns} and
 			$host !~ /^(\d{1,3}\.){3}(\d{1,3})$/
 		) {
-			context $host;
+			context $host, 
+				timeout => ($self-> {deadline} || $IO::Lambda::DNS::TIMEOUT); 
 			warn "resolving $host\n" if $DEBUG;
 			return IO::Lambda::DNS::dns_query( sub {
 				$host = shift;
@@ -459,30 +460,20 @@ C<HTTP::Response> on success, or error string otherwise.
    use HTTP::Request;
    use IO::Lambda qw(:all);
    use IO::Lambda::HTTP qw(http_request);
-   use LWP::ConnCache;
-   
 
-   # prepare http request
-   my $req = HTTP::Request-> new( GET => "http://www.perl.com/");
-   $req-> protocol('HTTP/1.1');
-   $req-> headers-> header( Host => $req-> uri-> host);
-
-   # connection cache (optional)
-   my $cache = LWP::ConnCache-> new;
-   
-   this lambda {
-      context shift, conn_cache => $cache;
+   lambda {
+      context shift;
       http_request {
          my $result = shift;
          if ( ref($result)) {
-            print "good:", length($result-> content), "\n";
+            print "good: ", length($result-> content), " bytes\n";
          } else {
-            print "bad:$result\n";
+            print "bad: $result\n";
          }
       }
-   };
-
-   this-> wait($req);
+   }-> wait(
+       HTTP::Request-> new( GET => "http://www.perl.com/")
+   );
 
 =head1 API
 
@@ -509,7 +500,7 @@ string otherwise.
 
 =item async_dns BOOLEAN
 
-If set, hostname will be resolved with L<IO::Lambda::DNS> using asynhronous
+If set, hostname will be resolved with L<IO::Lambda::DNS> using asynchronous
 L<Net::DNS>. Note that this method won't be able to account for non-DNS
 (/etc/hosts, NIS) host names.
 
@@ -523,10 +514,11 @@ See L<LWP::ConnCache> for details.
 
 =item auth $AUTH
 
-Normally, a request is sent without any authentication, and a 401 error is returned,
-the next step is to try authentication methods. To avoid this first stage, and
-send the authentication to the remote, C<auth> can be used.
-     
+Normally, a request is sent without any authentication. When 401 error is
+returned, only then authentication is tried. To avoid this first stage,
+knowing in advance the type of authentication will be accepted by the
+remote, C<auth> can be used.
+
    username => 'user',
    password => 'pass',
    auth     => 'Basic',
@@ -546,10 +538,12 @@ Maximum allowed redirects. If 1, no redirection attemps are made.
 
 =item preferred_auth $AUTH|%AUTH
 
-List of preferred authentication methods, where many are supported by the server.
-When a single string, this method is tried first, then all available methods.
-When a hash, its values are treated as weight factors, -- the method with greatest
-factor is tried first. Negative values exclude corresponding methods from trying.
+List of preferred authentication methods, used to choose the authentication
+method in case when many are supported by the server.  When option is a single
+string, the given method is tried first, and then all available methods.  When
+it is a hash, its values are treated as weight factors, - the method with the
+greatest factor is tried first. Negative values exclude the corresponding
+methods from trying.
 
      # try basic and whatever else
      preferred_auth => 'Basic',
@@ -559,6 +553,11 @@ factor is tried first. Negative values exclude corresponding methods from trying
          Basic => 1,
 	 NTLM  => -1,
      },
+
+Note that the current implementation doesn't provide re-trying of
+authentication if either a method or username/password combination fails.
+When at least one method was declared by the remote as supported, and was
+tried and failed, no further retries will be made.
 
 =item timeout SECONDS = undef
 
