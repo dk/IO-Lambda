@@ -1,4 +1,4 @@
-# $Id: NTLM.pm,v 1.2 2008/05/09 19:14:41 dk Exp $
+# $Id: NTLM.pm,v 1.3 2008/05/11 21:39:01 dk Exp $
 
 package IO::Lambda::HTTP::Authen::NTLM;
 
@@ -11,48 +11,43 @@ sub authenticate
 {
 	my ( $class, $self, $req, $response) = @_;
 
-	my $method = ($class =~ /:(\w+)$/)[0];
-	
-	# operate over existing connection
-	ntlm_reset;
-	ntlm_user( $self-> {username});
-	ntlm_domain( $self-> {domain}) if defined $self-> {domain};
-
-	my $r = $req-> clone;
-	$r-> content('');
-	$r-> header('Content-Length' => 0);
-	$r-> header('Authorization'  => "$method " . ntlm());
-
 	lambda {
 		# issue req phase 1
 		my $tried_phase1;
+		my $method = ($class =~ /:(\w+)$/)[0];
+		
+		ntlm_reset;
+		ntlm_user( $self-> {username});
+		ntlm_domain( $self-> {domain}) if defined $self-> {domain};
+
+		my $r = $req-> clone;
+		$r-> content('');
+		$r-> header('Content-Length' => 0);
+		$r-> header('Authorization'  => "$method " . ntlm());
 				
 		context $self-> handle_connection( $r);
 	tail {
 		my $answer = shift;
 		return $answer unless ref($answer);
 
-                if ( not($tried_phase1) and $answer-> code == 401) {
-			my $challenge = $answer-> header('WWW-Authenticate') || '';
-			if ( $challenge =~ s/^$method //) {
-				# issue req phase 2
-				ntlm_reset;
-				ntlm();
-				ntlm_user( $self-> {username});
-				ntlm_password( $self-> {password});
-				ntlm_domain( $self-> {domain}) if defined $self-> {domain};
-				
-				my $r = $req-> clone;
-        			$r-> header('Authorization' => "$method ". ntlm($challenge));
+                return $answer if $tried_phase1 or $answer-> code != 401;
+		my $challenge = $answer-> header('WWW-Authenticate') || '';
+		return $answer unless $challenge =~ s/^$method //;
 
-				ntlm_reset;
-				$tried_phase1++;
-				context $self-> handle_connection( $r);
-                                return again;
-			}
-                }
+		# issue req phase 2
+		ntlm_reset;
+		ntlm();
+		ntlm_user( $self-> {username});
+		ntlm_password( $self-> {password});
+		ntlm_domain( $self-> {domain}) if defined $self-> {domain};
+		
+		my $r = $req-> clone;
+        	$r-> header('Authorization' => "$method ". ntlm($challenge));
 
-		return $answer;
+		ntlm_reset;
+		$tried_phase1++;
+		context $self-> handle_connection( $r);
+                return again;
 	}}
 }
 
