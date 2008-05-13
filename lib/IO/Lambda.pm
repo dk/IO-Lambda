@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.37 2008/05/09 13:43:46 dk Exp $
+# $Id: Lambda.pm,v 1.38 2008/05/13 07:38:11 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.13';
+$VERSION     = '0.14';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -151,7 +151,7 @@ sub watch_timer
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "$self: time is undefined" unless defined $deadline;
 	
-	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
+	$deadline += time if $deadline < 1_000_000_000;
 	my $rec = [
 		$self,
 		$deadline,
@@ -360,7 +360,7 @@ sub terminate
 	warn $self-> _msg('terminate') if $DEBUG;
 }
 
-# synchronization
+# synchronisation
 
 # drives objects dependant on the other objects until all of them
 # are stopped
@@ -831,7 +831,7 @@ IO::Lambda - non-blocking I/O in lambda style
 
 This module is another attempt to fight the horrors of non-blocking I/O
 programming. The simplicity of the sequential programming is only available
-when one employs threads, coroutines, or coprocesses. Otherwise state machines
+when one employs threads, coroutines, or Co-processes. Otherwise state machines
 are to be built, often quite complex, which fact doesn't help the clarity of
 the code. This module uses closures to achieve clarity of sequential
 programming with single-process, single-thread, non-blocking I/O.
@@ -996,7 +996,7 @@ right after C<print> statement.
 Lambda can listen to events by calling predicates, that internally subscribe
 the lambda object to corresponding file handles, timers, and other lambdas.
 There are only those three types of events that basically constitute everything
-needed for building a state machive driven by external events, in particular,
+needed for building a state machine driven by external events, in particular,
 by non-blocking I/O. Parameters passed to predicates with explicit C<context>
 call, not by perl subroutine call convention. In the example below,
 lambda watches for file handle readability:
@@ -1021,7 +1021,7 @@ restarting the last predicate with C<again> call. For example, code
 
      read { int(rand 2) ? print 1 : again }
 
-will print undeterminable number of ones.
+will print indeterminable number of ones.
 
 =head2 Contexts
 
@@ -1092,7 +1092,7 @@ executed callback, so constructions like
 
 will eventually return 3, but whether it will be 1+2 or 2+1, is not known.
 
-C<wait> is not the only function that synchronizes input and output data.
+C<wait> is not the only function that synchronises input and output data.
 C<wait_for_all> method waits for all lambdas, including the caller, to finish.
 It returns collected results of all the objects in a single list.
 C<wait_for_any> method waits for at least one lambda, from the list of passed
@@ -1192,7 +1192,7 @@ that means that it will never be called with FALSE.
 
 =item write($filehandle, $deadline = undef)
 
-Exaclty same as C<read>, but executes when C<$filehandle> becomes writable.
+Exactly same as C<read>, but executes when C<$filehandle> becomes writable.
 
 =item io($flags, $filehandle, $deadline = undef)
 
@@ -1223,7 +1223,8 @@ unordered results of the objects.
 =item again(@frame = ())
 
 Restarts the current state with the current context. All the predicates above,
-excluding C<lambda>, are restartable ( see C<start> for this ). The code
+excluding C<lambda>, are restartable with C<again> call (see C<start> for
+restarting a C<lambda>). The code
 
    context $obj1;
    tail {
@@ -1243,7 +1244,7 @@ is thus equivalent to
 C<again> passes the current context to the predicate.
 
 If C<@frame> is provided, then it is treated as result of previous C<this_frame> call.
-It contains data suffucient to restarting another call, instead of the current.
+It contains data sufficient to restarting another call, instead of the current.
 See C<this_frame> for details.
 
 =item context @ctx
@@ -1258,7 +1259,7 @@ If really needed, use C<this(this)> syntax.
 If called with no parameters, returns the current lambda.
 Otherwise, replaces both the current lambda and the current context.
 Can be useful either when juggling with several lambdas, or as a
-conveniency over C<my> variables, for example,
+convenience over C<my> variables, for example,
 
     this lambda { ... };
     this-> wait;
@@ -1293,27 +1294,28 @@ Example:
     }
 
 The outermost tail callback will be called twice: first time in the normal course of event,
-and second time as a result of the C<again> call. C<this_frame> and C<alarm> thus provide
+and second time as a result of the C<again> call. C<this_frame> and C<again> thus provide
 a kind of restartable continuations.
 
 =back
 
 =head2 Stream I/O
 
-The whole point of this module is to build complex protocols in clear,
-consequent programming style. Consider how perl's low-level C<sysread> and
-C<syswrite> relate to its higher-level C<readline>, where the latter not only
-does the buffering, but also recognizes C<$/> as input record separator. The
-section above described lower-level lambda I/O predicates, that are only useful
-for C<sysread> and C<syswrite>; this section tells about higher-level lambdas
-that relate to these as the said C<readline> to C<sysread>.
+The whole point of this module is to help building complex protocols in a
+clear, consequent programming style. Consider how perl's low-level C<sysread>
+and C<syswrite> relate to its higher-level C<readline>, where the latter not
+only does the buffering, but also recognizes C<$/> as input record separator.
+The section above described lower-level lambda I/O predicates, that are only
+useful for C<sysread> and C<syswrite>; this section tells about higher-level
+lambdas that relate to these low-level ones, as the aforementioned C<readline>
+relates to C<sysread>.
 
-All functions in this section return a lambda, that does the actual work.  Not
+All functions in this section return the lambda, that does the actual work.  Not
 unlike as a class constructor returns a newly created class instance, these
 functions return newly created lambdas. Therefore, these functions are
 documented here as having two inputs and one output, as for example a function
 C<sysreader> is a function that takes 0 parameters, always returns a new
-lambda, and this lambda, in turn, takes four parameters and returns two. Such
+lambda, and this lambda, in turn, takes four parameters and returns two. This
 function will be described as
 
     # sysreader() :: ($fh,$buf,$length,$deadline) -> ($result,$error)
@@ -1332,15 +1334,15 @@ C<'timeout'> (if C<$deadline> was set).
 
 =item sysreader() :: ($fh, $buf, $length, $deadline) -> ioresult
 
-Creates lambda that will accept all the parameters used by C<sysread> (except
+Creates a lambda that accepts all the parameters used by C<sysread> (except
 C<$offset> though), plus C<$deadline>. The lambda tries to read C<$length>
 bytes from C<$fh> into C<$buf>, when C<$fh> becomes available for reading. If
 C<$deadline> expires, fails with C<'timeout'> error. On successful read,
-returns number of bytes read, or <$!> otherwise.
+returns number of bytes read, or C<$!> otherwise.
 
 =item syswriter() :: ($fh, $buf, $length, $offset, $deadline) -> ioresult
 
-Creates lambda that will accept all the parameters used by C<syswrite> plus
+Creates a lambda that accepts all the parameters used by C<syswrite> plus
 C<$deadline>. The lambda tries to write C<$length> bytes to C<$fh> from C<$buf>
 from C<$offset>, when C<$fh> becomes available for writing. If C<$deadline>
 expires, fails with C<'timeout'> error. On successful write, returns number of
@@ -1354,7 +1356,7 @@ The lambda when called, will read continually from C<$fh> into C<$buf>, and
 will either fail on timeout, I/O error, or end of file, or succeed if C<$cond>
 condition matches.
 
-The condition is a "smart match" of sorts, and can be one of:
+The condition C<$cond> is a "smart match" of sorts, and can be one of:
 
 =over
 
@@ -1375,7 +1377,7 @@ The lambda will succeed if coderef called with C<$buf> returns true value.
 =item undef
 
 The lambda will succeed on end of file. Note that for all other conditions end
-of file is reported as an error.
+of file is reported as an error, with literal C<"eof"> string.
 
 =back
 
@@ -1383,9 +1385,9 @@ of file is reported as an error.
 
 Creates a lambda that is able to perform buffered writes to C<$fh>, either
 using custom lambda C<writer>, or using one newly generated by C<syswriter>.
-The lambda when called, will write continually C<$buf> (from C<$offset>,
-C<$length> bytes) and will either fail on timeout or I/O error,
-or succeed when C<$length> bytes are written successfully.
+That lambda, in turn, will write continually C<$buf> (from C<$offset>,
+C<$length> bytes) and will either fail on timeout or I/O error, or succeed when
+C<$length> bytes are written successfully.
 
 =item getline($reader) :: ($fh, $buf, $deadline) -> ioresult
 
@@ -1396,20 +1398,21 @@ is read.
 
 =head2 Object API
 
-This section lists methods of C<IO::Lambda> class. Note that all lambda-style
-functionality is also available for object-style programming by design.
+This section lists methods of C<IO::Lambda> class. Note that by design all
+lambda-style functionality is also available for object-style programming.
 Together with the fact that lambda syntax is not exported by default, it thus
-leaves a place for possible implementations of independent syntaxes, either with
-or without lambdas, on top of the object API, without accessing the internals.
+leaves a place for possible implementations of independent syntaxes, either
+with or without lambdas, on top of the object API, without accessing the
+internals.
 
 The object API is mostly targeted to developers that need to connect
-third-party asynchronous events with lambda interface.
+third-party asynchronous events with the lambda interface.
 
 =over
 
 =item new
 
-Creates new C<IO::Lambda> object in passive state.
+Creates new C<IO::Lambda> object in the passive state.
 
 =item watch_io($flags, $handle, $deadline, $callback)
 
@@ -1477,7 +1480,7 @@ arguments from the previous calls are overwritten.
 =item terminate @args
 
 Cancels all watchers and resets lambda to the stopped state.  If there are any
-lambdas that watch for this object, these will be called first. C<@args> will
+lambdas that watch for this object, these will be notified first. C<@args> will
 be stored and available for later calls by C<peek>.
 
 =item wait @args
@@ -1514,7 +1517,7 @@ individual C<resolve>.
 
 Removes C<$event> from the internal waiting list. If lambda has no more
 events to wait, notifies eventual lambdas that wait to the objects, and
-the stops.
+then stops.
 
 Note that C<resolve> doesn't provide any means to call associated
 callbacks, which is intentional.
@@ -1533,19 +1536,15 @@ If you need to use these, install these separately:
 
 =item *
 
-L<IO::Lambda::SNMP> requires L<SNMP> (not a prerequisite).
+L<IO::Lambda::SNMP> requires L<SNMP>.
 
 =item *
 
-L<IO::Lambda::DNS> requires L<Net::DNS>.
+Lambda C<pid> in L<IO::Lambda::Signal> requires functioning C<POSIX::waitpid>.
 
 =item *
 
-L<IO::Lambda::Signal> requires functioning C<POSIX::waitpid>.
-
-=item *
-
-L<IO::Lambda::HTTP::Authen::NTLM> requires functioning L<Authen::NTLM>.
+L<IO::Lambda::HTTP::Authen::NTLM> requires L<Authen::NTLM>.
 
 =back
 
