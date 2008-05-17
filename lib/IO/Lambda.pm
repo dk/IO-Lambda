@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.38 2008/05/13 07:38:11 dk Exp $
+# $Id: Lambda.pm,v 1.39 2008/05/17 08:32:42 dk Exp $
 
 package IO::Lambda;
 
@@ -445,8 +445,8 @@ sub wait_for_any
 	}
 }
 
-# run the event loop until no lambdas are left in the blocking state
-sub run
+# do one quant
+sub yield
 {
 	LOOP: while ( $LOOP) {
 		drive;
@@ -454,10 +454,13 @@ sub run
 			next LOOP if $_-> yield;
 		}
 
-		last if $LOOP-> empty;
 		$LOOP-> yield;
+		last;
 	}
-}	
+}
+
+# run the event loop until no lambdas are left in the blocking state
+sub run { yield while $LOOP }
 
 #
 # Part II - Procedural interface to the lambda-style programming
@@ -1499,6 +1502,10 @@ are unordered.
 
 Waits for at least one lambda from list of caller lambda and C<@lambdas> to
 finish.  Returns list of finished objects.
+
+=item yield
+
+Runs onle round of dispatching events.
 
 =item run
 
