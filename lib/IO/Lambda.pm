@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.39 2008/05/17 08:32:42 dk Exp $
+# $Id: Lambda.pm,v 1.40 2008/05/17 09:32:40 dk Exp $
 
 package IO::Lambda;
 
@@ -454,13 +454,16 @@ sub yield
 			next LOOP if $_-> yield;
 		}
 
+		return 0 if $LOOP-> empty;
 		$LOOP-> yield;
 		last;
 	}
+
+	return 1;
 }
 
 # run the event loop until no lambdas are left in the blocking state
-sub run { yield while $LOOP }
+sub run { do {} while yield }
 
 #
 # Part II - Procedural interface to the lambda-style programming
@@ -1505,7 +1508,8 @@ finish.  Returns list of finished objects.
 
 =item yield
 
-Runs onle round of dispatching events.
+Runs onle round of dispatching events. Returns 1 if there are likely to
+be more events, 0 otherwise.
 
 =item run
 
