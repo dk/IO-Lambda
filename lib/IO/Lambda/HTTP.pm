@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.29 2008/05/10 23:14:49 dk Exp $
+# $Id: HTTP.pm,v 1.30 2008/05/17 09:34:19 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -366,9 +366,8 @@ sub handle_request_in_buffer
 
 		# no headers? 
 		return $self-> http_tail
-			unless $line =~ /^HTTP\/([\.\d]+)\s+(\d{3})\s+/i;
+			unless $line =~ /^HTTP\/[\.\d]+\s+\d{3}\s+/i;
 		
-		my ( $proto, $code) = ( $1, $2);
 		# got some headers
 		context $self-> http_read( qr/^.*?\r?\n\r?\n/s);
 	tail {
@@ -376,25 +375,34 @@ sub handle_request_in_buffer
 		return undef, shift unless defined $line;
 
 		my $headers = HTTP::Response-> parse( $line);
-		my $offset  = length( $line);
 
 		# Connection: close
 		my $c = lc( $headers-> header('Connection') || '');
 		$self-> {close_connection} = $c =~ /^close\s*$/i;
-		
-		# have Content-Length? read that many bytes then
-		my $l = $headers-> header('Content-Length');
-		return $self-> http_tail( $1 + $offset )
-			if defined ($l) and $l =~ /^(\d+)\s*$/;
 
-		# have 'Transfer-Encoding: chunked' ? read the chunks
-		my $te = lc( $headers-> header('Transfer-Encoding') || '');
-		return $self-> http_read_chunked($offset)
-			if $self-> {chunked} = $te =~ /^chunked\s*$/i;
-	
-		# just read as much as possible then
-		return $self-> http_tail if $proto < 1.1;
+		return $self-> http_read_body( length $line, $headers);
 	}}}}}
+}
+
+# have headers, read body
+sub http_read_body
+{
+	my ( $self, $offset, $headers) = @_;
+
+	# have Content-Length? read that many bytes then
+	my $l = $headers-> header('Content-Length');
+	return $self-> http_tail( $1 + $offset )
+		if defined ($l) and $l =~ /^(\d+)\s*$/;
+
+	# have 'Transfer-Encoding: chunked' ? read the chunks
+	my $te = lc( $headers-> header('Transfer-Encoding') || '');
+	return $self-> http_read_chunked($offset)
+		if $self-> {chunked} = $te =~ /^chunked\s*$/i;
+	
+	# just read as much as possible then
+	return $self-> http_tail if 
+		$headers-> protocol =~ /^HTTP\/(\d+\.\d+)/ and
+		$1 < 1.1;
 }
 
 # read sequence of TE chunks
