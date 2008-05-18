@@ -35,3 +35,9 @@
 
 0.13 - 9 May 2008
 	add http authentication
+
+0.14 - 13 May 2008
+	minor changes
+
+0.15 - 18 May 2008
+	add watch_* override()
