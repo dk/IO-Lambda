@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.5 2008/05/09 19:15:20 dk Exp $
+# $Id: Makefile.PL,v 1.6 2008/05/18 09:27:06 dk Exp $
 use ExtUtils::MakeMaker;
 use IO::Socket::INET;
 
@@ -24,6 +24,8 @@ EOT
 if ($online_tests) {
 	open(ENABLED, ">t/online.enabled") || die "Can't touch ./t/online.enabled $!";
 	close(ENABLED)                     || die "Can't touch ./t/online.enabled $!";
+} else {
+	unlink "t/online.enabled";
 }
 
 WriteMakefile(

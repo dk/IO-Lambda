@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.40 2008/05/17 09:32:40 dk Exp $
+# $Id: Lambda.pm,v 1.41 2008/05/18 09:27:06 dk Exp $
 
 package IO::Lambda;
 
@@ -6,6 +6,7 @@ use Carp;
 use strict;
 use warnings;
 use Exporter;
+use Class::Prototyped;
 use Time::HiRes qw(time);
 use vars qw(
 	$LOOP %EVENTS @LOOPS
@@ -15,7 +16,7 @@ use vars qw(
 	$DEBUG
 );
 $VERSION     = '0.14';
-@ISA         = qw(Exporter);
+@ISA         = qw(Exporter Class::Prototyped);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
 	WATCH_OBJ WATCH_DEADLINE WATCH_LAMBDA WATCH_CALLBACK
@@ -126,6 +127,9 @@ sub watch_io
 	croak "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
 
 	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
+	
+	return $self-> override_handler( 'watch_io', $flags, $handle, $deadline, $callback)
+		if $self-> {override};
 
 	my $rec = [
 		$self,
@@ -150,6 +154,9 @@ sub watch_timer
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "$self: time is undefined" unless defined $deadline;
+	
+	return $self-> override_handler( 'watch_timer', $deadline, $callback)
+		if $self-> {override};
 	
 	$deadline += time if $deadline < 1_000_000_000;
 	my $rec = [
@@ -177,6 +184,9 @@ sub watch_lambda
 	croak "won't watch myself" if $self == $lambda;
 	# XXX check cycling
 	
+	return $self-> override_handler( 'watch_lambda', $lambda, $callback)
+		if $self-> {override};
+	
 	$lambda-> reset if $lambda-> is_stopped;
 
 	my $rec = [
@@ -192,6 +202,42 @@ sub watch_lambda
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
 
 	return $rec;
+}
+
+# watch the watchers
+sub override
+{
+	my ( $self, $override) = @_;
+
+	if ( $override) {
+		$self-> {override} ||= [];
+		push @{$self-> {override}}, $override;
+	} else {
+		return unless $self-> {override};
+		my $ret = pop @{$self-> {override}};
+		$self-> {override} = undef unless @{$self-> {override}};
+		return $ret;
+	}
+}
+
+sub override_handler
+{
+	my ( $self, @param) = @_;
+	if ( 1 == @{$self-> {override}}) {
+		my $o = $self-> {override}-> [0];
+		local $self-> {override} = undef;
+		return $o-> ( $self, @param);
+	} else {
+		my @r;
+		my $o = pop @{$self-> {override}};
+		if ( wantarray) {
+			@r    = $o-> ( $self, @param);
+		} else {
+			$r[0] = $o-> ( $self, @param);
+		}
+		push @{$self->{override}}, $o;
+		return wantarray ? @r : $r[0];
+	}
 }
 
 # handle incoming asynchronous events
@@ -1532,6 +1578,30 @@ then stops.
 
 Note that C<resolve> doesn't provide any means to call associated
 callbacks, which is intentional.
+
+=item override $CODEREF
+
+Installs a C<$CODEREF> as a overriding hook for C<watch_lambda>, C<watch_io>,
+and C<watch_timer> methods. Whenever a lambda calls one of these methods, the
+hook will be called instead, that should be able to analyze the call and pass
+or deny it from the further processing.
+
+There can be stacked more than one C<override> handlers; if C<$CODEREF> is C<undef>,
+removes the last registered hook.
+
+Example:
+
+    my $q = lambda { ... tail { ... }};
+    $q-> override( sub {
+        my ( $self, $method, @param) = @_;
+	if ( $method eq 'watch_lambda') {
+	    # pass
+            $self-> $method(@param);
+	} else {
+	    # deny and rewrite result
+	    return 42;
+	}
+    });
 
 =back
 
