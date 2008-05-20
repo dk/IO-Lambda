@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.2 2008/05/07 11:59:32 dk Exp $
+# $Id: Signal.pm,v 1.3 2008/05/20 09:40:12 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -38,7 +38,7 @@ sub unwatch_signal
 	return if @{ $SIGDATA{$id}-> {lambdas} };
 
 	if (defined($SIGDATA{$id}-> {save})) {
-		SIG{$id} = $SIGDATA{$id}-> {save};
+		$SIG{$id} = $SIGDATA{$id}-> {save};
 	} else {
 		delete $SIG{$id};
 	}

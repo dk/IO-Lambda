@@ -1,24 +1,32 @@
-# $Id: Makefile.PL,v 1.6 2008/05/18 09:27:06 dk Exp $
+# $Id: Makefile.PL,v 1.7 2008/05/20 09:40:12 dk Exp $
+use Getopt::Long  qw(GetOptions);
 use ExtUtils::MakeMaker;
 use IO::Socket::INET;
 
 my $online_tests;
-my $s = IO::Socket::INET->new(
-	PeerAddr => "www.google.com:80",
-	Timeout  => 10,
+
+GetOptions(
+	'online-tests!' => \$online_tests,
 );
-	
-if ($s) {
-	close($s);
-	
-	print <<EOT;
+
+unless ( defined $online_tests) {
+	my $s = IO::Socket::INET->new(
+		PeerAddr => "www.google.com:80",
+		Timeout  => 10,
+	);
+		
+	if ($s) {
+		close($s);
+		
+		print <<EOT;
 	
 You appear to be directly connected to the Internet.  I have some tests
 that try to query live nameservers and google.
 	
 EOT
 	
-	$online_tests = prompt("Do you want to enable these tests?", "y") =~ /^y/i ? 1 : 0;
+		$online_tests = prompt("Do you want to enable these tests?", "y") =~ /^y/i ? 1 : 0;
+	}
 }
 
 if ($online_tests) {
