@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.44 2008/05/25 06:50:30 dk Exp $
+# $Id: Lambda.pm,v 1.45 2008/05/25 12:14:21 dk Exp $
 
 package IO::Lambda;
 
@@ -26,9 +26,9 @@ $VERSION     = '0.18';
 );
 @EXPORT_LAMBDA = qw(
 	this context lambda this_frame again
-	io read write sleep tail tails
+	io read write sleep tail tails state
 );
-@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, qw(state));
+@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
 %EXPORT_TAGS = (
 	lambda    => \@EXPORT_LAMBDA, 
 	stream    => \@EXPORT_STREAM, 

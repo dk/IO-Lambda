@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.7 2008/05/25 06:50:30 dk Exp $
+# $Id: SNMP.pm,v 1.8 2008/05/25 12:14:22 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -162,10 +162,12 @@ sub wrapper
 	this-> add_tail( $cb, $caller, $q, context);
 
 	# fire an snmp request
-	$session-> $method(
+	my $ok = $session-> $method(
 		@param, 
 		[ \&snmpcallback, $q, $c ]
 	);
+
+	return $q-> resolve($c) unless $ok;
 
 	reshuffle_fds();
 
