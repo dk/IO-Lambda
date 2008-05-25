@@ -1,9 +1,9 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.7 2008/05/07 11:07:06 dk Exp $
+# $Id: 03_lambda_api.t,v 1.8 2008/05/25 14:04:36 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 12;
+use Test::More tests => 13;
 use IO::Lambda qw(:lambda);
 
 alarm(10);
@@ -66,6 +66,15 @@ this lambda {
     }
 };
 ok( '3' eq this-> wait, 'frame restart');
+
+this lambda {
+	context 
+		lambda { 1 }, 
+		lambda { context 0.1; sleep { 2 }},
+		lambda { 3 };
+	tailo { join '', @_ }
+};
+ok( '123' eq this-> wait, 'tailo');
 
 SKIP: {
 	skip "select(file) doesn't work on win32", 3 if $^O =~ /win32/i;

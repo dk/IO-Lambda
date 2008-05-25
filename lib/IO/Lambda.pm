@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.45 2008/05/25 12:14:21 dk Exp $
+# $Id: Lambda.pm,v 1.46 2008/05/25 14:04:36 dk Exp $
 
 package IO::Lambda;
 
@@ -26,7 +26,7 @@ $VERSION     = '0.18';
 );
 @EXPORT_LAMBDA = qw(
 	this context lambda this_frame again
-	io read write sleep tail tails state
+	io read write sleep tail tails tailo state
 );
 @EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
 %EXPORT_TAGS = (
@@ -656,6 +656,38 @@ sub tails(&)
 	$this-> watch_lambda( $_, $watcher) for @lambdas;
 }
 
+# tailo(@lambdas) -- wait for all lambdas to finish, return ordered results
+sub tailo(&)
+{
+	my $cb = $_[0];
+	my @lambdas = context;
+	my $n = $#lambdas;
+	my $i = 0;
+	my %n;
+	$n{"$_"} = $i++ for @lambdas;
+	croak "no tails" unless @lambdas;
+	croak "won't wait for same lambda more than once" unless @lambdas == $i;
+
+	my @ret;
+	my $watcher;
+	$watcher = sub {
+		my $curr  = shift;
+		$THIS     = shift;
+		$ret[ $n{"$curr"} ] = \@_;
+		return if $n--;
+
+		@CONTEXT  = @lambdas;
+		$METHOD   = \&tails;
+		$CALLBACK = $cb;
+		@ret = map { @$_ } @ret;
+		$cb ? $cb-> (@ret) : @ret;
+	};
+	my $this = $THIS;
+	for my $l ( @lambdas) {
+		$this-> watch_lambda( $l, sub { $watcher->($l, @_) });
+	};
+}
+
 #
 # Part III - High order lambdas
 #
@@ -1265,6 +1297,10 @@ to complete.
 
 Executes when all objects in C<@lambdas> are finished, returns the collected,
 unordered results of the objects.
+
+=item tailo(@lambdas)
+
+Same as C<tails>, but the results are ordered.
 
 =item again(@frame = ())
 
