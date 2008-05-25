@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.30 2008/05/17 09:34:19 dk Exp $
+# $Id: HTTP.pm,v 1.31 2008/05/25 06:50:30 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -12,7 +12,7 @@ use Socket;
 use Exporter;
 use IO::Socket;
 use HTTP::Response;
-use IO::Lambda qw(:lambda :stream);
+use IO::Lambda qw(:lambda :stream state);
 use Time::HiRes qw(time);
 
 sub http_request(&)
@@ -344,7 +344,7 @@ sub handle_request_in_buffer
 			$self-> {writer}, 
 			$self-> {socket}, \ $req, 
 			undef, 0, $self-> {deadline};
-	tail {
+	state write => tail {
 		my ( $bytes_written, $error) = @_;
 		return undef, $error if $error;
 
@@ -355,7 +355,7 @@ sub handle_request_in_buffer
 		
 		# read first line
 		context $self-> http_read(qr/^.*?\n/);
-	tail {
+	state head => tail {
 		my $line = shift;
 		unless ( defined $line) {
 			my $error = shift;
@@ -370,7 +370,7 @@ sub handle_request_in_buffer
 		
 		# got some headers
 		context $self-> http_read( qr/^.*?\r?\n\r?\n/s);
-	tail {
+	state body => tail {
 		$line = shift;
 		return undef, shift unless defined $line;
 
@@ -415,7 +415,7 @@ sub http_read_chunked
 	# read chunk size
 	pos( $self-> {buf} ) = $offset;
 	context @ctx = $self-> http_read( qr/\G[\da-f]+\r?\n/i);
-	tail {
+	state size => tail {
 		# save this lambda frame
 		@frame = this_frame;
 		# got error
@@ -430,7 +430,7 @@ sub http_read_chunked
 
 	# read the chunk itself
 	context $self-> http_read( $size);
-	tail {
+	state chunk => tail {
 		return undef, shift unless shift;
 		$offset += $size + 2; # 2 for CRLF
 		pos( $self-> {buf} ) = $offset;

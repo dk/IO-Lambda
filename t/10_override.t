@@ -1,10 +1,10 @@
 #! /usr/bin/perl
-# $Id: 10_override.t,v 1.1 2008/05/18 09:27:06 dk Exp $
+# $Id: 10_override.t,v 1.2 2008/05/25 06:50:30 dk Exp $
 
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 8;
 use IO::Lambda qw(:all);
 
 # override and pass
@@ -69,3 +69,22 @@ $q-> override( \&bypass);
 $q-> reset;
 $q-> wait;
 ok( $q-> wait == 43 && $bypass == 1, 'one pass, one deny');
+
+# state
+$q = lambda {
+	context lambda { 'A' };
+	state A => tail {
+	context lambda { 'B' };
+	state B => tail {
+	context lambda { 'C' };
+	state C => tail {
+	}}}
+};
+my $states = '';
+$q-> override( sub {
+	my ( $self, $method, @param) = @_;
+	$states .= $self-> state;
+	$self-> $method( @param);
+});
+$q-> wait;
+ok( $states eq 'ABC', 'states');

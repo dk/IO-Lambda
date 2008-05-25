@@ -1,11 +1,10 @@
-# $Id: SNMP.pm,v 1.6 2008/02/01 12:49:18 dk Exp $
+# $Id: SNMP.pm,v 1.7 2008/05/25 06:50:30 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
 	@ISA @EXPORT_OK %EXPORT_OK 
 	$MASTER %ACTIVE_FDS %PASSIVE_FDS 
 	@TIMER $TIMER_ACTIVE
-	$EVENTS
 );
 @ISA = qw(Exporter);
 my @methods = qw(get fget getnext fgetnext set bulkwalk);
@@ -41,21 +40,12 @@ END { IO::Lambda::remove_loop($MASTER) };
 
 sub remove {}
 
+sub empty { 0 == keys %ACTIVE_FDS and 0 == keys %PASSIVE_FDS }
+
 sub yield
 {
-	$EVENTS = 0;
-
 	warn "snmp.yield\n" if $DEBUG;
-	# Handle snmp code here
 	SNMP::MainLoop(1e-6);
-	warn "snmp.yield handled $EVENTS events\n" if $DEBUG;
-	# Main event loop will be called after this sub is finished -
-	# register fds and timers
-	reshuffle_fds();
-
-	# if some events passed, ask IO::Lambda to not to enter its main
-	# loop, but go another drive() circle
-	return $EVENTS;
 }
 # Use the same $MASTER for the lambda emulator and do not call anything in the handler,
 # but do that in yield()
@@ -151,12 +141,13 @@ sub snmpcallback
 {
 	my ($q, $c) = (shift, shift);
 
-	$EVENTS++;
 	warn "snmp.cb: $q\n" if $DEBUG;
 	$q-> resolve($c);
 	$q-> terminate(@_);
 	undef $c;
 	undef $q;
+
+	reshuffle_fds();
 }
 
 
@@ -175,6 +166,8 @@ sub wrapper
 		@param, 
 		[ \&snmpcallback, $q, $c ]
 	);
+
+	reshuffle_fds();
 
 	# don't set up timers and fd listeners yet, yield() will do that
 	warn "snmp.call: $method($q)\n" if $DEBUG;

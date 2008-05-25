@@ -41,3 +41,7 @@
 
 0.15 - 18 May 2008
 	add watch_* override()
+
+0.18 - 25 May 2008
+	simplify yield()/wait(), facilitate override() with state()
+	

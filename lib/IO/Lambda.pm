@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.43 2008/05/20 09:40:12 dk Exp $
+# $Id: Lambda.pm,v 1.44 2008/05/25 06:50:30 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.17';
+$VERSION     = '0.18';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -28,7 +28,7 @@ $VERSION     = '0.17';
 	this context lambda this_frame again
 	io read write sleep tail tails
 );
-@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
+@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, qw(state));
 %EXPORT_TAGS = (
 	lambda    => \@EXPORT_LAMBDA, 
 	stream    => \@EXPORT_STREAM, 
@@ -431,6 +431,30 @@ sub drive
 	return $executed;
 }
 
+# do one quant
+sub yield
+{
+	my $more_events = 0;
+
+	# custom loops must not wait
+	for ( @LOOPS) {
+		next if $_-> empty;
+		$_-> yield;
+		$more_events = 1;
+	}
+	drive;
+
+	# main loop waits, if anything
+	unless ( $LOOP-> empty) {
+		$LOOP-> yield;
+		$more_events = 1;
+	}
+
+	$more_events = 1 if keys %EVENTS;
+	return $more_events;
+}
+
+
 # wait for one lambda to stop
 sub wait
 {
@@ -439,15 +463,7 @@ sub wait
 		$self-> call(@_);
 		$self-> start;
 	}
-	LOOP: while ( 1) {
-		drive;
-		last if $self-> {stopped};
-
-		for ( @LOOPS) {
-			next LOOP if $_-> yield;
-		}
-		$LOOP-> yield;
-	}
+	do {} while yield and not $self->{stopped};
 	return $self-> peek;
 }
 
@@ -458,16 +474,11 @@ sub wait_for_all
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
 	my @ret;
-	LOOP: while ( 1) {
-		drive;
+	while ( 1) {
 		push @ret, map { $_-> peek } grep { $_-> {stopped} } @objects;
 		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
-
-		for ( @LOOPS) {
-			next LOOP if $_-> yield;
-		}
-		$LOOP-> yield;
+		yield;
 	}
 	return @ret;
 }
@@ -478,33 +489,11 @@ sub wait_for_any
 	my @objects = @_;
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
-	LOOP: while ( 1) {
-		drive;
+	while ( 1) {
 		@objects = grep { $_-> {stopped} } @objects;
 		return @objects if @objects;
-
-		for ( @LOOPS) {
-			next LOOP if $_-> yield;
-		}
-		$LOOP-> yield;
+		yield;
 	}
-}
-
-# do one quant
-sub yield
-{
-	LOOP: while ( $LOOP) {
-		drive;
-		for ( @LOOPS) {
-			next LOOP if $_-> yield;
-		}
-
-		return 0 if $LOOP-> empty;
-		$LOOP-> yield;
-		last;
-	}
-
-	return 1;
 }
 
 # run the event loop until no lambdas are left in the blocking state
@@ -545,6 +534,12 @@ sub again
 sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub this_frame   { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
+
+sub state($)
+{
+	my $this = ($_[0] && ref($_[0])) ? shift(@_) : this;
+	@_ ? $this-> {state} = $_[0] : return $this-> {state};
+}
 
 #
 # Predicates:
@@ -1543,7 +1538,7 @@ C<@args> are not used.
 =item wait_for_all @lambdas
 
 Waits for caller lambda and C<@lambdas> to finish. Returns
-collection of C<peek> results for all objects. The return results
+collection of C<peek> results for all objects. The results
 are unordered.
 
 =item wait_for_any @lambdas
@@ -1553,8 +1548,8 @@ finish.  Returns list of finished objects.
 
 =item yield
 
-Runs onle round of dispatching events. Returns 1 if there are likely to
-be more events, 0 otherwise.
+Runs onle round of dispatching events. Returns 1 if there are more events
+in internal queues, 0 otherwise.
 
 =item run
 
@@ -1583,7 +1578,7 @@ callbacks, which is intentional.
 Installs a C<$CODEREF> as a overriding hook for C<watch_lambda>, C<watch_io>,
 and C<watch_timer> methods. Whenever a lambda calls one of these methods, the
 hook will be called instead, that should be able to analyze the call and pass
-or deny it from the further processing.
+or deny it from the further processing. See also C<state>.
 
 There can be stacked more than one C<override> handlers; if C<$CODEREF> is C<undef>,
 removes the last registered hook.
@@ -1601,6 +1596,28 @@ Example:
 	    return 42;
 	}
     });
+
+=item state $STATE
+
+Helper function for explicit naming of predicate calls. The function stores
+C<$STATE> string on the current lambda, so that eventual C<override>, needing
+to override internal states of the lambda, will make use of the string to
+identify a particular state.
+
+The rule of thumb is to use it when a lambda contains more than one predicate
+of a certain type; for example the code
+
+   tail {
+   tail {
+      ...
+   }}
+
+is therefore better to be written as
+    
+   state A => tail {
+   state B => tail {
+      ...
+   }}
 
 =back
 
