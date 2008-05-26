@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.46 2008/05/25 14:04:36 dk Exp $
+# $Id: Lambda.pm,v 1.47 2008/05/26 18:45:52 dk Exp $
 
 package IO::Lambda;
 
@@ -1023,27 +1023,40 @@ talk_redirect() will have exactly the same properties as talk() does
     use strict;
     use IO::Lambda qw(:lambda);
     use IO::Socket::INET;
-    my $q = lambda {
+
+    sub get
+    {
         my ( $socket, $url) = @_;
-        context $socket;
+        lambda {
+            context $socket;
         write {
             print $socket "GET $url HTTP/1.0\r\n\r\n";
             my $buf = '';
-            read {
-                my $n = sysread( $socket, $buf, 1024, length($buf));
-		return "read error:$!" unless defined $n;
-		return $buf unless $n;
-                again;
-            }
-        }
-    };
-    print $q-> wait( 
-        IO::Socket::INET-> new( 
-            PeerAddr => 'www.perl.com', 
-            PeerPort => 80 
-        ),
-        '/index.html'
-    );
+        read {
+            my $n = sysread( $socket, $buf, 1024, length($buf));
+            return "read error:$!" unless defined $n;
+            return $buf unless $n;
+            again;
+        }}}
+    }
+
+    sub get_parallel
+    {
+        my @hosts = @_;
+
+	lambda {
+	   context map { get(
+              IO::Socket::INET-> new(
+                  PeerAddr => $_, 
+                  PeerPort => 80 
+              ), '/index.html') } @hosts;
+	   tails {
+	      join("\n\n\n", @_ )
+	   }
+	}
+    }
+
+    print get_parallel('www.perl.com', 'www.google.com')-> wait;
 
 See tests and examples in directory C<eg/> for more.
 
