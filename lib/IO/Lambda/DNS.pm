@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.4 2008/05/10 23:14:49 dk Exp $
+# $Id: DNS.pm,v 1.5 2008/05/30 11:44:27 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -83,6 +83,8 @@ sub dns_lambda
 
 sub dns_query(&)
 {
+	return this-> override_handler('dns_query', \&dns_query, shift)
+		if this-> {override}->{dns_query};
 	this-> add_tail( 
 		shift, 
 		\&dns_query, 

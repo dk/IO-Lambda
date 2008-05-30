@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.8 2008/05/25 12:14:22 dk Exp $
+# $Id: SNMP.pm,v 1.9 2008/05/30 11:44:27 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -154,6 +154,10 @@ sub snmpcallback
 sub wrapper 
 {
 	my ( $cb, $method, $caller) = @_;
+
+	return this-> override_handler( $method, $caller, $cb)
+		if this-> {override}->{$method};
+
 	my ( $session, @param ) = context;
 
 	# the caller will listen to a new lambda

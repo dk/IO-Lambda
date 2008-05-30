@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.3 2008/05/20 09:40:12 dk Exp $
+# $Id: Signal.pm,v 1.4 2008/05/30 11:44:27 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -112,8 +112,19 @@ sub pid_lambda
 }
 
 # predicates
-sub signal(&) { this-> add_tail( shift, \&signal, signal_lambda(context), context)}
-sub pid   (&) { this-> add_tail( shift, \&pid,    pid_lambda(context),    context)}
+sub signal(&)
+{
+	return this-> override_handler('signal', \&signal, shift)
+		if this-> {override}->{signal};
+	this-> add_tail( shift, \&signal, signal_lambda(context), context);
+}
+
+sub pid(&) 
+{
+	return this-> override_handler('pid', \&pid, shift)
+		if this-> {override}->{pid};
+	this-> add_tail( shift, \&pid, pid_lambda(context), context);
+}
 
 1;
 

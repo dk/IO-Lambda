@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.47 2008/05/26 18:45:52 dk Exp $
+# $Id: Lambda.pm,v 1.48 2008/05/30 11:44:27 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.18';
+$VERSION     = '0.19';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -127,9 +127,6 @@ sub watch_io
 
 	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
 	
-	return $self-> override_handler( 'watch_io', $flags, $handle, $deadline, $callback)
-		if $self-> {override};
-
 	my $rec = [
 		$self,
 		$deadline,
@@ -153,9 +150,6 @@ sub watch_timer
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "$self: time is undefined" unless defined $deadline;
-	
-	return $self-> override_handler( 'watch_timer', $deadline, $callback)
-		if $self-> {override};
 	
 	$deadline += time if $deadline < 1_000_000_000;
 	my $rec = [
@@ -183,9 +177,6 @@ sub watch_lambda
 	croak "won't watch myself" if $self == $lambda;
 	# XXX check cycling
 	
-	return $self-> override_handler( 'watch_lambda', $lambda, $callback)
-		if $self-> {override};
-	
 	$lambda-> reset if $lambda-> is_stopped;
 
 	my $rec = [
@@ -206,36 +197,76 @@ sub watch_lambda
 # watch the watchers
 sub override
 {
-	my ( $self, $override) = @_;
+	my ( $self, $method, $state, $cb) = ( 4 == @_) ? @_ : (@_[0,1],'*',$_[2]);
 
-	if ( $override) {
-		$self-> {override} ||= [];
-		push @{$self-> {override}}, $override;
+	if ( $cb) {
+		$self-> {override}->{$method} ||= [];
+		push @{$self-> {override}->{$method}}, [ $state, $cb ];
 	} else {
-		return unless $self-> {override};
-		my $ret = pop @{$self-> {override}};
-		$self-> {override} = undef unless @{$self-> {override}};
-		return $ret;
+		my $p;
+		return unless $p = $self-> {override}->{$method};
+		for ( my $i = $#$p; $i >= 0; $i--) {
+			if (
+				(
+					not defined ($state) and 
+					not defined ($p->[$i]-> [0])
+				) or (
+					defined($state) and 
+					defined($p->[$i]-> [0]) and 
+					$p->[$i]->[0] eq $state
+				) 
+			) {
+				my $ret = splice( @$p, $i, 1);
+				delete $self-> {override}->{$method} unless @$p;
+				return $ret->[1];
+			}
+		}
+
+		return undef;
 	}
+}
+
+sub super
+{
+	croak "super() call outside overridden predicate" unless $_[0]-> {super};
+	$_[0]-> {super}-> [0]-> ($_[0]-> {super}-> [1]);
 }
 
 sub override_handler
 {
-	my ( $self, @param) = @_;
-	if ( 1 == @{$self-> {override}}) {
-		my $o = $self-> {override}-> [0];
-		local $self-> {override} = undef;
-		return $o-> ( $self, @param);
-	} else {
-		my @r;
-		my $o = pop @{$self-> {override}};
-		if ( wantarray) {
-			@r    = $o-> ( $self, @param);
+	my ( $self, $method, $sub, $cb) = @_;
+
+	my $o = $self-> {override}-> {$method}-> [-1];
+
+	# check state match
+	my ($a, $b) = ( $self-> {state}, $o-> [0]);
+	unless (
+		( not defined($a) and not defined ($b)) or
+		( defined $a and defined $b and $a eq $b) or
+		( defined $b and $b eq '*')
+	) {
+		# state not matched
+		if ( 1 == @{$self-> {override}->{$method}}) {
+			local $self-> {override}->{$method} = undef;
+			return $sub-> ($cb);
 		} else {
-			$r[0] = $o-> ( $self, @param);
+			pop @{$self-> {override}->{$method}};
+			my $ret = $sub-> ($cb);
+			push @{$self->{override}->{$method}}, $o;
+			return $ret;
 		}
-		push @{$self->{override}}, $o;
-		return wantarray ? @r : $r[0];
+	} else {
+		# state matched
+		local $self-> {super} = [ $sub, $cb ];
+		if ( 1 == @{$self-> {override}->{$method}}) {
+			local $self-> {override}->{$method} = undef;
+			return $o-> [1]-> ( $self, $sub, $cb);
+		} else {
+			pop @{$self-> {override}->{$method}};
+			my $ret = $o-> [1]-> ( $self, $sub, $cb);
+			push @{$self->{override}->{$method}}, $o;
+			return $ret;
+		}
 	}
 }
 
@@ -564,8 +595,11 @@ sub add_watch
 # io($flags,$handle,$deadline)
 sub io(&)
 {
+	return $THIS-> override_handler('io', \&io, shift)
+		if $THIS-> {override}->{io};
+
 	$THIS-> add_watch( 
-		shift, \&watch,
+		shift, \&io,
 		@CONTEXT[0,1,2,0,1,2]
 	)
 }
@@ -573,6 +607,9 @@ sub io(&)
 # read($handle,$deadline)
 sub read(&)
 {
+	return $THIS-> override_handler('read', \&read, shift)
+		if $THIS-> {override}->{read};
+
 	$THIS-> add_watch( 
 		shift, \&read, IO_READ, 
 		@CONTEXT[0,1,0,1]
@@ -582,6 +619,9 @@ sub read(&)
 # handle($handle,$deadline)
 sub write(&)
 {
+	return $THIS-> override_handler('write', \&write, shift)
+		if $THIS-> {override}->{write};
+	
 	$THIS-> add_watch( 
 		shift, \&write, IO_WRITE, 
 		@CONTEXT[0,1,0,1]
@@ -605,7 +645,12 @@ sub add_timer
 }
 
 # sleep($deadline)
-sub sleep(&) { $THIS-> add_timer( shift, \&sleep, @CONTEXT[0,0]) }
+sub sleep(&)
+{
+	return $THIS-> override_handler('sleep', \&sleep, shift)
+		if $THIS-> {override}->{sleep};
+	$THIS-> add_timer( shift, \&sleep, @CONTEXT[0,0])
+}
 
 # common wrapper for declaration of single lambda-watching user predicates
 sub add_tail
@@ -626,6 +671,9 @@ sub add_tail
 # tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
 sub tail(&)
 {
+	return $THIS-> override_handler('tail', \&tail, shift)
+		if $THIS-> {override}->{tail};
+	
 	my ( $lambda, @param) = context;
 	$lambda-> reset if $lambda-> is_stopped;
 	$lambda-> call( @param);
@@ -635,6 +683,9 @@ sub tail(&)
 # tails(@lambdas) -- wait for all lambdas to finish
 sub tails(&)
 {
+	return $THIS-> override_handler('tails', \&tails, shift)
+		if $THIS-> {override}->{tails};
+	
 	my $cb = $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
@@ -659,6 +710,9 @@ sub tails(&)
 # tailo(@lambdas) -- wait for all lambdas to finish, return ordered results
 sub tailo(&)
 {
+	return $THIS-> override_handler('tailo', \&tailo, shift)
+		if $THIS-> {override}->{tailo};
+	
 	my $cb = $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
@@ -1622,12 +1676,16 @@ then stops.
 Note that C<resolve> doesn't provide any means to call associated
 callbacks, which is intentional.
 
-=item override $CODEREF
+=item override $PREDICATE [ $STATE ] $CODEREF
 
-Installs a C<$CODEREF> as a overriding hook for C<watch_lambda>, C<watch_io>,
-and C<watch_timer> methods. Whenever a lambda calls one of these methods, the
-hook will be called instead, that should be able to analyze the call and pass
-or deny it from the further processing. See also C<state>.
+Installs a C<$CODEREF> as a overriding hook for a predicate - C<tail>, C<read>,
+C<write>, etc, possibly with a named state.  Whenever a lambda calls one of
+these predicates, the hook will be called instead, that should be able to analyze
+the call and pass or deny it from the further processing. 
+
+C<$STATE>, if omitted, is equivalent to C<'*'>, that means that checks on lambda 
+state are omitted too. Setting C<$STATE> to C<undef> is allowed though, and will
+match when the lambda state is also undefined (which it is by default).
 
 There can be stacked more than one C<override> handlers; if C<$CODEREF> is C<undef>,
 removes the last registered hook.
@@ -1635,16 +1693,22 @@ removes the last registered hook.
 Example:
 
     my $q = lambda { ... tail { ... }};
-    $q-> override( sub {
-        my ( $self, $method, @param) = @_;
-	if ( $method eq 'watch_lambda') {
+    $q-> override( tail => sub {
+	if ( stars are aligned right) {
 	    # pass
-            $self-> $method(@param);
+            this-> super;
 	} else {
 	    # deny and rewrite result
-	    return 42;
+	    return tail { 'not right' }
 	}
     });
+
+See also C<state> and C<super>.
+
+=item super
+
+Analogous to native perl's C<SUPER>, but on the predicate level, this method is to
+be called from overridden predicates to call the original predicate.
 
 =item state $STATE
 
