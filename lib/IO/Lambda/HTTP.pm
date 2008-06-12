@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.33 2008/05/30 11:44:27 dk Exp $
+# $Id: HTTP.pm,v 1.34 2008/06/12 13:18:27 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -36,8 +36,9 @@ sub new
 	$self-> {timeout}      = $options{deadline}       if defined $options{deadline};
 	$self-> {deadline}     = $options{timeout} + time if defined $options{timeout};
 	$self-> {max_redirect} = defined($options{max_redirect}) ? $options{max_redirect} : 7;
-	$self-> {$_} = $options{$_} for qw(async_dns conn_cache username password domain
-		auth keep_alive preferred_auth);
+
+	delete @options{qw(deadline timeout max_redirect)};
+	$self-> {$_} = $options{$_} for keys %options;
 
 	my %headers;
 	$headers{'User-Agent'} = "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION";

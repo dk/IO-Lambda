@@ -1,4 +1,4 @@
-# $Id: NTLM.pm,v 1.3 2008/05/11 21:39:01 dk Exp $
+# $Id: NTLM.pm,v 1.4 2008/06/12 13:18:27 dk Exp $
 
 package IO::Lambda::HTTP::Authen::NTLM;
 
@@ -6,6 +6,8 @@ use strict;
 use Authen::NTLM;
 
 use IO::Lambda qw(:all);
+
+*ntlmv2 = sub { die "NTLMv2 requires Authen::NTLM v1.04 or higher" if shift } if $Authen::NTLM::VERSION < 1.04;
 
 sub authenticate
 {
@@ -18,7 +20,8 @@ sub authenticate
 		
 		ntlm_reset;
 		ntlm_user( $self-> {username});
-		ntlm_domain( $self-> {domain}) if defined $self-> {domain};
+		ntlm_domain( defined($self->{domain}) ? $self-> {domain} : "");
+		ntlmv2(($self-> {ntlm_version} > 1) ? 1 : 0);
 
 		my $r = $req-> clone;
 		$r-> content('');
@@ -36,10 +39,11 @@ sub authenticate
 
 		# issue req phase 2
 		ntlm_reset;
+		ntlmv2(( $self-> {ntlm_version} > 1) ? 1 : 0);
 		ntlm();
 		ntlm_user( $self-> {username});
 		ntlm_password( $self-> {password});
-		ntlm_domain( $self-> {domain}) if defined $self-> {domain};
+		ntlm_domain( defined($self->{domain}) ? $self-> {domain} : "");
 		
 		my $r = $req-> clone;
         	$r-> header('Authorization' => "$method ". ntlm($challenge));
