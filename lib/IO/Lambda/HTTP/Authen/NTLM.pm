@@ -1,13 +1,11 @@
-# $Id: NTLM.pm,v 1.4 2008/06/12 13:18:27 dk Exp $
+# $Id: NTLM.pm,v 1.5 2008/07/02 09:25:51 dk Exp $
 
 package IO::Lambda::HTTP::Authen::NTLM;
 
 use strict;
-use Authen::NTLM;
+use Authen::NTLM 1.05;
 
 use IO::Lambda qw(:all);
-
-*ntlmv2 = sub { die "NTLMv2 requires Authen::NTLM v1.04 or higher" if shift } if $Authen::NTLM::VERSION < 1.04;
 
 sub authenticate
 {
@@ -18,15 +16,17 @@ sub authenticate
 		my $tried_phase1;
 		my $method = ($class =~ /:(\w+)$/)[0];
 		
-		ntlm_reset;
-		ntlm_user( $self-> {username});
-		ntlm_domain( defined($self->{domain}) ? $self-> {domain} : "");
-		ntlmv2(($self-> {ntlm_version} > 1) ? 1 : 0);
+		my $ntlm = Authen::NTLM-> new(
+			user     => $self-> {username},
+			password => $self-> {password},
+			domain   => $self-> {domain},
+			version  => $self-> {ntlm_version},
+		);
 
 		my $r = $req-> clone;
 		$r-> content('');
 		$r-> header('Content-Length' => 0);
-		$r-> header('Authorization'  => "$method " . ntlm());
+		$r-> header('Authorization'  => "$method " . $ntlm-> challenge);
 				
 		context $self-> handle_connection( $r);
 	tail {
@@ -38,15 +38,8 @@ sub authenticate
 		return $answer unless $challenge =~ s/^$method //;
 
 		# issue req phase 2
-		ntlm_reset;
-		ntlmv2(( $self-> {ntlm_version} > 1) ? 1 : 0);
-		ntlm();
-		ntlm_user( $self-> {username});
-		ntlm_password( $self-> {password});
-		ntlm_domain( defined($self->{domain}) ? $self-> {domain} : "");
-		
 		my $r = $req-> clone;
-        	$r-> header('Authorization' => "$method ". ntlm($challenge));
+        	$r-> header('Authorization' => "$method ". $ntlm-> challenge($challenge));
 
 		ntlm_reset;
 		$tried_phase1++;
