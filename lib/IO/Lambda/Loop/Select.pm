@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.11 2008/05/07 11:07:06 dk Exp $
+# $Id: Select.pm,v 1.12 2008/07/07 13:35:59 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -259,9 +259,9 @@ Returns TRUE if there are no records in the loop, FALSE otherwise.
 
 Removes all records associated with C<$OBJECT>.
 
-=item remove_event $EVENT
+=item remove_event $RECORD
 
-Removes a single events
+Removes a single event record.
 
 =item watch $RECORD
 

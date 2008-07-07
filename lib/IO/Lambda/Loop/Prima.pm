@@ -1,4 +1,4 @@
-# $Id: Prima.pm,v 1.5 2008/02/01 10:48:30 dk Exp $
+# $Id: Prima.pm,v 1.6 2008/07/07 13:35:59 dk Exp $
 
 package IO::Lambda::Loop::Prima;
 use strict;
@@ -340,4 +340,4 @@ loop.  The module is not intended for direct use.
 
 =head1 SEE ALSO
 
-  L<Prima>
+L<Prima>
