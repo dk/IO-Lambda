@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.49 2008/07/02 09:25:51 dk Exp $
+# $Id: Lambda.pm,v 1.50 2008/07/09 09:00:47 dk Exp $
 
 package IO::Lambda;
 
@@ -345,7 +345,7 @@ sub lambda_handler
 # The object becomes stopped, so no new events will be allowed to register.
 sub cancel_all_events
 {
-	my $self = shift;
+	my ( $self, %opt) = @_;
 
 	$self-> {stopped} = 1;
 
@@ -357,9 +357,19 @@ sub cancel_all_events
 	@{$self-> {in}} = (); 
 
 	if ( $arr) {
+		my $cascade = $opt{cascade};
+		my (%called, @cancel);
 		for my $rec ( @$arr) {
 			next unless my $watcher = $rec-> [WATCH_OBJ];
+			# global destruction in action! this should be $self, but isn't
+			next unless ref($rec-> [WATCH_LAMBDA]); 
 			$watcher-> lambda_handler( $rec);
+			push @cancel, $watcher if $cascade;
+		}
+		for ( @cancel) {
+			next if $called{"$_"};
+			$called{"$_"}++;
+			$_-> cancel_all_events(%opt);
 		}
 	}
 }
@@ -434,6 +444,12 @@ sub terminate
 	$self-> cancel_all_events;
 	$self-> {last} = \@error;
 	warn $self-> _msg('terminate') if $DEBUG;
+}
+
+# propagate event destruction on all levels
+sub destroy
+{
+	shift-> cancel_all_events( cascade => 1);
 }
 
 # synchronisation
@@ -1631,6 +1647,13 @@ arguments from the previous calls are overwritten.
 Cancels all watchers and resets lambda to the stopped state.  If there are any
 lambdas that watch for this object, these will be notified first. C<@args> will
 be stored and available for later calls by C<peek>.
+
+=item destroy
+
+Cancels all watchers and resets lambda to the stopped state. Does the same to
+all lambdas the caller lambda watches after, recursively. Useful where
+explicit, long-lived lambdas shouldn't be subject to global destruction, which
+kills objects in random order; C<destroy> kills them in some order, at least.
 
 =item wait @args
 

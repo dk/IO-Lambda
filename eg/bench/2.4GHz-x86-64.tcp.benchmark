@@ -1,0 +1,8 @@
+Lambda using select
+0.694 sec
+Lambda using AnyEvent
+0.684 sec
+Raw sockets using select
+0.145 sec
+POE using select
+5.349 sec
