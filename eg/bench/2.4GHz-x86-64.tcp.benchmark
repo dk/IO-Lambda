@@ -1,8 +1,24 @@
 Lambda using select
-0.694 sec
+0.688 sec
+
+real	0m0.736s
+user	0m0.696s
+sys	0m0.036s
 Lambda using AnyEvent
-0.684 sec
+0.685 sec
+
+real	0m0.737s
+user	0m0.676s
+sys	0m0.060s
 Raw sockets using select
 0.145 sec
+
+real	0m0.181s
+user	0m0.144s
+sys	0m0.036s
 POE using select
-5.349 sec
+5.748 sec
+
+real	0m5.863s
+user	0m4.988s
+sys	0m0.440s

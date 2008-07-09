@@ -1,10 +1,10 @@
 #!/bin/sh
 
-echo "Lambda using select";
-time perl tcp-lambda.pl;
-echo "Lambda using AnyEvent";
-time perl tcp-lambda.pl --anyevent;
-echo "Raw sockets using select";
-time perl tcp-raw.pl;
-echo "POE using select";
-time perl tcp-poe.pl;
+echo "Lambda using select"
+time perl tcp-lambda.pl
+echo "Lambda using AnyEvent"
+time perl tcp-lambda.pl --anyevent
+echo "Raw sockets using select"
+time perl tcp-raw.pl
+echo "POE using select"
+time perl tcp-poe.pl
