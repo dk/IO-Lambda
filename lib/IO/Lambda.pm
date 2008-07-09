@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.51 2008/07/09 09:04:22 dk Exp $
+# $Id: Lambda.pm,v 1.52 2008/07/09 14:01:24 dk Exp $
 
 package IO::Lambda;
 
@@ -1791,11 +1791,11 @@ Single-process tcp client and server; server echoes back everything is sent by
 the client. 500 connections sequentially created, instructed to send a single
 line to the server, and destroyed.
 
-                        2.4GHz x86-64 linux
-  Lambda using select       0.694 sec
-  Lambda using AnyEvent     0.684 sec
-  Raw sockets using select  0.145 sec
-  POE using select          5.349 sec
+                        2.4GHz x86-64 linux 1.2GHz win32
+  Lambda using select       0.694 sec        6.364 sec
+  Lambda using AnyEvent     0.684 sec        7.031 sec
+  Raw sockets using select  0.145 sec        4.141 sec
+  POE using select          5.349 sec       14.887 sec
 
 =back
 

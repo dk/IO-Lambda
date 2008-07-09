@@ -1,4 +1,4 @@
-# $Id: tcp-poe.pl,v 1.1 2008/07/09 09:00:47 dk Exp $
+# $Id: tcp-poe.pl,v 1.2 2008/07/09 14:01:24 dk Exp $
 # An echo client-server benchmark
 use strict;
 use Time::HiRes qw(time);
@@ -55,7 +55,7 @@ sub client
         ServerInput => sub {
             my ( $kernel, $heap, $input, $sess ) = @_[ KERNEL, HEAP, ARG0, SESSION ];
             if ( $id < $CYCLES) {
-		delete $heap-> {client};
+		delete $heap-> {server};
 		client($id+1);
             } else {
             	$kernel-> stop;
