@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.50 2008/07/09 09:00:47 dk Exp $
+# $Id: Lambda.pm,v 1.51 2008/07/09 09:04:22 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.20';
+$VERSION     = '0.21';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -1778,6 +1778,24 @@ Lambda C<pid> in L<IO::Lambda::Signal> requires functioning C<POSIX::waitpid>.
 =item *
 
 L<IO::Lambda::HTTP::Authen::NTLM> requires L<Authen::NTLM>.
+
+=back
+
+=head1 BENCHMARKS
+
+=over
+
+=item *
+
+Single-process tcp client and server; server echoes back everything is sent by
+the client. 500 connections sequentially created, instructed to send a single
+line to the server, and destroyed.
+
+                        2.4GHz x86-64 linux
+  Lambda using select       0.694 sec
+  Lambda using AnyEvent     0.684 sec
+  Raw sockets using select  0.145 sec
+  POE using select          5.349 sec
 
 =back
 
