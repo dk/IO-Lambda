@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.52 2008/07/09 14:01:24 dk Exp $
+# $Id: Lambda.pm,v 1.53 2008/07/31 14:48:04 dk Exp $
 
 package IO::Lambda;
 
@@ -26,7 +26,7 @@ $VERSION     = '0.21';
 );
 @EXPORT_LAMBDA = qw(
 	this context lambda this_frame again
-	io read write sleep tail tails tailo state
+	io read write readwrite sleep tail tails tailo state
 );
 @EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
 %EXPORT_TAGS = (
@@ -568,6 +568,8 @@ sub lambda(&)
 	$l;
 }
 
+*io = \&lambda;
+
 # re-enter the latest (or other) frame
 sub again
 {
@@ -608,14 +610,14 @@ sub add_watch
 	)
 }
 
-# io($flags,$handle,$deadline)
-sub io(&)
+# readwrite($flags,$handle,$deadline)
+sub readwrite(&)
 {
-	return $THIS-> override_handler('io', \&io, shift)
-		if $THIS-> {override}->{io};
+	return $THIS-> override_handler('readwrite', \&io, shift)
+		if $THIS-> {override}->{readwrite};
 
 	$THIS-> add_watch( 
-		shift, \&io,
+		shift, \&readwrite,
 		@CONTEXT[0,1,2,0,1,2]
 	)
 }
@@ -868,8 +870,10 @@ sub getline
 	lambda {
 		my ( $fh, $buf, $deadline) = @_;
 		context readbuf($reader), $fh, $buf, qr/^[^\n]*\n/, $deadline;
-		&tail();
-	}
+	tail {
+		substr( $$buf, 0, length($_[0]), '') unless defined $_[1];
+		@_;
+	}}
 }
 
 # write whole buffer to stream
@@ -986,49 +990,63 @@ programming with single-process, single-thread, non-blocking I/O.
 
 =head1 SYNOPSIS
 
-=head2 Basics
+This is a fairly large document, so depending on your reading tastes, you may
+either read all from here - it begins with code examples, then with more code
+examples, then the explanation of basic concepts, and finally gets to the
+complex ones. Or, you may skip directly to the fun part (L<Stream IO>, where
+functional style mixes with I/O.
 
-Prerequisite
+=head2 Read line by line from filehandle
 
-    use IO::Lambda qw(:lambda);
+Given C<$filehandle> is non-blocking, the following code creates a lambda than
+reads from it util EOF or error occured. C<getline> (see L<Stream IO> below) is
+a similar lambda that reads single line from a filehandle.
 
-Create an empty IO::Lambda object
+    use IO::Lambda qw(:all);
 
-    my $q = lambda {};
+    sub my_reader
+    {
+       my $filehandle = shift;
+       lambda {
+           context getline, $filehandle, \(my $buf = '');
+       tail {
+           my ( $string, $error) = @_;
+           if ( $error) {
+               warn "error: $error\n";
+           } else {
+               print $string;
+               return again;
+           }
+       }}
+    }
 
-Wait for it to finish
+Assume we have two socket connections, and sockets are non-blocking - read from
+both of them simulteously. The following code creates a lambda that reads from
+two readers:
 
-    $q-> wait;
+    sub my_reader_all
+    {
+        my @filehandles = @_;
+	lambda {
+	    context map { my_reader($_) } @filehandles;
+	    tails { print "all is finished\n" };
+	}
+    }
 
-Create lambda object and get its value
+    my_reader_all( $socket1, $socket2)-> wait;
 
-    $q = lambda { 42 };
-    print $q-> wait; # will print 42
-
-Create pipeline of two lambda objects
-
-    $q = lambda {
-        context lambda { 42 };
-	tail { 1 + shift };
-    };
-    print $q-> wait; # will print 43
-
-Create pipeline that waits for 2 lambdas
-
-    $q = lambda {
-        context lambda { 2 }, lambda { 3 };
-	tails { sort @_ }; # order is not guaranteed
-    };
-    print $q-> wait; # will print 23
-
-=head2 Non-blocking I/O
+=head2 Non-blocking HTTP
 
 Given a socket, create a lambda that implements http protocol
+
+    use IO::Lambda qw(:all);
+    use IO::Socket;
+    use HTTP::Request;
 
     sub talk
     {
         my $req    = shift;
-        my $socket = IO::Socket::INET-> new( PeerAddr => $req-> host, PeerPort => 80);
+        my $socket = IO::Socket::INET-> new( PeerAddr => 'www.perl.com', PeerPort => 80);
 
 	lambda {
 	    context $socket;
@@ -1043,6 +1061,7 @@ Given a socket, create a lambda that implements http protocol
 	    }
 	}
     }
+
 
 Connect and talk to the remote
 
@@ -1283,7 +1302,7 @@ many bytes from a socket within 5 seconds:
 
 Rewriting the same code with C<read> semantics that accepts time as timeout instead, 
 would be not that elegant:
-   
+
    lambda {
        my $buf = '';
        my $time_left = 5;
@@ -1344,6 +1363,10 @@ or by using the package syntax,
 
 Creates a new C<IO::Lambda> object.
 
+=item io()
+
+Same as C<lambda>.
+
 =item read($filehandle, $deadline = undef)
 
 Executes either when C<$filehandle> becomes readable, or after C<$deadline>.
@@ -1355,7 +1378,7 @@ that means that it will never be called with FALSE.
 
 Exactly same as C<read>, but executes when C<$filehandle> becomes writable.
 
-=item io($flags, $filehandle, $deadline = undef)
+=item readwrite($flags, $filehandle, $deadline = undef)
 
 Executes either when C<$filehandle> satisfies any of the condition C<$flags>,
 or after C<$deadline>. C<$flags> is a combination of three integer constants,
@@ -1464,7 +1487,7 @@ a kind of restartable continuations.
 
 =back
 
-=head2 Stream I/O
+=head2 Stream IO
 
 The whole point of this module is to help building complex protocols in a
 clear, consequent programming style. Consider how perl's low-level C<sysread>
@@ -1749,7 +1772,7 @@ of a certain type; for example the code
    }}
 
 is therefore better to be written as
-    
+
    state A => tail {
    state B => tail {
       ...
