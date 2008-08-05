@@ -1,16 +1,16 @@
 #! /usr/bin/perl
-# $Id: 10_override.t,v 1.3 2008/05/30 11:44:27 dk Exp $
+# $Id: 10_override.t,v 1.4 2008/08/05 19:44:26 dk Exp $
 
 use strict;
 use warnings;
 
-use Test::More tests => 9;
+use Test::More tests => 10;
 use IO::Lambda qw(:all);
 
 # override and pass
 my $q = lambda {
 	context lambda { 42 };
-	&tail;
+	&tail();
 };
 
 my $bypass = 0;
@@ -35,6 +35,17 @@ $bypass = 0;
 $q-> reset;
 $q-> override( tail => undef);
 ok( $q-> wait == 42, 'remove override');
+
+# two overrides, order
+$bypass = 0;
+$q-> reset;
+my $xls = '0';
+$q-> override( tail => sub { $xls .= '2'; shift-> super } );
+$q-> override( tail => sub { $xls .= '1'; shift-> super } );
+$q-> wait;
+ok($xls eq '012', 'order');
+$q-> override( tail => undef);
+$q-> override( tail => undef);
 
 # two overrides, both increment
 $bypass = 0;

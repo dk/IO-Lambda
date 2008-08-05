@@ -44,4 +44,6 @@
 
 0.18 - 25 May 2008
 	simplify yield()/wait(), facilitate override() with state()
-	
+
+0.22 - 5 Aug 2008
+	add intercept()	
