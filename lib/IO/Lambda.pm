@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.53 2008/07/31 14:48:04 dk Exp $
+# $Id: Lambda.pm,v 1.54 2008/08/05 17:08:19 dk Exp $
 
 package IO::Lambda;
 
@@ -613,7 +613,7 @@ sub add_watch
 # readwrite($flags,$handle,$deadline)
 sub readwrite(&)
 {
-	return $THIS-> override_handler('readwrite', \&io, shift)
+	return $THIS-> override_handler('readwrite', \&readwrite, shift)
 		if $THIS-> {override}->{readwrite};
 
 	$THIS-> add_watch( 
