@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.59 2008/08/06 19:46:58 dk Exp $
+# $Id: Lambda.pm,v 1.60 2008/08/06 19:56:24 dk Exp $
 
 package IO::Lambda;
 
@@ -1871,25 +1871,31 @@ is therefore better to be written as
 
 =head1 SEE ALSO
 
-L<Coro>, L<threads>, L<POE>.
-
-The package contains backends for other libraries that benefit from 
-asynchronous I/O, but may or may not list them as explicit dependency.
-If you need to use these, install these separately:
+Helper modules:
 
 =over
 
 =item *
 
-L<IO::Lambda::SNMP> requires L<SNMP>.
+L<IO::Lambda::Signal> - POSIX signals.
 
 =item *
 
-Lambda C<pid> in L<IO::Lambda::Signal> requires functioning C<POSIX::waitpid>.
+L<IO::Lambda::Socket> - lambda versions of C<connect>, C<accept> etc.
 
 =item *
 
-L<IO::Lambda::HTTP::Authen::NTLM> requires L<Authen::NTLM>.
+L<IO::Lambda::HTTP> - implementation of HTTP and HTTPS protocols.  HTTPS
+requires L<IO::Socket::SSL>, NTLM/Negotiate authentication requires
+L<Authem::NTLM> modules (not marked as dependencies).
+
+=item *
+
+L<IO::Lambda::DNS> - asynchronous domain name resolver.
+
+=item *
+
+L<IO::Lambda::SNMP> - SNMP requests lambda style. Requires L<SNMP>.
 
 =back
 
