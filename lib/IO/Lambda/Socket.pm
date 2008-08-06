@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.1 2008/08/06 13:30:35 dk Exp $
+# $Id: Socket.pm,v 1.2 2008/08/06 15:12:28 dk Exp $
 use strict;
 use warnings;
 
@@ -98,7 +98,7 @@ sub recv(&)
 				my $buf = '';
 				my $r = CORE::recv( 
 					$socket, $buf, $length, 
-					($flags || 0) | MSG_DONTWAIT
+					$flags || 0
 				);
 				if ( defined($r)) {
 					@param = defined($r) ? ($r,$buf) : (undef,$!);
