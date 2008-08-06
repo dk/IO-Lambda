@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.60 2008/08/06 19:56:24 dk Exp $
+# $Id: Lambda.pm,v 1.61 2008/08/06 20:08:35 dk Exp $
 
 package IO::Lambda;
 
@@ -1745,7 +1745,7 @@ are unordered.
 Waits for at least one lambda from list of caller lambda and C<@lambdas> to
 finish.  Returns list of finished objects.
 
-=item yield [ $NONBLOCKING = 0 ]
+=item yield $nonblocking = 0
 
 Runs onle round of dispatching events. Returns 1 if there are more events
 in internal queues, 0 otherwise. If C<$NONBLOCKING> is set, exits as soon
@@ -1774,20 +1774,20 @@ then stops.
 Note that C<resolve> doesn't provide any means to call associated
 callbacks, which is intentional.
 
-=item intercept $PREDICATE [ $STATE ] $CODEREF
+=item intercept $predicate [ $state = '*' ] $coderef
 
-Installs a C<$CODEREF> as a overriding hook for a predicate callback, where
-predicate is C<tail>, C<read>, C<write>, etc.  Whenever a the predicate
-callback is being called, the hook will be called instead, that should be able
-to analyze the call, and allow or deny it the further processing. 
+Installs a C<$coderef> as a overriding hook for a predicate callback, where
+predicate is C<tail>, C<read>, C<write>, etc.  Whenever a predicate callback
+is being called, the C<$coderef> hook will be called instead, that should be able to
+analyze the call, and allow or deny it the further processing. 
 
-C<$STATE>, if omitted, is equivalent to C<'*'>, that means that checks on
-lambda state are omitted too. Setting C<$STATE> to C<undef> is allowed though,
+C<$state>, if omitted, is equivalent to C<'*'>, that means that checks on
+lambda state are omitted too. Setting C<$state> to C<undef> is allowed though,
 and will match when the lambda state is also undefined (which it is by
 default).
 
-There can be stacked more than one C<intercept> handlers; if C<$CODEREF> is C<undef>,
-removes the last registered hook.
+There can exist more than one C<intercept> handlers, stacked on top of each
+other. If C<$coderef> is C<undef>, the last registered hook is removed.
 
 Example:
 
@@ -1803,19 +1803,19 @@ Example:
 
 See also C<state>, C<super>, and C<override>.
 
-=item override $PREDICATE [ $STATE ] $CODEREF
+=item override $predicate [ $state = '*' ] $coderef
 
-Installs a C<$CODEREF> as a overriding hook for a predicate - C<tail>, C<read>,
+Installs a C<$coderef> as a overriding hook for a predicate - C<tail>, C<read>,
 C<write>, etc, possibly with a named state.  Whenever a lambda calls one of
-these predicates, the hook will be called instead, that should be able to analyze
-the call, and allow or deny it the further processing. 
+these predicates, the C<$coderef> hook will be called instead, that should be
+able to analyze the call, and allow or deny it the further processing. 
 
-C<$STATE>, if omitted, is equivalent to C<'*'>, that means that checks on lambda 
-state are omitted too. Setting C<$STATE> to C<undef> is allowed though, and will
+C<$state>, if omitted, is equivalent to C<'*'>, that means that checks on lambda 
+state are omitted too. Setting C<$state> to C<undef> is allowed though, and will
 match when the lambda state is also undefined (which it is by default).
 
-There can be stacked more than one C<override> handlers; if C<$CODEREF> is C<undef>,
-removes the last registered hook.
+There can exist more than one C<override> handlers, stacked on top of each
+other. If C<$coderef> is C<undef>, the last registered hook is removed.
 
 Example:
 
@@ -1836,24 +1836,25 @@ See also C<state>, C<super>, and C<intercept>.
 
 Analogous to native perl's C<SUPER>, but on the predicate level, this method is
 to be called from overridden or intercepted predicates to call the original
-predicate.
+predicate or callback.
 
-There is a slight difference of the call syntax, depending on whether it is
-being called from C<override> or C<intercept> callbacks. The C<intercept>
-callback will call the previous callback right away, and therefore has chance
-to supply it with altered parameters. The C<override> callback will call only
-the predicate registration routine itself, not the callback, and therefore is
-called without parameters. See L<intercept> and L<override> for examples of use.
+There is a slight difference in the call syntax, depending on whether it is
+being called from inside an C<override> or C<intercept> callback. The
+C<intercept>'ed callback will call the previous callback right away, and may
+call it with parameters directly. The C<override> callback will only call the
+predicate registration routine itself, not the callback, and therefore is
+called without parameters. See L<intercept> and L<override> for examples of
+use.
 
-=item state $STATE
+=item state $state
 
 Helper function for explicit naming of predicate calls. The function stores
-C<$STATE> string on the current lambda, so that eventual C<intercept> and
+C<$state> string on the current lambda, so that eventual C<intercept> and
 C<override>, needing to override internal states of the lambda, will make use
 of the string to identify a particular state.
 
-The rule of thumb is to use it when a lambda contains more than one predicate
-of a certain type; for example the code
+The recommended use of the method is when a lambda contains more than one
+predicate of a certain type; for example the code
 
    tail {
    tail {
