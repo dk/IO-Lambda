@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.55 2008/08/05 19:44:26 dk Exp $
+# $Id: Lambda.pm,v 1.56 2008/08/06 10:39:02 dk Exp $
 
 package IO::Lambda;
 
@@ -1017,9 +1017,9 @@ IO::Lambda - non-blocking I/O in lambda style
 
 This module is another attempt to fight the horrors of non-blocking I/O
 programming. The simplicity of the sequential programming is only available
-when one employs threads, coroutines, or Co-processes. Otherwise state machines
+when one employs threads, coroutines, or co-processes. Otherwise state machines
 are to be built, often quite complex, which fact doesn't help the clarity of
-the code. This module uses closures to achieve clarity of sequential
+the code. This module uses closures to approximate the sequential
 programming with single-process, single-thread, non-blocking I/O.
 
 =head1 SYNOPSIS
@@ -1027,8 +1027,10 @@ programming with single-process, single-thread, non-blocking I/O.
 This is a fairly large document, so depending on your reading tastes, you may
 either read all from here - it begins with code examples, then with more code
 examples, then the explanation of basic concepts, and finally gets to the
-complex ones. Or, you may skip directly to the fun part (L<Stream IO>, where
-functional style mixes with I/O.
+complex ones. Or, you may skip directly to the fun part (L<Stream IO>), where
+functional style mixes with I/O. Also note that C<io> and C<lambda> are synonyms - 
+I personally prefer C<lambda> but some find the word slighly inappropriate, hence
+C<io>.
 
 =head2 Read line by line from filehandle
 
@@ -1041,7 +1043,7 @@ a similar lambda that reads single line from a filehandle.
     sub my_reader
     {
        my $filehandle = shift;
-       lambda {
+       io {
            context getline, $filehandle, \(my $buf = '');
        tail {
            my ( $string, $error) = @_;
@@ -1890,6 +1892,8 @@ line to the server, and destroyed.
   Lambda using AnyEvent     0.684 sec        7.031 sec
   Raw sockets using select  0.145 sec        4.141 sec
   POE using select          5.349 sec       14.887 sec
+
+See benchmarking code in F<eg/bench>.
 
 =back
 
