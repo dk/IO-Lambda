@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.57 2008/08/06 13:30:35 dk Exp $
+# $Id: Lambda.pm,v 1.58 2008/08/06 17:03:15 dk Exp $
 
 package IO::Lambda;
 
@@ -515,6 +515,7 @@ sub drive
 # do one quant
 sub yield
 {
+	my $nonblocking = shift;
 	my $more_events = 0;
 
 	# custom loops must not wait
@@ -527,7 +528,7 @@ sub yield
 
 	# main loop waits, if anything
 	unless ( $LOOP-> empty) {
-		$LOOP-> yield;
+		$LOOP-> yield( $nonblocking);
 		$more_events = 1;
 	}
 
@@ -1744,10 +1745,12 @@ are unordered.
 Waits for at least one lambda from list of caller lambda and C<@lambdas> to
 finish.  Returns list of finished objects.
 
-=item yield
+=item yield [ $NONBLOCKING = 0 ]
 
 Runs onle round of dispatching events. Returns 1 if there are more events
-in internal queues, 0 otherwise.
+in internal queues, 0 otherwise. If C<$NONBLOCKING> is set, exits as soon
+as possible, otherwise waits for events; this feature can be used for
+organizing event loops without C<wait/run> calls.
 
 =item run
 
