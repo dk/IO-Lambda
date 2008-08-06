@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.58 2008/08/06 17:03:15 dk Exp $
+# $Id: Lambda.pm,v 1.59 2008/08/06 19:46:58 dk Exp $
 
 package IO::Lambda;
 
@@ -1043,7 +1043,7 @@ either read all from here - it begins with code examples, then with more code
 examples, then the explanation of basic concepts, and finally gets to the
 complex ones. Or, you may skip directly to the fun part (L<Stream IO>), where
 functional style mixes with I/O. Also note that C<io> and C<lambda> are synonyms - 
-I personally prefer C<lambda> but some find the word slighly inappropriate, hence
+I personally prefer C<lambda> but some find the word slightly inappropriate, hence
 C<io>.
 
 =head2 Read line by line from filehandle
