@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.56 2008/08/06 10:39:02 dk Exp $
+# $Id: Lambda.pm,v 1.57 2008/08/06 13:30:35 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.22';
+$VERSION     = '0.23';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -720,6 +720,17 @@ sub add_tail
 	);
 }
 
+# convert constant @param into a lambda
+sub add_constant
+{
+	my ( $self, $cb, $method, @param) = @_;
+	$self-> add_tail ( 
+		$cb, $method,
+		lambda { @param },
+		@CONTEXT
+	);
+}
+
 # tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
 sub tail(&)
 {
@@ -802,7 +813,7 @@ sub tailo(&)
 # sysread lambda wrapper
 #
 # ioresult    :: ($result, $error)
-# sysreader() :: ($fh, $buf, $offset, $deadline) -> ioresult
+# sysreader() :: ($fh, $buf, $length, $deadline) -> ioresult
 sub sysreader (){ lambda 
 {
 	my ( $fh, $buf, $length, $deadline) = @_;
@@ -903,6 +914,8 @@ sub getline
 	my $reader = shift;
 	lambda {
 		my ( $fh, $buf, $deadline) = @_;
+		croak "getline() needs a buffer! ( f.ex getline,\$fh,\\(my \$buf='') )"
+			unless ref($buf);
 		context readbuf($reader), $fh, $buf, qr/^[^\n]*\n/, $deadline;
 	tail {
 		substr( $$buf, 0, length($_[0]), '') unless defined $_[1];
