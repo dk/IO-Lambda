@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.63 2008/08/07 12:58:34 dk Exp $
+# $Id: Lambda.pm,v 1.64 2008/08/07 14:32:57 dk Exp $
 
 package IO::Lambda;
 
@@ -796,7 +796,7 @@ sub tailo(&)
 		return if $n--;
 
 		@CONTEXT  = @lambdas;
-		$METHOD   = \&tails;
+		$METHOD   = \&tailo;
 		$CALLBACK = $cb;
 		@ret = map { @$_ } @ret;
 		$cb ? $cb-> (@ret) : @ret;
@@ -954,6 +954,52 @@ sub writebuf
 		again;
 	}}
 }
+
+# convert predicate to a factory
+sub to_factory
+{
+	my ( undef, $predicate) = @_;
+	return sub { lambda {
+		context @_;
+		$predicate-> ();
+	}};
+}
+
+# convert factory to a predicate
+sub to_predicate
+{
+	my ( undef, $factory, $name, $context_mark) = @_;
+	$context_mark = -1 unless defined $context_mark;
+	my $sub;
+	$sub = sub(&) {
+		return $THIS-> override_handler( $name, $sub, shift)
+			if defined($name) and this-> {override}->{$name};
+
+		my $cb     = shift;
+		my @ctx    = @CONTEXT;
+		$context_mark = 
+			( $context_mark == -1) ? @CONTEXT : $context_mark + 1
+			if $context_mark < 0;
+		my @param  = splice( @ctx, 0, $context_mark);
+
+		my $lambda = $factory-> (@param);
+		$lambda-> reset if $lambda-> is_stopped;
+		$lambda-> call( @ctx);
+
+		this-> watch_lambda( 
+			$lambda, 
+			$cb ? sub {
+				$THIS     = shift;
+				@CONTEXT  = ( @param, @ctx);
+				$METHOD   = $sub;
+				$CALLBACK = $cb;
+				$cb-> (@_);
+			} : undef
+		);
+	};
+	return $sub;
+}
+
 
 #
 # Part IV - Developer API for custom condvars and event loops
@@ -1632,6 +1678,46 @@ C<$length> bytes are written successfully.
 
 Same as C<readbuf>, but succeeds when a string of bytes ended by a newline
 is read.
+
+=back
+
+=head2 Predicates and factories
+
+Predicate ( C<read>, C<write> ) and factory ( C<readbuf>, C<writebuf> )
+functions can be converted into each other, if necessary.  Conversion can be
+done with C<factory> and C<predicate> functions. 
+
+=over
+
+=item to_factory $predicate
+
+Converts an existing predicate function into a new factory function.
+
+Example: convert an existing C<read> predicate into a factory:
+
+   *reader = IO::Lambda-> to_factory(\&read);
+   context reader, $fh, $deadline;
+   tail { ... }
+
+=item to_predicate $factory, $name = undef, $context_mark = -1
+
+Converts an existing factory function into a new predicate function.
+
+C<$name> is used for interaction with C<override> and C<intercept> schemes. If
+is undefined, then the new predicate won't be able to participate there.
+
+C<$context_mark> is a mark in context, which part of the context goes to
+the C<$factory> call, and which to a new lambda object it has created.
+By default, all context parameters go to C<$factory>. To make all context
+parameter go to the lambda, set C<$context_mark> to 0; to make only
+the last parameter go to lambda, set it to -2, etc.
+
+Example: convert existing C<getline> factory into a predicate:
+
+   sub gl(&);
+   *gl = IO::Lambda-> to_predicate(\&getline, 'gl', 1);
+   context $reader, $fh, $buf, $deadline;
+   gl { ... }
 
 =back
 
