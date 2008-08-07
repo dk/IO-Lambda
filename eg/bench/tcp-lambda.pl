@@ -1,4 +1,4 @@
-# $Id: tcp-lambda.pl,v 1.1 2008/07/09 09:00:47 dk Exp $
+# $Id: tcp-lambda.pl,v 1.2 2008/08/07 19:36:15 dk Exp $
 # An echo client-server benchmark
 use strict;
 use IO::Lambda qw(:all);
@@ -25,7 +25,7 @@ sub session
 { 
 	my $conn = shift;
 	lambda {
-		context getline(), $conn;
+		context getline(), $conn, \(my $buf);
 	tail {
 		my $s = shift;
 		return unless defined $s;

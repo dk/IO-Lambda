@@ -1,8 +1,8 @@
-# $Id: Signal.pm,v 1.4 2008/05/30 11:44:27 dk Exp $
+# $Id: Signal.pm,v 1.5 2008/08/07 19:36:15 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(signal signal_lambda pid pid_lambda);
+@EXPORT_OK = qw(signal pid);
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
 
 use strict;
@@ -91,14 +91,14 @@ sub signal_or_timeout_lambda
 	return $q;
 }
 
-sub signal_lambda
+sub new_signal
 {
 	my ( $id, $deadline) = @_;
 	signal_or_timeout_lambda( $id, $deadline, 
 		sub { 1 });
 }
 
-sub pid_lambda
+sub new_pid
 {
 	my ( $pid, $deadline) = @_;
 
@@ -112,19 +112,8 @@ sub pid_lambda
 }
 
 # predicates
-sub signal(&)
-{
-	return this-> override_handler('signal', \&signal, shift)
-		if this-> {override}->{signal};
-	this-> add_tail( shift, \&signal, signal_lambda(context), context);
-}
-
-sub pid(&) 
-{
-	return this-> override_handler('pid', \&pid, shift)
-		if this-> {override}->{pid};
-	this-> add_tail( shift, \&pid, pid_lambda(context), context);
-}
+sub signal (&) { new_signal(context)-> predicate(shift, \&signal, 'signal') }
+sub pid    (&) { new_pid   (context)-> predicate(shift, \&pid,    'pid') }
 
 1;
 
@@ -139,8 +128,7 @@ IO::Lambda::Signal - Wait for pid/signal or timeout
 =head1 DESCRIPTION
 
 The module provides access to signal-based callbacks, generic signal listener
-C<signal> and process ID listener C<pid>.  Each function is exported in two
-flavors: predicate-style C<pid> and lambda-style C<pid_lambda>.
+C<signal> and process ID listener C<pid>.
 
 =head1 SYNOPSIS
 
@@ -165,16 +153,16 @@ flavors: predicate-style C<pid> and lambda-style C<pid_lambda>.
 =item pid ($PID, $TIMEOUT) -> $?|undef
 
 Accepts PID and optional deadline/timeout, returns either process exit status,
-or undef on timeout.  The corresponding lambda is C<pid_lambda> :
+or undef on timeout.  The corresponding lambda is C<new_pid> :
 
-   pid_lambda ($PID, $TIMEOUT) :: () -> $?|undef
+   new_pid ($PID, $TIMEOUT) :: () -> $?|undef
 
 =item signal ($SIG, $TIMEOUT) -> boolean
 
 Accepts signal name and optional deadline/timeout, returns 1 if signal was caught,
-or C<undef> on timeout.  The corresponding lambda is C<signal_lambda> :
+or C<undef> on timeout.  The corresponding lambda is C<new_signal> :
 
-   signal_lambda ($SIG, $TIMEOUT) :: () -> boolean
+   new_signal ($SIG, $TIMEOUT) :: () -> boolean
 
 =back
 

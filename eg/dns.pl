@@ -1,6 +1,5 @@
-# $Id: dns.pl,v 1.1 2008/05/06 14:19:12 dk Exp $
+# $Id: dns.pl,v 1.2 2008/08/07 19:36:15 dk Exp $
 use strict;
-use Net::DNS;
 use IO::Lambda::DNS qw(:all);
 use IO::Lambda qw(:lambda);
 
@@ -29,7 +28,7 @@ lambda {
 		context $site,
 			timeout => 1.0, 
 			retry => 1;
-		dns_query { show(@_) }
+		dns { show(@_) }
 	}
 }-> wait;
 
@@ -37,6 +36,8 @@ print "--------------\n";
 
 # style two -- dns_lambda returns a lambda
 lambda {
-	context map { dns_lambda( "www.$_.com" ) } qw(google perl yahoo);
+	context map { 
+		IO::Lambda::DNS-> new( "www.$_.com" )
+	} qw(google perl yahoo);
 	tails { show($_) for @_ };
 }-> wait;

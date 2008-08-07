@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.65 2008/08/07 14:34:42 dk Exp $
+# $Id: Lambda.pm,v 1.66 2008/08/07 19:36:15 dk Exp $
 
 package IO::Lambda;
 
@@ -733,6 +733,28 @@ sub add_constant
 	);
 }
 
+# handle default predicate logic given a lambda
+sub predicate
+{
+	my ( $self, $cb, $method, $name) = @_;
+
+	return $THIS-> override_handler($name, $method, $cb)
+		if defined($name) and $THIS-> {override}->{$name};
+	
+	my @ctx = @CONTEXT;
+	$THIS-> watch_lambda( 
+		$self, 
+		$cb ? sub {
+			$THIS     = shift;
+			@CONTEXT  = @ctx;
+			$METHOD   = $method;
+			$CALLBACK = $cb;
+			$cb-> (@_);
+		} : undef
+	);
+}
+
+
 # tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
 sub tail(&)
 {
@@ -954,52 +976,6 @@ sub writebuf
 		again;
 	}}
 }
-
-# convert predicate to a factory
-sub to_factory
-{
-	my ( undef, $predicate) = @_;
-	return sub { lambda {
-		context @_;
-		$predicate-> ();
-	}};
-}
-
-# convert factory to a predicate
-sub to_predicate
-{
-	my ( undef, $factory, $name, $context_mark) = @_;
-	$context_mark = -1 unless defined $context_mark;
-	my $sub;
-	$sub = sub(&) {
-		return $THIS-> override_handler( $name, $sub, shift)
-			if defined($name) and this-> {override}->{$name};
-
-		my $cb     = shift;
-		my @ctx    = @CONTEXT;
-		$context_mark = 
-			( $context_mark == -1) ? @CONTEXT : $context_mark + 1
-			if $context_mark < 0;
-		my @param  = splice( @ctx, 0, $context_mark);
-
-		my $lambda = $factory-> (@param);
-		$lambda-> reset if $lambda-> is_stopped;
-		$lambda-> call( @ctx);
-
-		this-> watch_lambda( 
-			$lambda, 
-			$cb ? sub {
-				$THIS     = shift;
-				@CONTEXT  = ( @param, @ctx);
-				$METHOD   = $sub;
-				$CALLBACK = $cb;
-				$cb-> (@_);
-			} : undef
-		);
-	};
-	return $sub;
-}
-
 
 #
 # Part IV - Developer API for custom condvars and event loops
@@ -1582,6 +1558,18 @@ The outermost tail callback will be called twice: first time in the normal cours
 and second time as a result of the C<again> call. C<this_frame> and C<again> thus provide
 a kind of restartable continuations.
 
+=item predicate $lambda, $callback, $method, $name
+
+Helper function for predicate wrappers, to be called inside a
+predicate that waits for a lambda.
+
+Example: convert existing C<getline> constructor into a predicate:
+
+   sub gl(&) { getline-> predicate( shift, \&gl, 'gl') }
+   ...
+   context $fh, $buf, $deadline;
+   gl { ... }
+
 =back
 
 =head2 Stream IO
@@ -1598,11 +1586,11 @@ relates to C<sysread>.
 All functions in this section return the lambda, that does the actual work.
 Not unlike as a class constructor returns a newly created class instance, these
 functions return newly created lambdas. Such functions will be further referred
-as lambda object factories, or simply factories. Therefore, factories are
+as lambda constructors, or simply constructors. Therefore, constructors are
 documented here as having two inputs and one output, as for example a function
 C<sysreader> is a function that takes 0 parameters, always returns a new
 lambda, and this lambda, in turn, takes four parameters and returns two. This
-factory will be described as
+constructor will be described as
 
     # sysreader() :: ($fh,$buf,$length,$deadline) -> ($result,$error)
 
@@ -1679,46 +1667,6 @@ C<$length> bytes are written successfully.
 
 Same as C<readbuf>, but succeeds when a string of bytes ended by a newline
 is read.
-
-=back
-
-=head2 Predicates and factories
-
-Predicate ( such as C<read>, C<write> ) and factory ( such as C<readbuf>,
-C<writebuf> ) functions can be converted into each other, if necessary.
-Conversion can be done with C<to_factory> and C<to_predicate> functions. 
-
-=over
-
-=item to_factory $predicate
-
-Converts an existing predicate function into a new factory function.
-
-Example: convert an existing C<read> predicate into a factory:
-
-   *reader = IO::Lambda-> to_factory(\&read);
-   context reader, $fh, $deadline;
-   tail { ... }
-
-=item to_predicate $factory, $name = undef, $context_mark = -1
-
-Converts an existing factory function into a new predicate function.
-
-C<$name> is used for interaction with C<override> and C<intercept> schemes. If
-is undefined, then the new predicate won't be able to participate there.
-
-C<$context_mark> is a mark in context, which part of the context goes to
-the C<$factory> call, and which to a new lambda object it has created.
-By default, all context parameters go to C<$factory>. To make all context
-parameter go to the lambda, set C<$context_mark> to 0; to make only
-the last parameter go to lambda, set it to -2, etc.
-
-Example: convert existing C<getline> factory into a predicate:
-
-   sub gl(&);
-   *gl = IO::Lambda-> to_predicate(\&getline, 'gl', 1);
-   context $reader, $fh, $buf, $deadline;
-   gl { ... }
 
 =back
 

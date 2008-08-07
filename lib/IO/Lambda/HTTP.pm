@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.34 2008/06/12 13:18:27 dk Exp $
+# $Id: HTTP.pm,v 1.35 2008/08/07 19:36:15 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -15,16 +15,10 @@ use HTTP::Response;
 use IO::Lambda qw(:lambda :stream);
 use Time::HiRes qw(time);
 
-sub http_request(&)
+sub http_request(&) 
 {
-	return this-> override_handler('http_request', \&http_request, shift)
-		if this-> {override}->{http_request};
-	this-> add_tail(
-		shift,
-		\&http_request,
-		__PACKAGE__-> new( context ),
-		context
-	);
+	__PACKAGE__-> new(context)-> 
+		predicate(shift, \&http_request, 'http_request')
 }
 
 sub new
@@ -250,7 +244,7 @@ sub handle_connection
 			context $host, 
 				timeout => ($self-> {deadline} || $IO::Lambda::DNS::TIMEOUT); 
 			warn "resolving $host\n" if $DEBUG;
-			return IO::Lambda::DNS::dns_query( sub {
+			return IO::Lambda::DNS::dns( sub {
 				$host = shift;
 				return $host unless $host =~ /^\d/; # error
 				warn "resolved to $host\n" if $DEBUG;
