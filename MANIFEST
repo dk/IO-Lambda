@@ -34,6 +34,7 @@ eg/http-redirect.pl
 eg/snmp.pl
 eg/loop.pl
 eg/dns.pl
+eg/webserver.pl
 eg/bench/tcp-batch
 eg/bench/tcp-lambda.pl
 eg/bench/tcp-poe.pl
