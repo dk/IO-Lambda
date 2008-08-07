@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.61 2008/08/06 20:08:35 dk Exp $
+# $Id: Lambda.pm,v 1.62 2008/08/07 09:23:23 dk Exp $
 
 package IO::Lambda;
 
@@ -821,7 +821,7 @@ sub sysreader (){ lambda
 	$$buf = '' unless defined $$buf;
 
 	this-> watch_io( IO_READ, $fh, $deadline, sub {
-		return undef, 'timeout' unless shift;
+		return undef, 'timeout' unless $_[1];
 		my $n = sysread( $fh, $$buf, $length, length($$buf));
 		if ( $DEBUG) {
 			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
@@ -840,7 +840,7 @@ sub syswriter (){ lambda
 	my ( $fh, $buf, $length, $offset, $deadline) = @_;
 
 	this-> watch_io( IO_WRITE, $fh, $deadline, sub {
-		return undef, 'timeout' unless shift;
+		return undef, 'timeout' unless $_[1];
 		my $n = syswrite( $fh, $$buf, $length, $offset);
 		if ( $DEBUG) {
 			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
