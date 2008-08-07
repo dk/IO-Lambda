@@ -1,7 +1,7 @@
 #!/usr/bin/perl
-# $Id: loop.pl,v 1.2 2008/02/18 10:46:16 dk Exp $
+# $Id: loop.pl,v 1.3 2008/08/07 09:26:31 dk Exp $
 
-# This example realizes a loop organized with lambdas, as a tail-chain
+# This example implements a loop with lambdas, as a tail-chain
 # of subsequent calls. There are two loops that run in parallel.
 
 use strict;
