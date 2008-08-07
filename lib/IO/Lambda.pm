@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.64 2008/08/07 14:32:57 dk Exp $
+# $Id: Lambda.pm,v 1.65 2008/08/07 14:34:42 dk Exp $
 
 package IO::Lambda;
 
@@ -1595,13 +1595,14 @@ useful for C<sysread> and C<syswrite>; this section tells about higher-level
 lambdas that relate to these low-level ones, as the aforementioned C<readline>
 relates to C<sysread>.
 
-All functions in this section return the lambda, that does the actual work.  Not
-unlike as a class constructor returns a newly created class instance, these
-functions return newly created lambdas. Therefore, these functions are
+All functions in this section return the lambda, that does the actual work.
+Not unlike as a class constructor returns a newly created class instance, these
+functions return newly created lambdas. Such functions will be further referred
+as lambda object factories, or simply factories. Therefore, factories are
 documented here as having two inputs and one output, as for example a function
 C<sysreader> is a function that takes 0 parameters, always returns a new
 lambda, and this lambda, in turn, takes four parameters and returns two. This
-function will be described as
+factory will be described as
 
     # sysreader() :: ($fh,$buf,$length,$deadline) -> ($result,$error)
 
@@ -1683,9 +1684,9 @@ is read.
 
 =head2 Predicates and factories
 
-Predicate ( C<read>, C<write> ) and factory ( C<readbuf>, C<writebuf> )
-functions can be converted into each other, if necessary.  Conversion can be
-done with C<factory> and C<predicate> functions. 
+Predicate ( such as C<read>, C<write> ) and factory ( such as C<readbuf>,
+C<writebuf> ) functions can be converted into each other, if necessary.
+Conversion can be done with C<to_factory> and C<to_predicate> functions. 
 
 =over
 
