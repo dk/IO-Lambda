@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.62 2008/08/07 09:23:23 dk Exp $
+# $Id: Lambda.pm,v 1.63 2008/08/07 12:58:34 dk Exp $
 
 package IO::Lambda;
 
@@ -618,6 +618,7 @@ sub again
 sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub this_frame   { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
+sub set_frame    { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
 
 sub state($)
 {

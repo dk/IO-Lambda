@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.2 2008/08/06 15:12:28 dk Exp $
+# $Id: Socket.pm,v 1.3 2008/08/07 12:58:34 dk Exp $
 use strict;
 use warnings;
 
@@ -27,8 +27,7 @@ sub connect(&)
 	this-> watch_io(
 		IO_WRITE, $socket, $deadline,
 		sub {
-			this(shift, $socket, $deadline);
-			this_frame(\&connect, $cb);
+			shift-> set_frame( \&connect, $cb, $socket, $deadline);
 
 			my @param;
 			unless ( $_[0]) {
@@ -55,8 +54,7 @@ sub accept(&)
 	this-> watch_io(
 		IO_READ, $socket, $deadline,
 		sub {
-			this(shift, $socket, $deadline);
-			this_frame(\&accept, $cb);
+			shift-> set_frame( \&accept, $cb, $socket, $deadline);
 
 			my @param;
 			unless ( $_[0]) {
@@ -88,8 +86,7 @@ sub recv(&)
 	this-> watch_io(
 		IO_READ, $socket, $deadline,
 		sub {
-			this(shift, $socket, $length, $flags, $deadline);
-			this_frame(\&recv, $cb);
+			shift-> set_frame( \&recv, $cb, $socket, $length, $flags, $deadline);
 
 			my @param;
 			unless ( $_[0]) {
@@ -126,8 +123,7 @@ sub send(&)
 	this-> watch_io(
 		IO_WRITE, $socket, $deadline,
 		sub {
-			this(shift, $socket, $msg, $flags, $to, $deadline);
-			this_frame(\&send, $cb);
+			shift-> set_frame( \&recv, $cb, $socket, $msg, $flags, $to, $deadline);
 
 			my @param;
 			unless ( $_[0]) {
@@ -252,7 +248,7 @@ UDP
 
 =over
 
-=item accept() :: ($socket, $deadline=undef) ->  ($new_socket | undef,$error)
+=item accept($socket, $deadline=undef) ->  ($new_socket | undef,$error)
 
 Expects stream C<$socket> in a non-blocking listening state. Executes either
 after connection arrives, or after C<$deadline>.  Returns a new socket serving
@@ -261,7 +257,7 @@ error string is either C<timeout> or C<$!>.
 
 See also L<perlfunc/accept>.
 
-=item connect() :: ($socket, $deadline=undef) -> (1 | undef,$error)
+=item connect($socket, $deadline=undef) -> (1 | undef,$error)
 
 Expects stream C<$socket> in a non-blocking connect state. Executes either
 after connection succeeds, or after C<$deadline>.  Returns true constant (C<1>)
@@ -270,7 +266,7 @@ C<timeout> or C<$!>.
 
 See also L<perlfunc/connect>.
 
-=item recv() :: ($socket, $length, $flags=0, $deadline=undef) -> ($addr,$msg | undef,$error)
+=item recv($socket, $length, $flags=0, $deadline=undef) -> ($addr,$msg | undef,$error)
 
 Expects a non-blocking datagram C<$socket>. After the socket becomes readable,
 tries to read C<$length> bytes using C<CORE::recv> call. Returns packed address
@@ -279,7 +275,7 @@ failure. The error string is either C<timeout> or C<$!>.
 
 See also L<perlfunc/recv>.
 
-=item send() :: ( $socket, $msg, $flags, $to=undef, $deadline=undef) -> ($nbytes | undef,$error)
+=item send($socket, $msg, $flags, $to=undef, $deadline=undef) -> ($nbytes | undef,$error)
 
 Expects a non-blocking datagram C<$socket>. After the socket becomes writable,
 tries to write C<$msg> using C<CORE::send> call. Depending whether C<$to> is
