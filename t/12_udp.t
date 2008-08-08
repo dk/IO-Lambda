@@ -1,13 +1,16 @@
 #! /usr/bin/perl
-# $Id: 12_udp.t,v 1.1 2008/08/06 13:30:35 dk Exp $
+# $Id: 12_udp.t,v 1.2 2008/08/08 07:37:50 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 2;
+use Test::More;
 use IO::Lambda qw(:lambda :stream);
 use Time::HiRes qw(time);
 use IO::Socket::INET;
 use IO::Lambda::Socket qw(send recv);
+	
+plan skip_all => "online tests disabled" unless -e 't/online.enabled';
+plan tests    => 3;
 
 alarm(10);
 
@@ -17,7 +20,7 @@ my $server = IO::Socket::INET-> new(
 	Blocking  => 0,
 	Proto     => 'udp',
 );
-die "udp.connect error: $!" unless $server;
+ok( $server, "udp.connect($!)");
 
 my @results;
 my $serv = lambda {

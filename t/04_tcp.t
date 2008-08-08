@@ -1,13 +1,16 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.12 2008/05/07 11:07:06 dk Exp $
+# $Id: 04_tcp.t,v 1.13 2008/08/08 07:37:50 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More;
 use IO::Lambda qw(:lambda :stream);
 use Time::HiRes qw(time);
 use IO::Handle;
 use IO::Socket::INET;
+
+plan skip_all => "online tests disabled" unless -e 't/online.enabled';
+plan tests    => 6;
 
 alarm(10);
 
