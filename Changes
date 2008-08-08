@@ -53,3 +53,6 @@
 
 0.23 - 6 Aug 2008
 	add IO::Lambda::Socket and webserver example
+
+0.24 - 7 Aug 2008
+	standartize predicate functions wrappers
