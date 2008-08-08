@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.67 2008/08/08 07:47:24 dk Exp $
+# $Id: Lambda.pm,v 1.68 2008/08/08 11:40:36 dk Exp $
 
 package IO::Lambda;
 
@@ -1072,8 +1072,8 @@ C<io>.
 =head2 Read line by line from filehandle
 
 Given C<$filehandle> is non-blocking, the following code creates a lambda than
-reads from it util EOF or error occured. C<getline> (see L<Stream IO> below) is
-a similar lambda that reads single line from a filehandle.
+reads from it util EOF or error occured. Here, C<getline> (see L<Stream IO> below) 
+constructs a lambda that reads single line from a filehandle.
 
     use IO::Lambda qw(:all);
 
@@ -1094,7 +1094,7 @@ a similar lambda that reads single line from a filehandle.
     }
 
 Assume we have two socket connections, and sockets are non-blocking - read from
-both of them simulteously. The following code creates a lambda that reads from
+both of them in parallel. The following code creates a lambda that reads from
 two readers:
 
     sub my_reader_all
