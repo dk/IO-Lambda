@@ -56,3 +56,6 @@
 
 0.24 - 7 Aug 2008
 	standartize predicate functions wrappers
+
+0.25 - 11 Aug 2008
+	any_tail() added 

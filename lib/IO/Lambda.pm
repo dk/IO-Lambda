@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.68 2008/08/08 11:40:36 dk Exp $
+# $Id: Lambda.pm,v 1.69 2008/08/11 10:21:08 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.24';
+$VERSION     = '0.25';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -25,8 +25,8 @@ $VERSION     = '0.24';
 	sysreader syswriter getline readbuf writebuf
 );
 @EXPORT_LAMBDA = qw(
-	this context lambda this_frame again
-	io read write readwrite sleep tail tails tailo state
+	this context lambda this_frame again state
+	io read write readwrite sleep tail tails tailo any_tail
 );
 @EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
 %EXPORT_TAGS = (
@@ -524,7 +524,11 @@ sub yield
 		$_-> yield;
 		$more_events = 1;
 	}
-	drive;
+
+	if ( drive) {
+	# some callbacks we called, don't let them wait in sleep
+		return 1;
+	}
 
 	# main loop waits, if anything
 	unless ( $LOOP-> empty) {
@@ -572,8 +576,8 @@ sub wait_for_any
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
 	while ( 1) {
-		@objects = grep { $_-> {stopped} } @objects;
-		return @objects if @objects;
+		my @n = grep { $_-> {stopped} } @objects;
+		return @n if @n;
 		yield;
 	}
 }
@@ -827,6 +831,45 @@ sub tailo(&)
 	for my $l ( @lambdas) {
 		$this-> watch_lambda( $l, sub { $watcher->($l, @_) });
 	};
+}
+
+# any_tail($deadline,@lambdas) -- wait for any lambda to finish within time
+sub any_tail(&)
+{
+	return $THIS-> override_handler('any_tail', \&any_tail, shift)
+		if $THIS-> {override}->{any_tail};
+	
+	my $cb = $_[0];
+	my ( $deadline, @lambdas) = context;
+	my $n = $#lambdas;
+	croak "no tails" unless @lambdas;
+
+	my ( @ret, @watchers);
+	my $this = $THIS;
+	my $timer = $this-> watch_timer( $deadline, sub {
+		$THIS     = shift;
+		$THIS-> cancel_event($_) for @watchers;
+		@CONTEXT  = @lambdas;
+		$METHOD   = \&any_tail;
+		$CALLBACK = $cb;
+		$cb ? $cb-> (@ret) : @ret;
+	});
+
+	my $watcher;
+	$watcher = sub {
+		$THIS     = shift;
+		push @ret, @_;
+		return if $n--;
+		
+		$THIS-> cancel_event( $timer);
+
+		@CONTEXT  = @lambdas;
+		$METHOD   = \&any_tail;
+		$CALLBACK = $cb;
+		$cb ? $cb-> (@ret) : @ret;
+	};
+
+	@watchers = map { $this-> watch_lambda( $_, $watcher) } @lambdas;
 }
 
 #
@@ -1480,6 +1523,12 @@ unordered results of the objects.
 =item tailo(@lambdas)
 
 Same as C<tails>, but the results are ordered.
+
+=item any_tail($deadline,@lambdas)
+
+Executes wither when all objects in C<@lambdas> are finished, or C<$deadline>
+expires. Returns lambdas that were successfully executed during the allotted
+time.
 
 =item again(@frame = ())
 
