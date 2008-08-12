@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.3 2008/08/07 12:58:34 dk Exp $
+# $Id: Socket.pm,v 1.4 2008/08/12 11:09:46 dk Exp $
 use strict;
 use warnings;
 
@@ -71,7 +71,7 @@ sub accept(&)
 	);
 }
 
-# recv() :: ($fh, $length, $flags, $deadline) -> (address,msg|undef,error)
+# recv($fh, $length, $flags, $deadline) -> (address,msg|undef,error)
 sub recv(&)
 {
 	return this-> override_handler('recv', \&recv, shift)
@@ -108,7 +108,7 @@ sub recv(&)
 	);
 }
 
-# send() :: ($fh, $msg, $flags, $to, $deadline) -> ioresult
+# send($fh, $msg, $flags, $to, $deadline) -> ioresult
 sub send(&)
 {
 	return this-> override_handler('send', \&send, shift)
@@ -154,8 +154,8 @@ IO::Lambda::Socket - primitive lambda socket wrappers
 
 This module provides a set of convenient wrappers for sockets as sources of I/O
 events. The module doesn't account for much lower-lever socket machinery, the
-programmer is expected to create non-blocking sockets by himself, preferably
-use C<IO::Socket> module.
+programmer is expected to create non-blocking sockets using C<IO::Socket> or
+C<Socket> modules.
 
 =head1 SYNOPSIS
 
