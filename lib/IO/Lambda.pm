@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.69 2008/08/11 10:21:08 dk Exp $
+# $Id: Lambda.pm,v 1.70 2008/08/14 11:16:46 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.25';
+$VERSION     = '0.26';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -375,6 +375,26 @@ sub lambda_handler
 	}
 }
 
+# Removes one event from queue; if that was the last event, triggers listening
+# lambdas
+sub cancel_event
+{
+	my ( $self, $rec) = @_;
+
+	return unless @{$self-> {in}};
+
+	$LOOP-> remove_event($self, $rec) if $LOOP;
+	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
+
+	return if @{$self->{in}};
+
+	# that was the last event
+	$_-> remove( $self) for @LOOPS;
+	my $arr = delete $EVENTS{$self};
+	return unless $arr;
+	$_-> [WATCH_OBJ]-> lambda_handler($_) for @$arr;
+}
+
 # Removes all events bound to the object, notifies the interested objects.
 # The object becomes stopped, so no new events will be allowed to register.
 sub cancel_all_events
@@ -390,36 +410,22 @@ sub cancel_all_events
 	my $arr = delete $EVENTS{$self};
 	@{$self-> {in}} = (); 
 
-	if ( $arr) {
-		my $cascade = $opt{cascade};
-		my (%called, @cancel);
-		for my $rec ( @$arr) {
-			next unless my $watcher = $rec-> [WATCH_OBJ];
-			# global destruction in action! this should be $self, but isn't
-			next unless ref($rec-> [WATCH_LAMBDA]); 
-			$watcher-> lambda_handler( $rec);
-			push @cancel, $watcher if $cascade;
-		}
-		for ( @cancel) {
-			next if $called{"$_"};
-			$called{"$_"}++;
-			$_-> cancel_all_events(%opt);
-		}
+	return unless $arr;
+
+	my $cascade = $opt{cascade};
+	my (%called, @cancel);
+	for my $rec ( @$arr) {
+		next unless my $watcher = $rec-> [WATCH_OBJ];
+		# global destruction in action! this should be $self, but isn't
+		next unless ref($rec-> [WATCH_LAMBDA]); 
+		$watcher-> lambda_handler( $rec);
+		push @cancel, $watcher if $cascade;
 	}
-}
-
-# Removes one event from queue; if that was the last event, triggers listening
-# lambdas
-sub cancel_event
-{
-	my ( $self, $rec) = @_;
-
-	return unless @{$self-> {in}};
-
-	$LOOP-> remove_event($self, $rec) if $LOOP;
-	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
-
-	$self-> cancel_all_events unless @{$self-> {in}};
+	for ( @cancel) {
+		next if $called{"$_"};
+		$called{"$_"}++;
+		$_-> cancel_all_events(%opt);
+	}
 }
 
 sub is_stopped  { $_[0]-> {stopped}  }
@@ -1609,12 +1615,16 @@ a kind of restartable continuations.
 
 =item predicate $lambda, $callback, $method, $name
 
-Helper function for predicate wrappers, to be called inside a
-predicate that waits for a lambda.
+Helper function for creating predicates, either from lambdas 
+or from lambda constrictors.
 
 Example: convert existing C<getline> constructor into a predicate:
 
-   sub gl(&) { getline-> predicate( shift, \&gl, 'gl') }
+   sub gl(&) {
+      my $gl = getline;
+      $gl-> call(context);
+      $gl-> predicate( shift, \&gl, 'gl');
+   }
    ...
    context $fh, $buf, $deadline;
    gl { ... }

@@ -59,3 +59,6 @@
 
 0.25 - 11 Aug 2008
 	any_tail() added 
+
+0.25 - 14 Aug
+	fixed some bugs in documentation and code
