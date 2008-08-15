@@ -60,5 +60,8 @@
 0.25 - 11 Aug 2008
 	any_tail() added 
 
-0.25 - 14 Aug
+0.26 - 14 Aug 2008
 	fixed some bugs in documentation and code
+
+0.27 - 15 Aug 2008
+	add spawn() in Signal.pm

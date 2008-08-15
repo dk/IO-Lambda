@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.70 2008/08/14 11:16:46 dk Exp $
+# $Id: Lambda.pm,v 1.71 2008/08/15 14:51:00 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK
 	$DEBUG
 );
-$VERSION     = '0.26';
+$VERSION     = '0.27';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -1620,11 +1620,7 @@ or from lambda constrictors.
 
 Example: convert existing C<getline> constructor into a predicate:
 
-   sub gl(&) {
-      my $gl = getline;
-      $gl-> call(context);
-      $gl-> predicate( shift, \&gl, 'gl');
-   }
+   sub gl(&) { getline-> call(context)-> predicate( shift, \&gl, 'gl') }
    ...
    context $fh, $buf, $deadline;
    gl { ... }

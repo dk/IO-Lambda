@@ -1,11 +1,12 @@
-# $Id: Signal.pm,v 1.5 2008/08/07 19:36:15 dk Exp $
+# $Id: Signal.pm,v 1.6 2008/08/15 14:51:00 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(signal pid);
+@EXPORT_OK = qw(signal pid spawn);
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
 
 use strict;
+use IO::Handle;
 use POSIX ":sys_wait_h";
 use IO::Lambda qw(:all);
 
@@ -111,9 +112,41 @@ sub new_pid
 		sub { (waitpid($pid, WNOHANG) < 0) ? () : $?  });
 }
 
+sub new_process
+{ 
+lambda {
+	my $cmd = @_;
+	my $h   = IO::Handle-> new;
+	my $pid = open( $h, '-|', @_);
+
+	return undef, undef, $! unless $pid;
+
+	this-> {pid} = $pid;
+	$h-> blocking(0);
+
+	my $buf;
+	context readbuf, $h, \$buf, undef; # wait for EOF
+tail {
+	my ($res, $error) = @_;
+	if ( defined $error) {
+		close $h;
+		return ($buf, $?, $error);
+	}
+	return ($buf, $?, $!) unless close $h;
+	# finished already
+	return ($buf, $?, $!) if waitpid($pid, WNOHANG) >= 0;
+
+	# wait for it
+	context $pid;
+pid {
+	return ($buf, shift);
+}}}}
+
 # predicates
-sub signal (&) { new_signal(context)-> predicate(shift, \&signal, 'signal') }
-sub pid    (&) { new_pid   (context)-> predicate(shift, \&pid,    'pid') }
+sub signal (&) { new_signal (context)-> predicate(shift, \&signal, 'signal') }
+sub pid    (&) { new_pid    (context)-> predicate(shift, \&pid,    'pid') }
+sub spawn  (&) { new_process-> call(context)-> predicate(shift, \&spawn,  'spawn') }
+
 
 1;
 
@@ -128,14 +161,16 @@ IO::Lambda::Signal - Wait for pid/signal or timeout
 =head1 DESCRIPTION
 
 The module provides access to signal-based callbacks, generic signal listener
-C<signal> and process ID listener C<pid>.
+C<signal>, process ID listener C<pid>, and asynchronous version of I<system>
+call, C<spawn>.
 
 =head1 SYNOPSIS
 
    use strict;
    use IO::Lambda qw(:all);
-   use IO::Lambda::Signal qw(pid);
+   use IO::Lambda::Signal qw(pid spawn);
 
+   # pid
    my $pid = fork;
    exec "/bin/ls" unless $pid;
    lambda {
@@ -144,6 +179,15 @@ C<signal> and process ID listener C<pid>.
           my $ret = shift;
 	  print defined($ret) ? ("exitcode(", $ret>>8, ")\n") : "timeout\n";
        }
+   }-> wait;
+
+   # spawn
+   this lambda {
+      context "perl -v";
+      spawn {
+      	  my ( $buf, $exitcode, $error) = @_;
+   	  print "buf=[$buf], exitcode=$exitcode, error=$error\n";
+      }
    }-> wait;
 
 =head2 USAGE
@@ -164,11 +208,33 @@ or C<undef> on timeout.  The corresponding lambda is C<new_signal> :
 
    new_signal ($SIG, $TIMEOUT) :: () -> boolean
 
+=item spawn (@LIST) -> ( output, $?, $!)
+
+Calls pipe open on C<@LIST>, read all data printed by the child process,
+and waits for the process to finish. Returns three scalars - collected output,
+process exitcode C<$?>, and an error string (usually C<$!>). The corresponding
+lambda is C<new_process> :
+
+   new_process (@LIST) :: () -> ( output, $?, $!)
+
+Lambda created by C<new_process> has field C<'pid'> set to the process pid.
+
 =back
+
+=head1 LIMITATIONS
+
+C<spawn> doesn't work on Win32, because pipes don't work with win32's select.
+they do (see L<Win32::Process>) work with win32-specific
+C<WaitforMultipleObjects>, which in turn IO::Lambda doesn't work with.
+
+L<IPC::Run> apparently manages to work on win32 B<and> be compatible with
+C<select>. I don't think that dragging C<IPC::Run> as a dependency here
+worth it, but if you need it, send me a working example so I can at least include
+it here.
 
 =head1 SEE ALSO
 
-L<IO::Lambda>
+L<IO::Lambda>, L<perlipc>, L<IPC::Open2>, L<IPC::Run>, L<Win32::Process>.
 
 =head1 AUTHOR
 

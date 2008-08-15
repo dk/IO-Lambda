@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 13_synthetic.t,v 1.2 2008/08/07 19:36:15 dk Exp $
+# $Id: 13_synthetic.t,v 1.3 2008/08/15 14:51:00 dk Exp $
 
 use strict;
 use warnings;
@@ -22,9 +22,7 @@ sub f
 # test synthetic predicates
 sub new_predicate(&)
 { 
-	my $l = f($a0++);
-	$l-> call($b0++);
-	$l-> predicate( shift, \&new_predicate) 
+	f($a0++)-> call($b0++)-> predicate( shift, \&new_predicate) 
 }
 
 my $a2 = 0;
