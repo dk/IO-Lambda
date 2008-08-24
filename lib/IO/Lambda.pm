@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.71 2008/08/15 14:51:00 dk Exp $
+# $Id: Lambda.pm,v 1.72 2008/08/24 19:46:33 dk Exp $
 
 package IO::Lambda;
 
@@ -603,6 +603,7 @@ sub lambda(&)
 	my $l   = __PACKAGE__-> new( sub {
 		# initial lambda code is usually executed by tail/tails inside another lambda,
 		# so protect the upper-level context
+		local *__ANON__ = "IO::Lambda::lambda::callback";
 		local $THIS     = shift;
 		local @CONTEXT  = ();
 		local $CALLBACK = $cb;
@@ -644,9 +645,11 @@ sub state($)
 sub add_watch
 {
 	my ($self, $cb, $method, $flags, $handle, $deadline, @ctx) = @_;
+	my $who = (caller(1))[3];
 	$self-> watch_io(
 		$flags, $handle, $deadline,
 		sub {
+			local *__ANON__ = "$who\:\:callback";
 			$THIS     = shift;
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
@@ -696,9 +699,11 @@ sub write(&)
 sub add_timer
 {
 	my ($self, $cb, $method, $deadline, @ctx) = @_;
+	my $who = (caller(1))[3];
 	$self-> watch_timer(
 		$deadline,
 		sub {
+			local *__ANON__ = "$who\:\:callback";
 			$THIS     = shift;
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
@@ -720,9 +725,11 @@ sub sleep(&)
 sub add_tail
 {
 	my ($self, $cb, $method, $lambda, @ctx) = @_;
+	my $who = (caller(1))[3];
 	$self-> watch_lambda(
 		$lambda,
 		$cb ? sub {
+			local *__ANON__ = "$who\:\:callback";
 			$THIS     = shift;
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
@@ -752,9 +759,11 @@ sub predicate
 		if defined($name) and $THIS-> {override}->{$name};
 	
 	my @ctx = @CONTEXT;
+	my $who = defined($name) ? $name : (caller(1))[3];
 	$THIS-> watch_lambda( 
 		$self, 
 		$cb ? sub {
+			local *__ANON__ = "$who\:\:callback";
 			$THIS     = shift;
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
@@ -795,6 +804,7 @@ sub tails(&)
 		push @ret, @_;
 		return if $n--;
 
+		local *__ANON__ = "IO::Lambda::tails::callback";
 		@CONTEXT  = @lambdas;
 		$METHOD   = \&tails;
 		$CALLBACK = $cb;
@@ -827,6 +837,7 @@ sub tailo(&)
 		$ret[ $n{"$curr"} ] = \@_;
 		return if $n--;
 
+		local *__ANON__ = "IO::Lambda::tailo::callback";
 		@CONTEXT  = @lambdas;
 		$METHOD   = \&tailo;
 		$CALLBACK = $cb;
@@ -855,6 +866,7 @@ sub any_tail(&)
 	my $timer = $this-> watch_timer( $deadline, sub {
 		$THIS     = shift;
 		$THIS-> cancel_event($_) for @watchers;
+		local *__ANON__ = "IO::Lambda::any_tails::callback";
 		@CONTEXT  = @lambdas;
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
@@ -869,6 +881,7 @@ sub any_tail(&)
 		
 		$THIS-> cancel_event( $timer);
 
+		local *__ANON__ = "IO::Lambda::any_tails::callback";
 		@CONTEXT  = @lambdas;
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;

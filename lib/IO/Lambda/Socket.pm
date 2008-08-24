@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.4 2008/08/12 11:09:46 dk Exp $
+# $Id: Socket.pm,v 1.5 2008/08/24 19:46:33 dk Exp $
 use strict;
 use warnings;
 
@@ -36,6 +36,7 @@ sub connect(&)
 				$! = unpack('i', getsockopt( $socket, SOL_SOCKET, SO_ERROR));
 				@param = ($!) if $!;
 			}
+			local *__ANON__ = "IO::Lambda::Socket::connect::callback";
 			$cb ? $cb-> (@param) : @param;
 		}
 	);
@@ -66,6 +67,7 @@ sub accept(&)
 					($h) : ($!)
 				);
 			}
+			local *__ANON__ = "IO::Lambda::Socket::accept::callback";
 			$cb ? $cb-> (@param) : @param;
 		}
 	);
@@ -103,6 +105,7 @@ sub recv(&)
 					@param = ( undef, $!);
 				}
 			}
+			local *__ANON__ = "IO::Lambda::Socket::recv::callback";
 			$cb ? $cb-> (@param) : @param;
 		}
 	);
@@ -135,6 +138,7 @@ sub send(&)
 					CORE::send($socket, $msg, $flags);
 				@param = defined($r) ? ($r) : (undef,$!);
 			}
+			local *__ANON__ = "IO::Lambda::Socket::send::callback";
 			$cb ? $cb-> (@param) : @param;
 		}
 	);
