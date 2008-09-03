@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.5 2008/08/24 19:46:33 dk Exp $
+# $Id: Socket.pm,v 1.6 2008/09/03 12:59:52 dk Exp $
 use strict;
 use warnings;
 
@@ -284,9 +284,8 @@ See also L<perlfunc/recv>.
 Expects a non-blocking datagram C<$socket>. After the socket becomes writable,
 tries to write C<$msg> using C<CORE::send> call. Depending whether C<$to> is
 defined or not, 4- or 3- parameter versions of C<CORE::send> are used. Returns
-number of bytes sent address and received message on success. On failure
-returns C<undef> and an error string. The error string is either C<timeout> or
-C<$!>.
+number of bytes sent on success. On failure returns C<undef> and an error
+string. The error string is either C<timeout> or C<$!>.
 
 See also L<perlfunc/send>.
 
