@@ -1,0 +1,47 @@
+=head1 NAME
+
+A step-by-step introduction to IO::Lambda
+
+=head1 Introduction to input/output
+
+=head2 Files, handles, buffered and unbuffered I/O
+
+Perl I/O system is built mostly around libc runtime library. All input/output
+notions are therefore inherited from C, and such terms are I<handle>,
+I<buffered I/O>, I<socket> etc are identical to the terms used in broader
+contexts, and are not dependent on the language. Sandard input and outputs,
+sockets, file handles, - these entites are provided and handled by libc, and
+Perl inherits their functionality, sometimes extending it, sometimes using
+system-specific additional functionality, but always treating them as libc
+objects.
+
+Perl was originally developed under Unix. One of the promintent Unix ideology
+features is that it regards everything as a file. Devices, hard disks,
+controllers, network sockets, pipes, all spectrum of means of a process
+interacting with the world, is done by reading and writing information from and
+to various files. There are standard means for interacting with files, provided
+by libc. There are operations inherent to all types of files, such as opening
+and closing, operations that only make sense on sockets, such as sending and
+receiving datagrams, and operations that execute system- or file- specific
+commands, such as ejecting a CD-ROM, implemented through an C<ioctl> call.
+
+Consider a simplest "Hello world" program:
+
+    perl -le 'print q(Hello world!)'
+
+It sends information to standard output, a special file handle each program
+is guaranteed to have after it has started. Standard output, along with standard
+input and standard error, is a handle internally connected to the terminal, or
+to a pipe if the command is redirected:
+    
+    perl -le 'print q(Hello world!)' > out.txt
+
+It only makes sense to write to the standard output, and read from standard input.
+That is because the former is opened only for writing, and the latter only for reading.
+However, files can usually be opened for both.
+
+=head1 AUTHOR
+
+Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
+
+=cut

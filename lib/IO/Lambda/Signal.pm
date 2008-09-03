@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.6 2008/08/15 14:51:00 dk Exp $
+# $Id: Signal.pm,v 1.7 2008/09/03 13:58:26 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -224,7 +224,7 @@ Lambda created by C<new_process> has field C<'pid'> set to the process pid.
 =head1 LIMITATIONS
 
 C<spawn> doesn't work on Win32, because pipes don't work with win32's select.
-they do (see L<Win32::Process>) work with win32-specific
+They do (see L<Win32::Process>) work with win32-specific
 C<WaitforMultipleObjects>, which in turn IO::Lambda doesn't work with.
 
 L<IPC::Run> apparently manages to work on win32 B<and> be compatible with
