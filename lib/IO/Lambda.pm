@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.72 2008/08/24 19:46:33 dk Exp $
+# $Id: Lambda.pm,v 1.73 2008/09/05 07:25:22 dk Exp $
 
 package IO::Lambda;
 
@@ -1142,7 +1142,7 @@ constructs a lambda that reads single line from a filehandle.
     sub my_reader
     {
        my $filehandle = shift;
-       io {
+       lambda {
            context getline, $filehandle, \(my $buf = '');
        tail {
            my ( $string, $error) = @_;
