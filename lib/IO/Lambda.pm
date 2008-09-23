@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.76 2008/09/23 21:57:25 dk Exp $
+# $Id: Lambda.pm,v 1.77 2008/09/23 21:57:56 dk Exp $
 
 package IO::Lambda;
 
@@ -1629,7 +1629,7 @@ a kind of restartable continuations.
 =item predicate $lambda, $callback, $method, $name
 
 Helper function for creating predicates, either from lambdas 
-or from lambda constrictors.
+or from lambda constructors.
 
 Example: convert existing C<getline> constructor into a predicate:
 
