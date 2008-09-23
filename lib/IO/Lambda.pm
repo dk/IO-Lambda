@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.79 2008/09/23 22:02:10 dk Exp $
+# $Id: Lambda.pm,v 1.80 2008/09/23 22:02:25 dk Exp $
 
 package IO::Lambda;
 
@@ -1909,7 +1909,7 @@ See also C<state>, C<super>, and C<override>.
 
 =item override $predicate [ $state = '*' ] $coderef
 
-Installs a C<$coderef> as a overriding hook for a predicate - C<tail>, C<read>,
+Installs a C<$coderef> as an overriding hook for a predicate - C<tail>, C<read>,
 C<write>, etc, possibly with a named state.  Whenever a lambda calls one of
 these predicates, the C<$coderef> hook will be called instead, that should be
 able to analyze the call, and allow or deny it the further processing. 
