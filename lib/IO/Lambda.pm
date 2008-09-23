@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.77 2008/09/23 21:57:56 dk Exp $
+# $Id: Lambda.pm,v 1.78 2008/09/23 21:58:58 dk Exp $
 
 package IO::Lambda;
 
@@ -1851,7 +1851,7 @@ finish.  Returns list of finished objects.
 
 =item yield $nonblocking = 0
 
-Runs onle round of dispatching events. Returns 1 if there are more events
+Runs one round of dispatching events. Returns 1 if there are more events
 in internal queues, 0 otherwise. If C<$NONBLOCKING> is set, exits as soon
 as possible, otherwise waits for events; this feature can be used for
 organizing event loops without C<wait/run> calls.
