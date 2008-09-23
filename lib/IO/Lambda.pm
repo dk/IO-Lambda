@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.73 2008/09/05 07:25:22 dk Exp $
+# $Id: Lambda.pm,v 1.74 2008/09/23 21:54:38 dk Exp $
 
 package IO::Lambda;
 
@@ -1471,7 +1471,7 @@ will simply be less precise, and will jitter plus-minus half a second.
 =head2 Predicates
 
 All predicates receive their parameters from the context stack, or simply the
-context. The only parameter passed to them by using perl call, is a callback
+context. The only parameter passed to them by using perl call, is the callback
 itself.  Predicates can also be called without a callback, in which case, they
 will pass further data that otherwise would be passed as C<@_> to the
 callback. Thus, a predicate can be called either as
