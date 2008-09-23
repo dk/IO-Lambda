@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.75 2008/09/23 21:55:31 dk Exp $
+# $Id: Lambda.pm,v 1.76 2008/09/23 21:57:25 dk Exp $
 
 package IO::Lambda;
 
@@ -1622,7 +1622,7 @@ Example:
 	}
     }
 
-The outermost tail callback will be called twice: first time in the normal course of event,
+The outermost tail callback will be called twice: first time in the normal course of events,
 and second time as a result of the C<again> call. C<this_frame> and C<again> thus provide
 a kind of restartable continuations.
 
