@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.74 2008/09/23 21:54:38 dk Exp $
+# $Id: Lambda.pm,v 1.75 2008/09/23 21:55:31 dk Exp $
 
 package IO::Lambda;
 
@@ -1545,7 +1545,7 @@ Same as C<tails>, but the results are ordered.
 
 =item any_tail($deadline,@lambdas)
 
-Executes wither when all objects in C<@lambdas> are finished, or C<$deadline>
+Executes either when all objects in C<@lambdas> are finished, or C<$deadline>
 expires. Returns lambdas that were successfully executed during the allotted
 time.
 
