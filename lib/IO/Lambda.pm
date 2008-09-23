@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.78 2008/09/23 21:58:58 dk Exp $
+# $Id: Lambda.pm,v 1.79 2008/09/23 22:02:10 dk Exp $
 
 package IO::Lambda;
 
@@ -1880,7 +1880,7 @@ callbacks, which is intentional.
 
 =item intercept $predicate [ $state = '*' ] $coderef
 
-Installs a C<$coderef> as a overriding hook for a predicate callback, where
+Installs a C<$coderef> as an overriding hook for a predicate callback, where
 predicate is C<tail>, C<read>, C<write>, etc.  Whenever a predicate callback
 is being called, the C<$coderef> hook will be called instead, that should be able to
 analyze the call, and allow or deny it the further processing. 
