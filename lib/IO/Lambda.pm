@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.80 2008/09/23 22:02:25 dk Exp $
+# $Id: Lambda.pm,v 1.81 2008/09/24 20:24:24 dk Exp $
 
 package IO::Lambda;
 
@@ -37,17 +37,19 @@ $VERSION     = '0.27';
 );
 $DEBUG = $ENV{IO_LAMBDA_DEBUG};
 
-use constant IO_READ              => 4;
-use constant IO_WRITE             => 2;
-use constant IO_EXCEPTION         => 1;
-
-use constant WATCH_OBJ            => 0;
-use constant WATCH_DEADLINE       => 1;
-use constant WATCH_LAMBDA         => 1;
-use constant WATCH_CALLBACK       => 2;
-
-use constant WATCH_IO_HANDLE      => 3;
-use constant WATCH_IO_FLAGS       => 4;
+use constant {
+	IO_READ              => 4,
+	IO_WRITE             => 2,
+	IO_EXCEPTION         => 1,
+	
+	WATCH_OBJ            => 0,
+	WATCH_DEADLINE       => 1,
+	WATCH_LAMBDA         => 1,
+	WATCH_CALLBACK       => 2,
+	
+	WATCH_IO_HANDLE      => 3,
+	WATCH_IO_FLAGS       => 4,
+};
 
 sub new
 {
@@ -823,18 +825,14 @@ sub tailo(&)
 	my $cb = $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
-	my $i = 0;
-	my %n;
-	$n{"$_"} = $i++ for @lambdas;
 	croak "no tails" unless @lambdas;
-	croak "won't wait for same lambda more than once" unless @lambdas == $i;
 
 	my @ret;
 	my $watcher;
 	$watcher = sub {
 		my $curr  = shift;
 		$THIS     = shift;
-		$ret[ $n{"$curr"} ] = \@_;
+		$ret[ $curr ] = \@_;
 		return if $n--;
 
 		local *__ANON__ = "IO::Lambda::tailo::callback";
@@ -845,8 +843,12 @@ sub tailo(&)
 		$cb ? $cb-> (@ret) : @ret;
 	};
 	my $this = $THIS;
-	for my $l ( @lambdas) {
-		$this-> watch_lambda( $l, sub { $watcher->($l, @_) });
+	for ( my $i = 0; $i < @lambdas; $i++) {
+		my $d = $i;
+		$this-> watch_lambda(
+			$lambdas[$i], 
+			sub { $watcher->($d, @_) }
+		);
 	};
 }
 
