@@ -65,3 +65,6 @@
 
 0.27 - 15 Aug 2008
 	add spawn() in Signal.pm
+
+0.28 - 25 Sep 2008
+	style changes, optimize tailo()
