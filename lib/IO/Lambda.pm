@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.82 2008/09/25 11:20:16 dk Exp $
+# $Id: Lambda.pm,v 1.83 2008/09/29 11:07:41 dk Exp $
 
 package IO::Lambda;
 
@@ -1114,30 +1114,73 @@ __DATA__
 
 IO::Lambda - non-blocking I/O in lambda style
 
+=head1 SYNOPSIS
+
+   use strict;
+   use IO::Lambda qw(:lambda);
+   use IO::Socket::INET;
+
+   # create a lambda object
+   sub http
+   {
+      my ( $host, $url) = @_;
+
+      my $socket = IO::Socket::INET-> new( 
+         PeerAddr => $host, 
+         PeerPort => 80 
+      );
+
+      lambda {
+         context $socket;
+      write {
+         print $socket "GET $url HTTP/1.0\r\n\r\n";
+         my $buf = '';
+      read {
+         return $buf unless 
+            sysread( $socket, $buf, 1024, length($buf));
+         again;
+      }}}
+   }
+
+   # fire up lambda and wait until it completes
+   print http( 'www.perl.com', '/')-> wait;
+
+   # fire up a lambda that waits for two http requests in parallel
+   lambda {
+      context
+         http( 'www.perl.com', '/'),
+         http( 'www.google.com', '/');
+      tails {
+         print @_;
+      }
+   }-> wait;
+
+Note: C<io> and C<lambda> are synonyms - I personally prefer C<lambda> but some
+find the word slightly inappropriate, hence C<io>.
+
 =head1 DESCRIPTION
 
 This module is another attempt to fight the horrors of non-blocking I/O
-programming. The simplicity of the sequential programming is only available
-when one employs threads, coroutines, or co-processes. Otherwise state machines
-are to be built, often quite complex, which fact doesn't help the clarity of
-the code. This module uses closures to approximate the sequential
-programming with single-process, single-thread, non-blocking I/O.
+programming. It tries to bring back the simplicity of the declarative
+programming style, that is only otherwise available when one employs threads,
+coroutines, or co-processes.  Usually coding non-blocking I/O for single
+process, single thread programs requires construction of state machines, often
+fairly complex, which doesn't help the clarity of the code. Not unlike monads
+in functional languages, that enforce order of execution over generally
+orderless functions, this framework helps programmer to express the order of
+execution of I/O callbacks in a coding style that resembles sequential,
+declarative programming.
 
-=head1 SYNOPSIS
+The manual begins with code examples, then explains basic assumptions, then
+finally gets of the complex concepts, where the real fun begins. You may skip
+directly there (L<Stream IO>), where functional style mixes with I/O. 
 
-This is a fairly large document, so depending on your reading tastes, you may
-either read all from here - it begins with code examples, then with more code
-examples, then the explanation of basic concepts, and finally gets to the
-complex ones. Or, you may skip directly to the fun part (L<Stream IO>), where
-functional style mixes with I/O. Also note that C<io> and C<lambda> are synonyms - 
-I personally prefer C<lambda> but some find the word slightly inappropriate, hence
-C<io>.
+=head2 Reading lines from a filehandle
 
-=head2 Read line by line from filehandle
-
-Given C<$filehandle> is non-blocking, the following code creates a lambda than
-reads from it util EOF or error occured. Here, C<getline> (see L<Stream IO> below) 
-constructs a lambda that reads single line from a filehandle.
+Given C<$filehandle> is non-blocking, the following code creates a lambda
+object (later, simply a I<lambda>) that reads from the handle until EOF or an
+error occured. Here, C<getline> (see L<Stream IO> below) constructs a lambda
+that reads a single line from a filehandle.
 
     use IO::Lambda qw(:all);
 
@@ -1172,9 +1215,9 @@ two readers:
 
     my_reader_all( $socket1, $socket2)-> wait;
 
-=head2 Non-blocking HTTP
+=head2 Non-blocking HTTP client
 
-Given a socket, create a lambda that implements http protocol
+Given a socket, create a lambda that implements the HTTP protocol
 
     use IO::Lambda qw(:all);
     use IO::Socket;
@@ -1284,14 +1327,14 @@ talk_redirect() will have exactly the same properties as talk() does
 
     print get_parallel('www.perl.com', 'www.google.com')-> wait;
 
-See tests and examples in directory C<eg/> for more.
+See tests and additional examples in directory C<eg/> for more information.
 
 =head1 API
 
 =head2 Events and states
 
 A lambda is an C<IO::Lambda> object, that waits for IO and timeout events, and
-for events generated when other lambdas are finished. On each such event a
+for events generated when other lambdas are completed. On each such event a
 callback is executed. The result of the execution is saved, and passed on to the
 next callback, when the next event arrives.
 
@@ -1305,12 +1348,12 @@ lambda will be executed:
     $q-> wait; # <- here will
 
 Lambdas are usually not started explicitly; the function that waits for a
-lambda, also starts it. C<wait>, the synchronous waiter, and C<tail>/C<tails>, the
-asynchronous ones, start passive lambdas when called. Lambda is finished when
-there are no more events to listen to. The example lambda above will finish
-right after C<print> statement.
+lambda, also starts it. C<wait>, the synchronous waiter, and C<tail>/C<tails>,
+the asynchronous ones, start passive lambdas when called. Lambda is I<finished>
+when there are no more events to listen to. The example lambda above will
+finish right after C<print> statement.
 
-Lambda can listen to events by calling predicates, that internally subscribe
+Lambda can listen to events by calling I<predicates>, that internally subscribe
 the lambda object to corresponding file handles, timers, and other lambdas.
 There are only those three types of events that basically constitute everything
 needed for building a state machine driven by external events, in particular,
@@ -1385,16 +1428,16 @@ which means that explicitly setting C<this> will always clear the context.
 
 =head2 Data and execution flow
 
-A lambda is initially called with arguments passed from outside. These arguments
-can be stored using C<call> method; C<wait> and C<tail> also issue C<call>
-internally, thus replacing any previous data stored by C<call>. Inside the
-lambda these arguments are available as C<@_>.
+A lambda is initially called with arguments passed from outside. These
+arguments can be stored using the C<call> method; C<wait> and C<tail> also
+issue C<call> internally, thus replacing any previous data stored by C<call>.
+Inside the lambda these arguments are available as C<@_>.
 
 Whatever is returned by a predicate callback (including C<lambda> predicate),
-will be passed as C<@_> to the next callback, or to the outside, if the lambda is
-finished. The result of a finished lambda is available by C<peek> method, that
-returns either all array of data available in the array context, or first item
-in the array otherwise. C<wait> returns the same data as C<peek> does.
+will be passed as C<@_> to the next callback, or to the outside, if the lambda
+is finished. The result of a finished lambda is available by C<peek> method,
+that returns either all array of data available in the array context, or first
+item in the array otherwise. C<wait> returns the same data as C<peek> does.
 
 When more than one lambda watches for another lambda, the latter will get its
 last callback results passed to all the watchers. However, when a lambda
@@ -1437,8 +1480,8 @@ many bytes from a socket within 5 seconds:
        }
    };
 
-Rewriting the same code with C<read> semantics that accepts time as timeout instead, 
-would be not that elegant:
+Rewriting the same code with C<read> semantics that accepts time as timeout
+instead, would be not that elegant:
 
    lambda {
        my $buf = '';
@@ -1745,7 +1788,7 @@ is read.
 This section lists methods of C<IO::Lambda> class. Note that by design all
 lambda-style functionality is also available for object-style programming.
 Together with the fact that lambda syntax is not exported by default, it thus
-leaves a place for possible implementations of independent syntaxes, either
+leaves a place for possible implementations of user-defined syntax, either
 with or without lambdas, on top of the object API, without accessing the
 internals.
 
@@ -1940,9 +1983,9 @@ See also C<state>, C<super>, and C<intercept>.
 
 =item super
 
-Analogous to native perl's C<SUPER>, but on the predicate level, this method is
-to be called from overridden or intercepted predicates to call the original
-predicate or callback.
+Analogous to Perl's C<SUPER>, but on the predicate level, this method is
+designed to be called from overridden predicates to call the original predicate
+or callback.
 
 There is a slight difference in the call syntax, depending on whether it is
 being called from inside an C<override> or C<intercept> callback. The
@@ -1954,10 +1997,9 @@ use.
 
 =item state $state
 
-Helper function for explicit naming of predicate calls. The function stores
-C<$state> string on the current lambda, so that eventual C<intercept> and
-C<override>, needing to override internal states of the lambda, will make use
-of the string to identify a particular state.
+A helper function for explicit naming of predicate calls. The function stores
+the C<$state> string on the current lambda; this string can be used in calls
+to C<intercept> and C<override> to identify a particular predicate or a callback.
 
 The recommended use of the method is when a lambda contains more than one
 predicate of a certain type; for example the code
@@ -2012,7 +2054,7 @@ L<IO::Lambda::SNMP> - SNMP requests lambda style. Requires L<SNMP>.
 
 =item *
 
-Single-process tcp client and server; server echoes back everything is sent by
+A single-process TCP client and server; server echoes back everything is sent by
 the client. 500 connections sequentially created, instructed to send a single
 line to the server, and destroyed.
 
