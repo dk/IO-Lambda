@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.9 2008/05/30 11:44:27 dk Exp $
+# $Id: SNMP.pm,v 1.10 2008/10/14 13:15:05 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -16,6 +16,7 @@ use warnings;
 use SNMP;
 use IO::Handle;
 use Exporter;
+use Sub::Name;
 use Time::HiRes qw(time);
 use IO::Lambda qw(:all);
 
@@ -159,6 +160,7 @@ sub wrapper
 		if this-> {override}->{$method};
 
 	my ( $session, @param ) = context;
+	_subname( $method, $cb, 1) if $cb;
 
 	# the caller will listen to a new lambda
 	my $q = IO::Lambda-> new;

@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.83 2008/09/29 11:07:41 dk Exp $
+# $Id: Lambda.pm,v 1.84 2008/10/14 13:15:04 dk Exp $
 
 package IO::Lambda;
 
@@ -6,15 +6,16 @@ use Carp;
 use strict;
 use warnings;
 use Exporter;
+use Sub::Name;
 use Time::HiRes qw(time);
 use vars qw(
 	$LOOP %EVENTS @LOOPS
 	$VERSION @ISA
-	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM
-	$THIS @CONTEXT $METHOD $CALLBACK
+	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM @EXPORT_DEV
+	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG
 );
-$VERSION     = '0.28';
+$VERSION     = '0.29';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -28,11 +29,15 @@ $VERSION     = '0.28';
 	this context lambda this_frame again state
 	io read write readwrite sleep tail tails tailo any_tail
 );
-@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM);
+@EXPORT_DEV    = qw(
+	_subname
+);
+@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, @EXPORT_DEV);
 %EXPORT_TAGS = (
 	lambda    => \@EXPORT_LAMBDA, 
 	stream    => \@EXPORT_STREAM, 
 	constants => \@EXPORT_CONSTANTS,
+	dev       => \@EXPORT_DEV,
 	all       => \@EXPORT_OK,
 );
 $DEBUG = $ENV{IO_LAMBDA_DEBUG};
@@ -275,6 +280,8 @@ sub intercept
 	my ( $self, $method, $state, $cb) = ( 4 == @_) ? @_ : (@_[0,1],'*',$_[2]);
 		
 	return $self-> override( $method, $state, undef) unless $cb;
+
+	_subname("intercept($method:$state)" => $cb);
 
 	$self-> {override}->{$method} ||= [];
 	unshift @{$self-> {override}->{$method}}, [ $state, sub {
@@ -601,7 +608,7 @@ sub run { do {} while yield }
 sub _lambda_restart { die "lambda() is not restartable" }
 sub lambda(&)
 {
-	my $cb  = $_[0];
+	my $cb  = _subname(lambda => $_[0]);
 	my $l   = __PACKAGE__-> new( sub {
 		# initial lambda code is usually executed by tail/tails inside another lambda,
 		# so protect the upper-level context
@@ -616,14 +623,24 @@ sub lambda(&)
 	$l;
 }
 
+sub _subname
+{
+	subname(
+		caller(1 + ($_[2] || 0)) .  '::_'.  $_[0], 
+		$_[1]
+	) if $_[1] and not $AGAIN; 
+	return $_[1];
+}
+
 *io = \&lambda;
 
 # re-enter the latest (or other) frame
 sub again
 {
 	( $METHOD, $CALLBACK) = @_ if 2 == @_;
+	local $AGAIN = 1;
 	defined($METHOD) ? 
-		$METHOD-> ( $CALLBACK) : 
+		$METHOD-> ($CALLBACK) : 
 		croak "again predicate outside of a restartable call" 
 }
 
@@ -638,6 +655,7 @@ sub state($)
 	my $this = ($_[0] && ref($_[0])) ? shift(@_) : this;
 	@_ ? $this-> {state} = $_[0] : return $this-> {state};
 }
+
 
 #
 # Predicates:
@@ -668,7 +686,7 @@ sub readwrite(&)
 		if $THIS-> {override}->{readwrite};
 
 	$THIS-> add_watch( 
-		shift, \&readwrite,
+		_subname(readwrite => shift), \&readwrite,
 		@CONTEXT[0,1,2,0,1,2]
 	)
 }
@@ -680,7 +698,7 @@ sub read(&)
 		if $THIS-> {override}->{read};
 
 	$THIS-> add_watch( 
-		shift, \&read, IO_READ, 
+		_subname(read => shift), \&read, IO_READ, 
 		@CONTEXT[0,1,0,1]
 	)
 }
@@ -692,7 +710,7 @@ sub write(&)
 		if $THIS-> {override}->{write};
 	
 	$THIS-> add_watch( 
-		shift, \&write, IO_WRITE, 
+		_subname(write => shift), \&write, IO_WRITE, 
 		@CONTEXT[0,1,0,1]
 	)
 }
@@ -720,7 +738,7 @@ sub sleep(&)
 {
 	return $THIS-> override_handler('sleep', \&sleep, shift)
 		if $THIS-> {override}->{sleep};
-	$THIS-> add_timer( shift, \&sleep, @CONTEXT[0,0])
+	$THIS-> add_timer( _subname(sleep => shift), \&sleep, @CONTEXT[0,0])
 }
 
 # common wrapper for declaration of single lambda-watching user predicates
@@ -746,7 +764,7 @@ sub add_constant
 {
 	my ( $self, $cb, $method, @param) = @_;
 	$self-> add_tail ( 
-		$cb, $method,
+		_subname(constant => $cb), $method,
 		lambda { @param },
 		@CONTEXT
 	);
@@ -762,6 +780,7 @@ sub predicate
 	
 	my @ctx = @CONTEXT;
 	my $who = defined($name) ? $name : (caller(1))[3];
+	_subname($who, $cb, 2) if $cb and not $AGAIN;
 	$THIS-> watch_lambda( 
 		$self, 
 		$cb ? sub {
@@ -785,7 +804,7 @@ sub tail(&)
 	my ( $lambda, @param) = context;
 	$lambda-> reset if $lambda-> is_stopped;
 	$lambda-> call( @param);
-	$THIS-> add_tail( shift, \&tail, $lambda, $lambda, @param);
+	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
 }
 
 # tails(@lambdas) -- wait for all lambdas to finish
@@ -794,7 +813,7 @@ sub tails(&)
 	return $THIS-> override_handler('tails', \&tails, shift)
 		if $THIS-> {override}->{tails};
 	
-	my $cb = $_[0];
+	my $cb = _subname tails => $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
 	croak "no tails" unless @lambdas;
@@ -822,7 +841,7 @@ sub tailo(&)
 	return $THIS-> override_handler('tailo', \&tailo, shift)
 		if $THIS-> {override}->{tailo};
 	
-	my $cb = $_[0];
+	my $cb = _subname tailo => $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
 	croak "no tails" unless @lambdas;
@@ -858,7 +877,7 @@ sub any_tail(&)
 	return $THIS-> override_handler('any_tail', \&any_tail, shift)
 		if $THIS-> {override}->{any_tail};
 	
-	my $cb = $_[0];
+	my $cb = _subname any_tail => $_[0];
 	my ( $deadline, @lambdas) = context;
 	my $n = $#lambdas;
 	croak "no tails" unless @lambdas;
@@ -907,7 +926,7 @@ sub sysreader (){ lambda
 	my ( $fh, $buf, $length, $deadline) = @_;
 	$$buf = '' unless defined $$buf;
 
-	this-> watch_io( IO_READ, $fh, $deadline, sub {
+	this-> watch_io( IO_READ, $fh, $deadline, subname _sysreader => sub {
 		return undef, 'timeout' unless $_[1];
 		my $n = sysread( $fh, $$buf, $length, length($$buf));
 		if ( $DEBUG) {
@@ -926,7 +945,7 @@ sub syswriter (){ lambda
 {
 	my ( $fh, $buf, $length, $offset, $deadline) = @_;
 
-	this-> watch_io( IO_WRITE, $fh, $deadline, sub {
+	this-> watch_io( IO_WRITE, $fh, $deadline, subname _syswriter => sub {
 		return undef, 'timeout' unless $_[1];
 		my $n = syswrite( $fh, $$buf, $length, $offset);
 		if ( $DEBUG) {

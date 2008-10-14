@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.9 2008/07/02 09:25:51 dk Exp $
+# $Id: Makefile.PL,v 1.10 2008/10/14 13:15:04 dk Exp $
 use Getopt::Long  qw(GetOptions);
 use ExtUtils::MakeMaker;
 use IO::Socket::INET;
@@ -45,6 +45,7 @@ WriteMakefile(
 		'Net::DNS'          => 0,
 		'LWP'               => 0,
 		'URI'               => 0,
+		'Sub::Name'         => 0,
 		# 'IO::Socket::SSL' => 0,     # for HTTPS
 		# 'SNMP'            => 0,     # for IO::Lambda::SNMP
 		# 'AnyEvent'        => 0,     # for alternative event loop

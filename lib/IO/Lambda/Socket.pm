@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.6 2008/09/03 12:59:52 dk Exp $
+# $Id: Socket.pm,v 1.7 2008/10/14 13:15:05 dk Exp $
 use strict;
 use warnings;
 
@@ -19,7 +19,7 @@ sub connect(&)
 	return this-> override_handler('connect', \&connect, shift)
 		if this-> {override}->{connect};
 
-	my $cb = shift;
+	my $cb = _subname connect => shift;
 	my ($socket, $deadline) = context;
 
 	return this-> add_constant( $cb, \&connect, "Bad socket") unless $socket;
@@ -47,7 +47,7 @@ sub accept(&)
 	return this-> override_handler('accept', \&accept, shift)
 		if this-> {override}->{accept};
 
-	my $cb = shift;
+	my $cb = _subname accept => shift;
 	my ($socket, $deadline) = context;
 
 	return this-> add_constant( $cb, \&connect, "Bad socket") unless $socket;
@@ -79,7 +79,7 @@ sub recv(&)
 	return this-> override_handler('recv', \&recv, shift)
 		if this-> {override}->{recv};
 
-	my $cb = shift;
+	my $cb = _subname( recv => shift );
 	my ($socket, $length, $flags, $deadline) = context;
 
 	return this-> add_constant( $cb, \&recv, undef, "Bad socket")
@@ -117,7 +117,7 @@ sub send(&)
 	return this-> override_handler('send', \&send, shift)
 		if this-> {override}->{send};
 
-	my $cb = shift;
+	my $cb = _subname send => shift;
 	my ($socket, $msg, $flags, $to, $deadline) = context;
 
 	return this-> add_constant( $cb, \&send, undef, "Bad socket")

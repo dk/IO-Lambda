@@ -68,3 +68,6 @@
 
 0.28 - 25 Sep 2008
 	style changes, optimize tailo()
+
+0.29 - 10 Oct 2008
+	use Sub::Name's magick
