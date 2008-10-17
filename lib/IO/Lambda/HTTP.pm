@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.35 2008/08/07 19:36:15 dk Exp $
+# $Id: HTTP.pm,v 1.36 2008/10/17 19:29:39 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -228,13 +228,26 @@ sub connect
 sub handle_connection
 {
 	my ( $self, $req) = @_;
+	
+	my ( $host, $port);
+	if ( defined( $self-> {proxy})) {
+		if ( ref($self->{proxy})) {
+			return lambda { "'proxy' option must be a non-empty array" } if
+				ref($self->{proxy}) ne 'ARRAY' or
+				not @{$self->{proxy}};
+			($host, $port) = @{$self->{proxy}};
+		} else {
+			$host = $self-> {proxy};
+		}
+		$port ||= $req-> uri-> port;
+	} else {
+		( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
+	}
 
 	# have a chance to load eventual modules early
 	my $err = $self-> prepare_transport( $req);
 	return lambda { $err } if defined $err;
 
-	my ( $host, $port) = ( $req-> uri-> host, $req-> uri-> port);
-	
 	lambda {
 		# resolve hostname
 		if (
@@ -420,7 +433,8 @@ sub http_read_chunked
 		return undef, shift unless defined $line;
 
 		# advance
-		$offset += length($line);
+		substr( $self-> {buf}, $offset, length($line), '');
+		pos( $self-> {buf} ) = $offset;
 		$line =~ s/\r?\n//;
 		my $size = hex $line;
 		return 1 unless $size;
@@ -511,12 +525,6 @@ L<Net::DNS>. Note that this method won't be able to account for non-DNS
 
 If unset (default), hostnames will be resolved in a blocking manner.
 
-=item conn_cache $LWP::ConnCache = undef
-
-Can optionally use a C<LWP::ConnCache> object to reuse connections on per-host per-port basis.
-Required for NTLM authentication.
-See L<LWP::ConnCache> for details.
-
 =item auth $AUTH
 
 Normally, a request is sent without any authentication. When 401 error is
@@ -527,6 +535,12 @@ remote, C<auth> can be used.
    username => 'user',
    password => 'pass',
    auth     => 'Basic',
+
+=item conn_cache $LWP::ConnCache = undef
+
+Can optionally use a C<LWP::ConnCache> object to reuse connections on per-host per-port basis.
+Required for NTLM authentication.
+See L<LWP::ConnCache> for details.
 
 =item keep_alive BOOLEAN
 
@@ -563,6 +577,11 @@ Note that the current implementation doesn't provide re-trying of
 authentication if either a method or username/password combination fails.
 When at least one method was declared by the remote as supported, and was
 tried and failed, no further retries will be made.
+
+=item proxy HOSTNAME | [ HOSTNAME, PORT ]
+
+If set, HOSTNAME (or HOSTNAME and PORT) are used as HTTP proxy
+settings.
 
 =item timeout SECONDS = undef
 
