@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.85 2008/10/17 19:35:56 dk Exp $
+# $Id: Lambda.pm,v 1.86 2008/10/18 08:37:37 dk Exp $
 
 package IO::Lambda;
 
@@ -83,7 +83,7 @@ sub _ev
 {
 	$_[0] =~ /0x([\w]+)/;
 	"event($1) ",
-	(($#{$_[0]} == WATCH_IO_FLAGS) ?  (
+	(($#{$_[0]} == WATCH_IO_FLAGS) ? (
 		'fd=', 
 		fileno($_[0]->[WATCH_IO_HANDLE]), 
 		' ',
