@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.36 2008/10/17 19:29:39 dk Exp $
+# $Id: HTTP.pm,v 1.37 2008/10/20 11:48:48 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -472,7 +472,7 @@ IO::Lambda::HTTP - http requests lambda style
 
 The module exports a single predicate C<http_request> that accepts a
 C<HTTP::Request> object and set of options as parameters. Returns either a
-C<HTTP::Response> on success, or error string otherwise.
+C<HTTP::Response> on success, or an error string otherwise.
 
 =head1 SYNOPSIS
 
@@ -506,10 +506,9 @@ string otherwise.
 
 =item new $HTTP::Request
 
-Stores C<HTTP::Request> object and returns a new lambda that will finish 
-when the request associated with it completes. The lambda callback will
-be passed either a C<HTTP::Response> object on success, or error
-string otherwise. 
+Stores C<HTTP::Request> object and returns a new lambda that will finish when
+the associated request completes. The lambda will return either a
+C<HTTP::Response> object on success, or an error string otherwise. 
 
 =back
 
@@ -527,10 +526,10 @@ If unset (default), hostnames will be resolved in a blocking manner.
 
 =item auth $AUTH
 
-Normally, a request is sent without any authentication. When 401 error is
-returned, only then authentication is tried. To avoid this first stage,
-knowing in advance the type of authentication will be accepted by the
-remote, C<auth> can be used.
+Normally, a request is sent without any authentication. The authentication
+is only tried after a 401 error is returned. To avoid this first stage,
+knowing in advance the type of authentication that shall be accepted by the
+remote, option C<auth> can be used.
 
    username => 'user',
    password => 'pass',
@@ -538,14 +537,19 @@ remote, C<auth> can be used.
 
 =item conn_cache $LWP::ConnCache = undef
 
-Can optionally use a C<LWP::ConnCache> object to reuse connections on per-host per-port basis.
-Required for NTLM authentication.
-See L<LWP::ConnCache> for details.
+The requestor can optionally use a C<LWP::ConnCache> object to reuse
+connections on per-host per-port basis.  Desired for HTTP/1.1. Required for
+NTLM authentication.  See L<LWP::ConnCache> for details.
+
+=item deadline SECONDS = undef
+
+Aborts a request and returns C<'timeout'> string if it is not finished
+by the given deadline (in epoch seconds). If undef, no timeouts occur.
 
 =item keep_alive BOOLEAN
 
 If set, all incoming requests are silently converted to use HTTP/1.1, and connections
-are reused. Same as combined effect of explicitly setting
+are reused. Same as a combination of the following:
 
    $req-> protocol('HTTP/1.1');
    $req-> headers-> header( Host => $req-> uri-> host);
@@ -553,16 +557,16 @@ are reused. Same as combined effect of explicitly setting
 
 =item max_redirect NUM = 7
 
-Maximum allowed redirects. If 1, no redirection attemps are made.
+Maximum allowed redirects. If 0, no redirection attemps are made.
 
 =item preferred_auth $AUTH|%AUTH
 
 List of preferred authentication methods, used to choose the authentication
-method in case when many are supported by the server.  When option is a single
-string, the given method is tried first, and then all available methods.  When
-it is a hash, its values are treated as weight factors, - the method with the
-greatest factor is tried first. Negative values exclude the corresponding
-methods from trying.
+method where there are more than one supported by the server. When the value is
+a string, the given method is tried first, and then all available methods.
+When it is a hash, its values are treated as weight factors, - the method with
+the greatest weight is tried first. Negative values prevent the corresponding
+methods from being tried.
 
      # try basic and whatever else
      preferred_auth => 'Basic',
@@ -576,11 +580,11 @@ methods from trying.
 Note that the current implementation doesn't provide re-trying of
 authentication if either a method or username/password combination fails.
 When at least one method was declared by the remote as supported, and was
-tried and failed, no further retries will be made.
+tried and failed, no further retries are made.
 
 =item proxy HOSTNAME | [ HOSTNAME, PORT ]
 
-If set, HOSTNAME (or HOSTNAME and PORT) are used as HTTP proxy
+If set, HOSTNAME (or HOSTNAME and PORT tuple) is used as HTTP proxy
 settings.
 
 =item timeout SECONDS = undef
