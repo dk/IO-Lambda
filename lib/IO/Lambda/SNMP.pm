@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.10 2008/10/14 13:15:05 dk Exp $
+# $Id: SNMP.pm,v 1.11 2008/10/20 11:52:41 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -35,7 +35,7 @@ use IO::Lambda qw(:all);
 # callbacks together with lambdas.
 $MASTER = bless {}, __PACKAGE__;
 
-# regsiter yield handler
+# register yield handler
 IO::Lambda::add_loop($MASTER);
 END { IO::Lambda::remove_loop($MASTER) };
 
@@ -62,8 +62,8 @@ sub io_handler
 $TIMER[WATCH_OBJ] = bless {}, "IO::Lambda::Loop::SNMP::Timer";
 sub IO::Lambda::Loop::SNMP::Timer::io_handler { $TIMER_ACTIVE = 0 }
 
-# get all fds monitored by SNMP, and monitor these by ourselves
-# returns how many events were passed and therefore resubmitted
+# Get all fds monitored by SNMP, and monitor these by ourselves.
+# Return number of events passed (and therefore resubmitted)
 sub reshuffle_fds
 {
 	my $resubmitted = 0;
