@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.86 2008/10/18 08:37:37 dk Exp $
+# $Id: Lambda.pm,v 1.87 2008/10/20 06:40:38 dk Exp $
 
 package IO::Lambda;
 
@@ -42,19 +42,17 @@ $VERSION     = '0.30';
 );
 $DEBUG = $ENV{IO_LAMBDA_DEBUG};
 
-use constant {
-	IO_READ              => 4,
-	IO_WRITE             => 2,
-	IO_EXCEPTION         => 1,
+use constant IO_READ         => 4;
+use constant IO_WRITE        => 2;
+use constant IO_EXCEPTION    => 1;
 	
-	WATCH_OBJ            => 0,
-	WATCH_DEADLINE       => 1,
-	WATCH_LAMBDA         => 1,
-	WATCH_CALLBACK       => 2,
+use constant WATCH_OBJ       => 0;
+use constant WATCH_DEADLINE  => 1;
+use constant WATCH_LAMBDA    => 1;
+use constant WATCH_CALLBACK  => 2;
 	
-	WATCH_IO_HANDLE      => 3,
-	WATCH_IO_FLAGS       => 4,
-};
+use constant WATCH_IO_HANDLE => 3;
+use constant WATCH_IO_FLAGS  => 4;
 
 sub new
 {
