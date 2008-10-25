@@ -74,3 +74,6 @@
 
 0.30 - 17 Oct 2008
 	implement http proxy
+
+0.31 - 25 Oct 2008
+	handle nasty win32 non-blocking connects gracefully
