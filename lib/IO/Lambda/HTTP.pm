@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.37 2008/10/20 11:48:48 dk Exp $
+# $Id: HTTP.pm,v 1.38 2008/10/25 11:18:19 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -13,6 +13,7 @@ use Exporter;
 use IO::Socket;
 use HTTP::Response;
 use IO::Lambda qw(:lambda :stream);
+use IO::Lambda::Socket qw(connect);
 use Time::HiRes qw(time);
 
 sub http_request(&) 
@@ -210,7 +211,7 @@ sub http_tail
 	&tail();
 }
 
-sub connect
+sub socket
 {
 	my ( $self, $host, $port) = @_;
 
@@ -285,18 +286,13 @@ sub handle_connection
 		# connect
 		my $err;
 		warn "connecting\n" if $DEBUG and not($sock);
-		( $sock, $err) = $self-> connect( $host, $port) unless $sock;
+		( $sock, $err) = $self-> socket( $host, $port) unless $sock;
 		return $err unless $sock;
 		context( $sock, $self-> {deadline});
 
-	write {
+	connect {
+		return shift if @_;
 		# connected
-		return 'connect timeout' unless shift;
-		my $err = unpack('i', getsockopt($sock, SOL_SOCKET, SO_ERROR));
-		if ( $err) {
-			$! = $err;
-			return "connect: $!";
-		}
 
 		$self-> {socket} = $sock;
 		$self-> {reader} = readbuf ( $self-> {reader});

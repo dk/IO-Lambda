@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 99_pod_coverage.t,v 1.14 2008/08/07 19:36:15 dk Exp $
+# $Id: 99_pod_coverage.t,v 1.15 2008/10/25 11:18:19 dk Exp $
 
 use strict;
 use warnings;
@@ -19,7 +19,7 @@ pod_coverage_ok( 'IO::Lambda::Loop::Select' => { trustme => [
 	qr/^(rebuild_vectors)$/x
 ] });
 pod_coverage_ok( 'IO::Lambda::HTTP' => { trustme => [qr/^(parse|http_\w+|
-	handle_\w+|connect|prepare_transport|get_authenticator)$/x] });
+	handle_\w+|socket|prepare_transport|get_authenticator)$/x] });
 pod_coverage_ok( 'IO::Lambda::DNS');
 pod_coverage_ok( 'IO::Lambda::Signal' => { trustme => [
 	qr/_(handler|signal|lambda)$/x,

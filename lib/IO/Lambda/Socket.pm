@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.7 2008/10/14 13:15:05 dk Exp $
+# $Id: Socket.pm,v 1.8 2008/10/25 11:18:19 dk Exp $
 use strict;
 use warnings;
 
@@ -24,8 +24,11 @@ sub connect(&)
 
 	return this-> add_constant( $cb, \&connect, "Bad socket") unless $socket;
 
+	my $w32 = $^O eq 'MSWin32';
+
 	this-> watch_io(
-		IO_WRITE, $socket, $deadline,
+		IO_WRITE | ( $w32 ? IO_EXCEPTION : 0),
+		$socket, $deadline,
 		sub {
 			shift-> set_frame( \&connect, $cb, $socket, $deadline);
 
@@ -33,8 +36,9 @@ sub connect(&)
 			unless ( $_[0]) {
 				@param = ('timeout');
 			} else {
-				$! = unpack('i', getsockopt( $socket, SOL_SOCKET, SO_ERROR));
-				@param = ($!) if $!;
+				my $e = $w32 ? \ $^E : \ $!;
+				$$e = unpack('i', getsockopt( $socket, SOL_SOCKET, SO_ERROR));
+				@param = ($$e) if $$e;
 			}
 			local *__ANON__ = "IO::Lambda::Socket::connect::callback";
 			$cb ? $cb-> (@param) : @param;
@@ -202,7 +206,7 @@ TCP
 			);
 			context $client;
 		connect {
-			die "error:$_[1]\n" unless $_[0];
+			die "error:$_[0]\n" if @_;
 			print $client "hello from $id\n";
 		}}
 	}
@@ -261,12 +265,12 @@ error string is either C<timeout> or C<$!>.
 
 See also L<perlfunc/accept>.
 
-=item connect($socket, $deadline=undef) -> (1 | undef,$error)
+=item connect($socket, $deadline=undef) -> (()|$error)
 
 Expects stream C<$socket> in a non-blocking connect state. Executes either
-after connection succeeds, or after C<$deadline>.  Returns true constant (C<1>)
-on success, C<undef> and an error string on failure. The error string is either
-C<timeout> or C<$!>.
+after connection succeeds, or after C<$deadline>.  Returns no parameters 
+on success, and an error string on failure. The error string is either
+C<timeout> or C<$!> (or C<$^E> on win32).
 
 See also L<perlfunc/connect>.
 

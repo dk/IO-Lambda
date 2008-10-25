@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.12 2008/07/07 13:35:59 dk Exp $
+# $Id: Select.pm,v 1.13 2008/10/25 11:18:19 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -72,7 +72,7 @@ sub yield
 		if ( $! == EINTR) {
 			# ignore
 		} else {
-			die "select() error:$!$^E" if $n < 0;
+			die "select() error:$!:$^E" if $n < 0;
 		}
 	}
 	
@@ -91,19 +91,11 @@ sub yield
 	if ( $n > 0) {
 		# process selected handles
 		for ( my $i = $min; $i <= $max && $n > 0; $i++) {
-			my $what = 0;
-			if ( vec( $R, $i, 1)) {
-				$what |= IO_READ;
-				vec( $self-> {read}, $i, 1) = 0;
-			}
-			if ( vec( $W, $i, 1)) {
-				$what |= IO_WRITE;
-				vec( $self-> {write}, $i, 1) = 0;
-			}
-			if ( vec( $E, $i, 4)) {
-				$what |= IO_EXCEPTION;
-				vec( $self-> {exc}, $i, 1) = 0;
-			}
+			my $what =
+				vec( $R, $i, 1) * IO_READ   +
+				vec( $W, $i, 1) * IO_WRITE  +
+				vec( $E, $i, 1) * IO_EXCEPTION
+				;
 			next unless $what;
 
 			my $bucket = $self-> {items}-> {$i};
@@ -134,8 +126,8 @@ sub yield
 			push @kill, $fileno unless @$bucket;
 		}
 		delete @{$self->{items}}{@kill};
-		$self-> rebuild_vectors;
 	}
+	$self-> rebuild_vectors;
 		
 	# call them
 	$$_[WATCH_OBJ]-> io_handler( $_) for @expired;
