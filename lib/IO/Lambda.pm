@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.89 2008/10/27 19:57:02 dk Exp $
+# $Id: Lambda.pm,v 1.90 2008/10/28 23:28:31 dk Exp $
 
 package IO::Lambda;
 
@@ -1259,7 +1259,6 @@ Given a socket, create a lambda that implements the HTTP protocol
 	}
     }
 
-
 Connect and talk to the remote
 
     $request = HTTP::Request-> new( GET => 'http://www.perl.com');
@@ -1481,8 +1480,8 @@ objects as soon as possible.
 Timers and I/O timeouts can be given not only in the timeout values, as it
 usually is in event libraries, but also as deadlines in (fractional) seconds
 since epoch. This decision, strange at first sight, actually helps a lot when
-total execution time is to be tracked. For example, the following code reads as
-many bytes from a socket within 5 seconds:
+a total execution time is to be tracked. For example, the following code reads as
+many bytes as possible from a socket within 5 seconds:
 
    lambda {
        my $buf = '';
@@ -1497,7 +1496,7 @@ many bytes from a socket within 5 seconds:
        }
    };
 
-Rewriting the same code with C<read> semantics that accepts time as timeout
+Rewriting the same code with C<read> semantics that accepts time as a timeout
 instead, would be not that elegant:
 
    lambda {
@@ -1526,14 +1525,15 @@ both sleep 5 seconds:
    lambda { context 5;        sleep {} }
    lambda { context time + 5; sleep {} }
 
-Internally, timers use C<Time::HiRes::time> that gives fractional number of
-seconds. This however is not required for the caller, in which case timeouts
-will simply be less precise, and will jitter plus-minus half a second.
+Internally, timers use C<Time::HiRes::time> that gives the fractional number of
+seconds. This however is not required for the caller, because when high-res
+timers are not used, timeouts will simply be less precise, and will jitter
+plus-minus half a second.
 
 =head2 Predicates
 
 All predicates receive their parameters from the context stack, or simply the
-context. The only parameter passed to them by using perl call, is the callback
+I<context>. The only parameter passed to them by using perl call, is the callback
 itself.  Predicates can also be called without a callback, in which case, they
 will pass further data that otherwise would be passed as C<@_> to the
 callback. Thus, a predicate can be called either as
@@ -1716,7 +1716,7 @@ relates to C<sysread>.
 All functions in this section return the lambda, that does the actual work.
 Not unlike as a class constructor returns a newly created class instance, these
 functions return newly created lambdas. Such functions will be further referred
-as lambda constructors, or simply constructors. Therefore, constructors are
+as lambda constructors, or simply I<constructors>. Therefore, constructors are
 documented here as having two inputs and one output, as for example a function
 C<sysreader> is a function that takes 0 parameters, always returns a new
 lambda, and this lambda, in turn, takes four parameters and returns two. This
