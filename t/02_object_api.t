@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.8 2008/05/07 11:07:06 dk Exp $
+# $Id: 02_object_api.t,v 1.9 2008/10/28 13:06:13 dk Exp $
 
 use strict;
 use warnings;
@@ -77,7 +77,8 @@ SKIP: {
 	$m-> reset;
 	$m-> watch_io( IO_READ|IO_EXCEPTION, \*FH, 0.1, sub { @x = @_ });
 	$m-> wait;
-	ok(( 2 == @x and $x[1] == IO_READ), 'io read/exception');
+	# solaris and darwin report IO_EXCEPTION on a file :)
+	ok(( 2 == @x and $x[1] & IO_READ), 'io read/exception');
 	
 	$l-> reset;
 	$m-> reset;
