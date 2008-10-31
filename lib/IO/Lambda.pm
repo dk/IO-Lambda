@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.93 2008/10/31 11:14:53 dk Exp $
+# $Id: Lambda.pm,v 1.94 2008/10/31 13:01:19 dk Exp $
 
 package IO::Lambda;
 
@@ -1810,6 +1810,60 @@ will be further on referred as C<ioresult>:
 C<ioresult>'s first scalar is defined on success, and is not otherwise.  In the
 latter case, the second scalar contains the error, usually either C<$!> or
 C<'timeout'> (if C<$deadline> was set).
+
+Before describing the actual functions, consider the code that uses them.
+Let's take a lambda that needs to implement a very simple HTTP/0.9 request:
+
+   lambda {
+       my $handle = shift;
+       my $buf = '';
+       context getline, $handle, $buf;
+   tail {
+       my $req = shift;
+       die "bad request" unless $req =~ m[GET (.*)$]i;
+       do_request($handle, $1);
+   }}
+
+C<getline> will read from C<$handle> to C<$buf>, and will wake up when new line
+is there. However, what if we need, for example, HTTPS instead of HTTP, where
+reading from socket may involve some writing, and of course some, waiting?
+Then the first default parameter to getline has to be replaced. By default, 
+
+   context getline, $handle, $buf;
+
+is the same as 
+
+   my $reader = sysreader;	  
+   context getline($reader), $handle, $buf;
+
+where C<sysreader> creates a lambda C<$reader>, that given C<$handle>, waits
+when it becomes readable, and reads from it. C<getline>, in turn, repeatedly
+calls C<$reader>, until the whole line is read.
+
+Thus, we call 
+
+   context getline(https_reader), $handle, $buf;
+
+instead, that should conform to sysreader signature:
+
+   sub https_reader
+   {
+       lambda {
+           my ( $fh, $buf, $length, $deadline) = @_;
+	   # read from SSL socket
+	   return $error ? (undef, $error) : $data;
+       }
+   }
+
+I don't show the actual implementation of a HTTPS read (if you're curious, look
+at L<IO::Lambda::HTTPS> ), but the idea is that inside that reader, it is
+perfectly fine to do any number of read and write operations, and wait for
+their completion, as long as the lambda will sooner or later return the data.
+C<getline> (or, rather, C<readbuf> that C<getline> is based on) won't care
+about internal states of the reader. 
+
+Note: check out F<t/06_stream.t> that emulates reading and writing in this
+fashion.
 
 =over
 
