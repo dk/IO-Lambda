@@ -80,3 +80,6 @@
 
 0.33 - 28 Oct 2008
 	fixes for solaris
+
+0.34 - 31 Oct 2008
+	add "apologetics" section in pod

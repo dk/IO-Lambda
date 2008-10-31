@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.91 2008/10/31 09:47:37 dk Exp $
+# $Id: Lambda.pm,v 1.92 2008/10/31 11:03:34 dk Exp $
 
 package IO::Lambda;
 
@@ -15,7 +15,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG
 );
-$VERSION     = '0.33';
+$VERSION     = '0.34';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -1133,6 +1133,8 @@ IO::Lambda - non-blocking I/O in lambda style
 
 =head1 SYNOPSIS
 
+The code below executes parallel HTTP requests
+
    use strict;
    use IO::Lambda qw(:lambda);
    use IO::Socket::INET;
@@ -1191,6 +1193,81 @@ declarative programming.
 The manual begins with code examples, then explains basic assumptions, then
 finally gets of the complex concepts, where the real fun begins. You may skip
 directly there (L<Stream IO>), where functional style mixes with I/O. 
+
+=head2 Apologetics
+
+There are many async libraries readily available from CPAN. C<IO::Lambda> is
+yet another one. How is it different from the existing tools? Why using it?  To
+answer these questions, I need to show the evolution of async libraries, to
+show how they grew from simple tools to more complex frameworks.
+
+First, all async libraries are based on OS-level syscalls, like C<select>,
+C<poll>, C<epoll>, C<kqueue>, and C<Win32::WaitForMultipleObjects>. The first
+layer of async libraries provides access to exactly these facilites: there are
+C<IO::Select>, C<IO::Epoll>, C<IO::Kqueue> etc. I won't go deepeer into
+describing pros and contras for programming on this level, this should be more
+or less obvious.
+
+Perl modules of the next abstraction layer are often characterised by two
+things: portability and event loops. While the first layer calls are seldom
+portable, and have no event loops, the second layer modules strive to be
+OS-independent, and use callbacks to ease the async IO programming. These
+modules mostly populate the "asynchronous input-output programming frameworks"
+niche in the perl world. The examples are many: C<IO::Events>, C<EV>,
+C<AnyEvent>, C<IO::NonBlocking>, to name the few. 
+
+Finally, there's the third layer of complexity, which, before C<IO::Lambda>,
+had a single representative: C<POE> (now, to the best of my knowledge,
+C<IO::Async> also falls in this category). Modules of the third layer are based
+on concepts from the second, but introduce a tool to help with the programming
+of complex protocols, something that isn't available in the second layer
+modules: finite state machines. The FSMs machines reduce complexity when
+programming, for example, intricate network protocols, that are best modelled
+as a set of states. Modules from the second layer do not provide much help
+here.  Also, the third layer modules are agnostic of the event loop module: the
+programmer is (almost) free to choose the event loop backend, such as C<Gtk>,
+C<Prima>, or C<AnyEvent>, depending on the nature of the task.
+
+C<IO::Lambda> also allows the programmer to build complex protocols, and is
+also based on event loops, callbacks, and is portable. It differs from C<POE>
+in the way the FSMs are declared. Where C<POE> requires an explicit switch from
+one state to another, using (f.ex.) C<post> or C<yield> commands, C<IO::Lambda>
+incorporates the switching directly into the program syntax. Consider C<POE>
+code:
+
+   POE::Session-> create(
+       inline_states => {
+           state1 => sub { 
+	      print "state1\n";
+	      $_[ KERNEL]-> yield("state2");
+	   },
+	   state2 => sub {
+	      print "state2\n";
+	   },
+   });
+
+and correspodning C<IO::Lambda> code:
+
+    lambda {
+       state1 {
+	  print "state1\n";
+       state2 {
+	  print "state2\n";
+       }}
+    }
+
+Here, the programming style is (deliberately) not much different from the declarative
+
+    print "state1\n";
+    print "state2\n";
+
+as much as the nature of asynchronous programming allows that.
+
+To sum up, the intended use of C<IO::Lambda> is for areas where simple
+callback-based libraries require much additional work, and where state machines
+are beneficial. Complex protocols like HTTP, parallel execution of several
+tasks, strict control of task and protocol hierarchy - this is the domain where
+C<IO::Lambda> works best.
 
 =head2 Reading lines from a filehandle
 
