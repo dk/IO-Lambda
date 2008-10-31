@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.92 2008/10/31 11:03:34 dk Exp $
+# $Id: Lambda.pm,v 1.93 2008/10/31 11:14:53 dk Exp $
 
 package IO::Lambda;
 
@@ -1161,7 +1161,7 @@ The code below executes parallel HTTP requests
       }}}
    }
 
-   # fire up lambda and wait until it completes
+   # fire up a single lambda and wait until it completes
    print http( 'www.perl.com', '/')-> wait;
 
    # fire up a lambda that waits for two http requests in parallel
