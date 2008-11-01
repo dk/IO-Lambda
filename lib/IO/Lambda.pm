@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.95 2008/11/01 09:06:07 dk Exp $
+# $Id: Lambda.pm,v 1.96 2008/11/01 09:49:08 dk Exp $
 
 package IO::Lambda;
 
@@ -896,7 +896,7 @@ sub any_tail(&)
 	$timer = $THIS-> watch_timer( $deadline, sub {
 		$THIS     = shift;
 		$THIS-> cancel_event($_) for @watchers;
-		local *__ANON__ = "IO::Lambda::any_tails::callback";
+		local *__ANON__ = "IO::Lambda::any_tail::callback";
 		@CONTEXT  = ($deadline, @lambdas);
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
@@ -905,20 +905,25 @@ sub any_tail(&)
 
 	my $watcher;
 	$watcher = sub {
-		$THIS     = shift;
-		push @ret, @_;
+		push @ret, shift;
 		return if $n--;
 		
+		$THIS = shift;
 		$THIS-> cancel_event( $timer) if $timer;
 
-		local *__ANON__ = "IO::Lambda::any_tails::callback";
+		local *__ANON__ = "IO::Lambda::any_tail::callback";
 		@CONTEXT  = ($deadline, @lambdas);
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
 		$cb ? $cb-> (@ret) : @ret;
 	};
 
-	@watchers = map { $THIS-> watch_lambda( $_, $watcher) } @lambdas;
+	@watchers = map {
+		my $l = $_;
+		$THIS-> watch_lambda( $l, sub {
+			$watcher->($l, @_);
+		})
+	} @lambdas;
 }
 
 #
@@ -1956,9 +1961,10 @@ third-party asynchronous events with the lambda interface.
 
 =over
 
-=item new
+=item new($start)
 
-Creates new C<IO::Lambda> object in the passive state.
+Creates new C<IO::Lambda> object in the passive state. C<$start>
+will be called once, after the lambda gets active.
 
 =item watch_io($flags, $handle, $deadline, $callback)
 

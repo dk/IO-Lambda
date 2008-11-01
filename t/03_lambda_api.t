@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.9 2008/08/11 10:21:08 dk Exp $
+# $Id: 03_lambda_api.t,v 1.10 2008/11/01 09:49:09 dk Exp $
 
 use strict;
 use warnings;
@@ -82,7 +82,7 @@ this lambda {
 		lambda { 1 }, 
 		lambda { context 1.0; sleep { 2 }},
 		lambda { 3 };
-	any_tail { join '', sort @_ };
+	any_tail { join '', sort map { $_-> peek } @_ };
 };
 ok( '13' eq this-> wait, 'any_tail');
 
