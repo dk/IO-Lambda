@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.1 2008/11/01 12:33:37 dk Exp $
+# $Id: Thread.pm,v 1.2 2008/11/01 19:50:20 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 
@@ -23,6 +23,8 @@ sub new
 			
 	$class-> SUPER::new( sub {
 		my $self = shift;
+		$self-> {thread_self} = threads-> tid;
+
 		my $r = IO::Handle-> new;
 		my $w = IO::Handle-> new;
 		socketpair( $r, $w, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
@@ -30,17 +32,14 @@ sub new
 		my $self_id;
 		$self_id = "$self" if $DEBUG;
 
-		my $t = threads-> create(
-			{ context => 'list' },
-			sub {
-				$SIG{KILL} = sub { threads-> exit(0) };
-				warn _t($self_id), ": thr started\n" if $DEBUG;
-				my @ret = $cb ? $cb->() : ();
-				warn _t($self_id), ": thr ended: [@ret]\n" if $DEBUG;
-				syswrite( $r, "0");
-				return @ret;
-			}
-		);
+		my ($t) = threads-> create( sub {
+			$SIG{KILL} = sub { threads-> exit(0) };
+			warn _t($self_id), ": thr started\n" if $DEBUG;
+			my @ret = $cb ? $cb->() : ();
+			warn _t($self_id), ": thr ended: [@ret]\n" if $DEBUG;
+			syswrite( $r, "0");
+			return @ret;
+		});
 		
 		warn _t($self), ": new thread(", _obj($t), ")\n" if $DEBUG;
 	
@@ -59,12 +58,29 @@ sub new
 	});
 }
 
+my $__warned = 0;
 sub kill
 {
 	my $self = $_[0];
-	return unless $self-> {thread_id};
+	return unless
+		$self-> {thread_id} and
+		$self-> {thread_self} == threads-> tid;
+
 	my $t = $self-> {thread_id};
 	warn _t($self), ": kill(", _obj($t), ")\n" if $DEBUG;
+	undef $self-> {thread_id};
+
+	if ( $] < 5.010) {
+		warn <<WARN unless $__warned++;
+Perl versions older than 5.10.0 cannot detach and kill threads gracefully.
+IO::Lambda::Thread is designed so that programmer doesn't and shouldn't care
+about waiting for long-running threads, which works only on higher perl
+version. Consider calling \$threaded_lambda->join() to avoid this
+warning, or upgrade to 5.10.0 .
+WARN
+		return;
+	}
+
 	if ( $t-> is_running) {
 		$t-> detach;
 		$t-> kill('KILL');
@@ -73,11 +89,23 @@ sub kill
 	}
 }
 
+sub join
+{
+	my $self = shift;
+	my $t;
+	return unless $t = $self-> {thread_id};
+	undef $self-> {thread_id};
+	$t-> join;
+}
+
+sub thread { $_[0]-> {thread_id} }
+
 sub DESTROY
 {
 	my $self = $_[0];
-	$self-> SUPER::DESTROY;
-	return unless $self-> {thread_id};
+	$self-> SUPER::DESTROY
+		if defined($self-> {thread_self}) and
+		$self-> {thread_self} == threads-> tid;
 	$self-> kill;
 }
 
@@ -144,6 +172,15 @@ can appear in rather long time.
 =item threaded($code)
 
 Same as C<new> but without a class.
+
+=item thread
+
+Returns internal thread object
+
+=item join
+
+Joins the internal thread. Can be needed for perl versions before 5.10.0,
+that can't kill a thread reliably. 
 
 =back
 

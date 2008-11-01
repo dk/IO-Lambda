@@ -1,9 +1,16 @@
 #! /usr/bin/perl
-# $Id: 15_thread.t,v 1.1 2008/11/01 12:33:37 dk Exp $
+# $Id: 15_thread.t,v 1.2 2008/11/01 19:50:20 dk Exp $
 
 use strict;
 use warnings;
 use Test::More;
+use Config;
+
+BEGIN {
+	plan skip_all => 'Threads not supported'
+		unless ( $Config{useithreads} || '') eq 'define';
+};
+
 use IO::Lambda qw(:lambda);
 use IO::Lambda::Thread qw(threaded);
 
@@ -27,16 +34,16 @@ this lambda {
 		threaded { 3 };
 	tails { join('', sort @_) }
 };
-ok( this-> wait eq '123', 'multi' );
+ok( this-> wait eq '123', 'join all' );
 
-my @threads;
+my $t;
 this lambda {
 	context
 		0.2,
 		threaded { 2 },
-		threaded { sec(5); 1 };
+		$t = threaded { sec(5); 1 };
 	any_tail { join('', sort map { $_-> peek } @_) }
 };
-ok( this-> wait eq '2', 'multi' );
+ok( this-> wait eq '2', 'join some' );
+$t-> join;
 this-> clear;
-
