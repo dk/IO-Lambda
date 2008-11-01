@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.94 2008/10/31 13:01:19 dk Exp $
+# $Id: Lambda.pm,v 1.95 2008/11/01 09:06:07 dk Exp $
 
 package IO::Lambda;
 
@@ -393,6 +393,9 @@ sub cancel_event
 	$LOOP-> remove_event($self, $rec) if $LOOP;
 	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
 
+	delete $EVENTS{$rec->[WATCH_LAMBDA]} if ref($rec->[WATCH_LAMBDA]);
+	@$rec = ();
+
 	return if @{$self->{in}};
 
 	# that was the last event
@@ -415,6 +418,12 @@ sub cancel_all_events
 	$LOOP-> remove( $self) if $LOOP;
 	$_-> remove($self) for @LOOPS;
 	my $arr = delete $EVENTS{$self};
+
+	for my $rec ( @{$self->{in}}) {
+		delete $EVENTS{$rec->[WATCH_LAMBDA]} if ref($rec->[WATCH_LAMBDA]);
+		@$rec = ();
+	}
+
 	@{$self-> {in}} = (); 
 
 	return unless $arr;
@@ -647,6 +656,7 @@ sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
 sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub this_frame   { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
 sub set_frame    { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
+sub clear        { set_frame() }
 
 sub state($)
 {
@@ -881,16 +891,17 @@ sub any_tail(&)
 	croak "no tails" unless @lambdas;
 
 	my ( @ret, @watchers);
-	my $this = $THIS;
-	my $timer = $this-> watch_timer( $deadline, sub {
+	my $timer;
+	
+	$timer = $THIS-> watch_timer( $deadline, sub {
 		$THIS     = shift;
 		$THIS-> cancel_event($_) for @watchers;
 		local *__ANON__ = "IO::Lambda::any_tails::callback";
-		@CONTEXT  = @lambdas;
+		@CONTEXT  = ($deadline, @lambdas);
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
 		$cb ? $cb-> (@ret) : @ret;
-	});
+	}) if defined $deadline;
 
 	my $watcher;
 	$watcher = sub {
@@ -898,16 +909,16 @@ sub any_tail(&)
 		push @ret, @_;
 		return if $n--;
 		
-		$THIS-> cancel_event( $timer);
+		$THIS-> cancel_event( $timer) if $timer;
 
 		local *__ANON__ = "IO::Lambda::any_tails::callback";
-		@CONTEXT  = @lambdas;
+		@CONTEXT  = ($deadline, @lambdas);
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
 		$cb ? $cb-> (@ret) : @ret;
 	};
 
-	@watchers = map { $this-> watch_lambda( $_, $watcher) } @lambdas;
+	@watchers = map { $THIS-> watch_lambda( $_, $watcher) } @lambdas;
 }
 
 #
