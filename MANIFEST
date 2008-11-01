@@ -14,6 +14,7 @@ lib/IO/Lambda/Loop/Prima.pm
 lib/IO/Lambda/Loop/AnyEvent.pm
 lib/IO/Lambda/HTTP/Authen/NTLM.pm
 lib/IO/Lambda/HTTP/Authen/Negotiate.pm
+lib/IO/Lambda/Thread.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t
@@ -28,6 +29,7 @@ t/11_intercept.t
 t/12_udp.t
 t/13_synthetic.t
 t/14_spawn.t
+t/15_thread.t
 t/98_pod.t
 t/99_pod_coverage.t
 eg/sequential.pl

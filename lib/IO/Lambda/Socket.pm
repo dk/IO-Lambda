@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.8 2008/10/25 11:18:19 dk Exp $
+# $Id: Socket.pm,v 1.9 2008/11/01 12:33:37 dk Exp $
 use strict;
 use warnings;
 
@@ -6,7 +6,7 @@ package IO::Lambda::Socket;
 use Carp qw(croak);
 use Socket;
 use Exporter;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:all :dev);
 use Time::HiRes qw(time);
 use vars       qw(@ISA @EXPORT_OK %EXPORT_TAGS);
 @ISA         = qw(Exporter);

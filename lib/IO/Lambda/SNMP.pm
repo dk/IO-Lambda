@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.11 2008/10/20 11:52:41 dk Exp $
+# $Id: SNMP.pm,v 1.12 2008/11/01 12:33:37 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -18,7 +18,7 @@ use IO::Handle;
 use Exporter;
 use Sub::Name;
 use Time::HiRes qw(time);
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:all :dev);
 
 # $DEBUG = 1;
 
