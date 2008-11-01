@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.96 2008/11/01 09:49:08 dk Exp $
+# $Id: Lambda.pm,v 1.97 2008/11/01 12:32:59 dk Exp $
 
 package IO::Lambda;
 
@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use Exporter;
 use Sub::Name;
+use Scalar::Util qw(weaken);
 use Time::HiRes qw(time);
 use vars qw(
 	$LOOP %EVENTS @LOOPS
@@ -30,7 +31,7 @@ $VERSION     = '0.34';
 	io read write readwrite sleep tail tails tailo any_tail
 );
 @EXPORT_DEV    = qw(
-	_subname
+	_subname _d
 );
 @EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, @EXPORT_DEV);
 %EXPORT_TAGS = (
@@ -38,7 +39,7 @@ $VERSION     = '0.34';
 	stream    => \@EXPORT_STREAM, 
 	constants => \@EXPORT_CONSTANTS,
 	dev       => \@EXPORT_DEV,
-	all       => \@EXPORT_OK,
+	all       => [ @EXPORT_LAMBDA, @EXPORT_STREAM, @EXPORT_CONSTANTS ],
 );
 $DEBUG = $ENV{IO_LAMBDA_DEBUG};
 
@@ -139,6 +140,7 @@ sub watch_io
 		$handle,
 		$flags,
 	];
+	weaken $rec->[0];
 	push @{$self-> {in}}, $rec;
 
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
@@ -162,6 +164,7 @@ sub watch_timer
 		$deadline,
 		$callback,
 	];
+	weaken $rec->[0];
 	push @{$self-> {in}}, $rec;
 
 	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
@@ -189,6 +192,7 @@ sub watch_lambda
 		$lambda,
 		$callback,
 	];
+	weaken $rec->[0];
 	push @{$self-> {in}}, $rec;
 	push @{$EVENTS{"$lambda"}}, $rec;
 
@@ -419,28 +423,32 @@ sub cancel_all_events
 	$_-> remove($self) for @LOOPS;
 	my $arr = delete $EVENTS{$self};
 
+	my $cascade = $opt{cascade};
+	my (%called, @cancel);
 	for my $rec ( @{$self->{in}}) {
-		delete $EVENTS{$rec->[WATCH_LAMBDA]} if ref($rec->[WATCH_LAMBDA]);
+		if ( ref($rec->[WATCH_LAMBDA])) {
+			push @cancel, $rec->[WATCH_LAMBDA] if $cascade;
+			delete $EVENTS{$rec->[WATCH_LAMBDA]};
+		}
 		@$rec = ();
 	}
 
 	@{$self-> {in}} = (); 
 
+	for ( @cancel) {
+		next if $called{"$_"};
+		$called{"$_"}++;
+		$_-> cancel_all_events(%opt);
+	}
+
 	return unless $arr;
 
-	my $cascade = $opt{cascade};
-	my (%called, @cancel);
 	for my $rec ( @$arr) {
 		next unless my $watcher = $rec-> [WATCH_OBJ];
 		# global destruction in action! this should be $self, but isn't
 		next unless ref($rec-> [WATCH_LAMBDA]); 
 		$watcher-> lambda_handler( $rec);
-		push @cancel, $watcher if $cascade;
-	}
-	for ( @cancel) {
-		next if $called{"$_"};
-		$called{"$_"}++;
-		$_-> cancel_all_events(%opt);
+		# push @cancel, $watcher if $cascade; # XXX
 	}
 }
 
@@ -1961,7 +1969,7 @@ third-party asynchronous events with the lambda interface.
 
 =over
 
-=item new($start)
+=item new($class, $start)
 
 Creates new C<IO::Lambda> object in the passive state. C<$start>
 will be called once, after the lambda gets active.
