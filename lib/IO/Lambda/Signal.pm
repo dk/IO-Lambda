@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.7 2008/09/03 13:58:26 dk Exp $
+# $Id: Signal.pm,v 1.8 2008/11/01 20:38:05 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -9,6 +9,37 @@ use strict;
 use IO::Handle;
 use POSIX ":sys_wait_h";
 use IO::Lambda qw(:all);
+
+my $MASTER = bless {}, __PACKAGE__;
+
+# register yield handler
+IO::Lambda::add_loop($MASTER);
+END { IO::Lambda::remove_loop($MASTER) };
+
+sub remove {}
+sub empty { 0 == keys %SIGDATA }
+
+sub yield
+{
+	warn "SIG yield\n" if $IO::Lambda::DEBUG;
+
+	for my $v ( values %SIGDATA) {
+		next unless $v-> {signal};
+		for my $r ( @{$v-> {lambdas}}) {
+			my ( $lambda, $callback, @param) = @$r;
+			$callback-> ( $lambda, @param);
+		}
+		$v-> {signal} = 0;
+	}
+}
+
+sub signal_handler
+{
+	my $id = shift;
+	warn "SIG{$id}\n" if $IO::Lambda::DEBUG;
+	return unless exists $SIGDATA{$id};
+	$SIGDATA{$id}-> {signal}++;
+}
 
 sub watch_signal
 {
@@ -44,17 +75,6 @@ sub unwatch_signal
 		delete $SIG{$id};
 	}
 	delete $SIGDATA{$id};
-}
-
-sub signal_handler
-{
-	my $id = shift;
-	warn "SIG{$id}\n" if $IO::Lambda::DEBUG;
-	return unless exists $SIGDATA{$id};
-	for my $r ( @{$SIGDATA{$id}-> {lambdas}}) {
-		my ( $lambda, $callback, @param) = @$r;
-		$callback-> ( $lambda, @param);
-	}
 }
 
 # create a lambda that either returns undef on timeout,
