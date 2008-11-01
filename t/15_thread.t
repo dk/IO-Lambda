@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 15_thread.t,v 1.2 2008/11/01 19:50:20 dk Exp $
+# $Id: 15_thread.t,v 1.3 2008/11/01 21:09:31 dk Exp $
 
 use strict;
 use warnings;
@@ -9,6 +9,8 @@ use Config;
 BEGIN {
 	plan skip_all => 'Threads not supported'
 		unless ( $Config{useithreads} || '') eq 'define';
+	plan skip_all => 'Threads require at least 5.8.0'
+		if $] < 5.008;
 };
 
 use IO::Lambda qw(:lambda);
