@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.97 2008/11/01 12:32:59 dk Exp $
+# $Id: Lambda.pm,v 1.98 2008/11/03 10:05:19 dk Exp $
 
 package IO::Lambda;
 
@@ -394,7 +394,7 @@ sub cancel_event
 
 	return unless @{$self-> {in}};
 
-	$LOOP-> remove_event($self, $rec) if $LOOP;
+	$LOOP-> remove_event($rec) if $LOOP;
 	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
 
 	delete $EVENTS{$rec->[WATCH_LAMBDA]} if ref($rec->[WATCH_LAMBDA]);
