@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.10 2008/11/01 09:49:09 dk Exp $
+# $Id: 03_lambda_api.t,v 1.11 2008/11/03 22:12:56 dk Exp $
 
 use strict;
 use warnings;
@@ -23,8 +23,9 @@ ok( 43 == this-> wait, 'tail lambda');
 
 my $i = 42;
 this lambda {
-	context lambda {};
-	tail { ( $i++ > 44) ? $i : again };
+	my $l = lambda {}; 
+	context $l;
+	tail { ( $i++ > 44) ? $i : ( $l-> reset, again ) };
 };
 ok( 46 == this-> wait, 'restart tail');
 

@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.11 2008/11/01 12:33:37 dk Exp $
+# $Id: Makefile.PL,v 1.12 2008/11/03 22:12:56 dk Exp $
 use Getopt::Long  qw(GetOptions);
 use ExtUtils::MakeMaker;
 use IO::Socket::INET;
@@ -43,6 +43,7 @@ WriteMakefile(
 	VERSION_FROM  => 'lib/IO/Lambda.pm',
 	PREREQ_PM     => {
 		'Net::DNS'          => 0,
+		'Storable'          => 0,
 		'LWP'               => 0,
 		'URI'               => 0,
 		'Sub::Name'         => 0,
@@ -51,6 +52,8 @@ WriteMakefile(
 		# 'SNMP'            => 0,     # for IO::Lambda::SNMP
 		# 'AnyEvent'        => 0,     # for alternative event loop
 		# 'Authen::NTLM'    => 1.05,  # for HTTP authentication
+		# 'DBI'             => 0,     # for IO::Lambda::DBI
+		# 'threads'         => 0,     # for IO::Lambda::Threads
 	},
 	clean         => { FILES => 't/online.enabled' },
 );

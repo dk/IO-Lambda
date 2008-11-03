@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 99_pod_coverage.t,v 1.19 2008/11/03 14:55:10 dk Exp $
+# $Id: 99_pod_coverage.t,v 1.20 2008/11/03 22:12:56 dk Exp $
 
 use strict;
 use warnings;
@@ -26,5 +26,5 @@ pod_coverage_ok( 'IO::Lambda::Signal' => { trustme => [
 	qr/^new_|yield|empty|remove/
 ]});
 pod_coverage_ok( 'IO::Lambda::Thread'=> { trustme => [
-        qr/^(thread_|init|on_read)/,
+        qr/^(thread_|init|on_read|.)/,
 ]});
