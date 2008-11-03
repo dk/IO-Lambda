@@ -1,9 +1,8 @@
-# $Id: Message.pm,v 1.1 2008/11/03 14:55:10 dk Exp $
+# $Id: Message.pm,v 1.2 2008/11/03 22:05:57 dk Exp $
 
 use strict;
 use warnings;
 
-# XXX timeouts; error effects on non-executed lambdas; 
 package IO::Lambda::Message::Storable;
 
 use Storable qw(freeze thaw);
@@ -29,13 +28,15 @@ package IO::Lambda::Message;
 
 use base qw(IO::Lambda::Message::Storable);
 
-our $DEBUG = $ENV{IO_MESSAGE_DEBUG};
 our $CRLF  = "\x0d\x0a";
 our @EXPORT_OK = qw(message);
+our $DEBUG = $IO::Lambda::DEBUG{message};
 
 use Carp;
 use Exporter;
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:all :dev);
+
+sub _d { "message(" . _o($_[0]) . ")" }
 
 sub new
 {
@@ -64,16 +65,21 @@ sub new
 		queue     => [],
 		transport => $transport,
 	}, $class;
+	
+	warn "new ", _d($self) . "\n" if $DEBUG;
 
 	return $self;	
 }
 
-sub handle_message
+sub msg_handler
 {
-	my ( $self, undef, $deadline) = @_;
-	return ( undef, $self-> {error}) if defined $self-> {error};
+	my $self = shift;
+	
+	$self-> {msg_handler} ||= 
+	lambda {
+		my ( undef, $deadline) = @_;
 
-	my $msg = length($_[1]) . $CRLF . $_[1] . $CRLF;
+		my $msg = length($_[0]) . $CRLF . $_[0] . $CRLF;
 	context 
 		writebuf($self-> {writer}), $self-> {handle},
 		\ $msg, $deadline;
@@ -104,57 +110,89 @@ sub handle_message
 		my $msg = substr( $self-> {buf}, 0, $size, '');
 		substr($msg, -$crlf) = '';
 		return $msg;
-	}}}
+	}}}}
 }
 
-sub return_message { shift; @_ }
+sub cancel_queue
+{	
+	my ( $self, @reason) = @_;
+	return unless $self-> {queue};
+	for my $q ( @{ $self-> {queue}}) {
+		my ( $outer, $bind) = @_;
+		$outer-> resolve( $bind);
+		$outer-> terminate( @reason);
+	}
+	@{ $self-> {queue} } = ();
+}
 
-sub wait_and_dequeue
+sub queue_handler
 {
-	my ( $self, $q) = @_;
-	context $q;
+	my $self = shift;
+	$self-> {queue_handler} ||= 
+	lambda {
+		warn _d($self) . ": sending msg ",
+			length($self-> {queue}-> [0]-> [2]), " bytes ",
+			_t($self-> {queue}-> [0]-> [3]),
+			"\n" if $DEBUG;
+		context $self-> msg_handler, 
+			$self-> {queue}-> [0]-> [2],
+			$self-> {queue}-> [0]-> [3];
 	tail {
 		my ( $result, $error) = @_;
-		shift @{$self-> {queue}};
 		if ( defined $error) {
-			# don't allow new lambdas, and kill the old ones
-			$self-> {error} = $error;
-		} else {
-			$self-> {transport}-> set_close_on_read(1) unless @{$self-> {queue}};
+			warn _d($self) . " > error $error\n" if $DEBUG;
+			$self-> cancel_queue( undef, $error);	
+			$self-> {transport}-> set_close_on_read(1);
+			this-> reset;
+			return ( undef, $error);
 		}
-		return $self-> return_message( $result, $error);
-	}
+		
+		# signal result to the outer lambda
+		my ( $outer, $bind, $msg, $deadline) = @{ shift @{$self-> {queue}} };
+		$outer-> resolve( $bind);
+		$outer-> terminate( $self-> return_message( $result, $error));
+		
+		# stop if it's all
+		unless ( @{$self-> {queue}}) {
+			warn _d($self) . ": stop messenger\n" if $DEBUG;
+			$self-> {transport}-> set_close_on_read(1);
+			return;
+		}
+
+		# fire up the next request
+		warn _d($self) . ": sending msg ",
+			length($msg), " bytes ",
+			_t($deadline),
+			"\n" if $DEBUG;
+		context $self-> msg_handler, $msg, $deadline;
+		again;
+	}}
 }
 
 sub new_message
 {
 	my ( $self, $msg, $deadline) = @_;
-	
-	return lambda { undef, $self-> {error} } if defined $self-> {error};
-		
-	$self-> {transport}-> set_close_on_read(0) unless @{$self-> {queue}};
 
-	my $inner = lambda {
-		my ( $result, $error) = $self-> handle_message( $msg, $deadline);
-		$self-> {transport}-> close if $error;
-		return ( $result, $error);
-	};
-
-	my @t = ( this, context );
-	
-	my $outer = IO::Lambda-> new;
-	this($outer);
-
-	if ( @{$self-> {queue}}) {
-		context $self-> {queue}-> [-1];
-		tail { $self-> wait_and_dequeue($inner) }
-	} else {
-		$self-> wait_and_dequeue($inner);
+	if ( $DEBUG) {
+		warn _d($self) . " > msg", _t($deadline), " ", length($msg), " bytes\n";
+		warn _d($self) . " is faulty($self->{error})\n"
+			if defined $self-> {error};
 	}
 	
-	this(@t);
+	return lambda { undef, $self-> {error} } if defined $self-> {error};
+	
+	# won't end until we call resolve
+	my $outer = IO::Lambda-> new;
+	my $bind  = $outer-> bind;
+	push @{ $self-> {queue} }, [ $outer, $bind, $msg, $deadline ];
 
-	push @{$self-> {queue}}, $inner;
+	# override transport listener
+	if (1 == @{$self-> {queue}}) {
+		$self-> {transport}-> set_close_on_read(0);
+		warn _d($self) . ": start messenger\n" if $DEBUG;
+		$self-> queue_handler-> reset;
+		$self-> queue_handler-> start;
+	}
 
 	return $outer;
 }

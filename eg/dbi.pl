@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.1 2008/11/03 20:58:54 dk Exp $
+#$Id: dbi.pl,v 1.2 2008/11/03 22:05:57 dk Exp $
 
 use IO::Lambda qw(:all);
 use IO::Lambda::DBI;
@@ -6,7 +6,7 @@ use IO::Lambda::DBI;
 sub check_dbi
 {
 	my $dbi = shift;
-	my $tries = 0;
+	my $tries = 3;
 	lambda {
 		my $expect = int rand 100;
 		context $dbi-> selectrow_array('SELECT 1 + ?', {}, $expect);
