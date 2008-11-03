@@ -15,6 +15,8 @@ lib/IO/Lambda/Loop/AnyEvent.pm
 lib/IO/Lambda/HTTP/Authen/NTLM.pm
 lib/IO/Lambda/HTTP/Authen/Negotiate.pm
 lib/IO/Lambda/Thread.pm
+lib/IO/Lambda/Message.pm
+lib/IO/Lambda/DBI.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t
@@ -39,6 +41,7 @@ eg/snmp.pl
 eg/loop.pl
 eg/dns.pl
 eg/webserver.pl
+eg/dbi.pl
 eg/bench/tcp-batch
 eg/bench/tcp-lambda.pl
 eg/bench/tcp-poe.pl
