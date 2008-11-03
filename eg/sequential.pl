@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: sequential.pl,v 1.6 2008/01/25 13:46:04 dk Exp $
+# $Id: sequential.pl,v 1.7 2008/11/03 09:24:02 dk Exp $
 # 
 # This example fetches sequentially two pages, one with http/1.0 another with
 # http/1.1 . The idea is to demonstrate three different ways of doing so, by
@@ -72,7 +72,7 @@ if ( $style eq 'object') {
 	this-> wait;
 } else {
 	# implicit loop - we don't know how many states we need
-	lambda {
+	this lambda {
 		context shift(@chain), conn_cache => $cache;
 		http_request {
 			report shift;
@@ -80,7 +80,6 @@ if ( $style eq 'object') {
 			context shift(@chain), conn_cache => $cache;
 			again;
 		}
-	}-> start;
+	};
+	this-> wait;
 }
-
-run IO::Lambda;
