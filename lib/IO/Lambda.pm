@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.99 2008/11/03 14:51:33 dk Exp $
+# $Id: Lambda.pm,v 1.100 2008/11/03 14:54:44 dk Exp $
 
 package IO::Lambda;
 
@@ -819,7 +819,11 @@ sub tail(&)
 	
 	my ( $lambda, @param) = context;
 	$lambda-> reset if $lambda-> is_stopped;
-	$lambda-> call( @param) unless $lambda-> is_active;
+	if ( @param) {
+		$lambda-> call( @param);
+	} else {
+		$lambda-> call if $lambda-> is_active;
+	}
 	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
 }
 
@@ -1697,7 +1701,8 @@ Executes after C<$deadline>. C<$deadline> cannot be C<undef>.
 =item tail($lambda, @parameters)
 
 Issues C<< $lambda-> call(@parameters) >>, then waits for the C<$lambda>
-to complete.
+to complete. Since C<call> can only be done on inactive lambdas, will
+fail if C<@parameters> is not empty and C<$lambda> is already running.
 
 =item tails(@lambdas)
 
