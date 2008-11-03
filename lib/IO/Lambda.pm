@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.101 2008/11/03 20:58:27 dk Exp $
+# $Id: Lambda.pm,v 1.102 2008/11/03 21:04:25 dk Exp $
 
 package IO::Lambda;
 
@@ -466,7 +466,7 @@ sub cancel_all_events
 sub autorestart
 {
 	$#_ ?
-		$_[0]-> {autorestart} = $_[0] :
+		$_[0]-> {autorestart} = $_[1] :
 		( exists($_[0]-> {autorestart}) ?
 			$_[0]-> {autorestart} : 1)
 }
