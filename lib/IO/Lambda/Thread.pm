@@ -1,8 +1,8 @@
-# $Id: Thread.pm,v 1.3 2008/11/03 14:55:10 dk Exp $
+# $Id: Thread.pm,v 1.4 2008/11/03 20:58:27 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 
-our $DEBUG = $ENV{IO_THREAD_DEBUG};
+our $DEBUG = $IO::Lambda::DEBUG{thread};
 	
 use strict;
 use warnings;
@@ -14,13 +14,13 @@ use IO::Lambda qw(:all :dev);
 
 our @EXPORT_OK = qw(threaded);
 
-sub _t   { "threaded(" . _obj($_[0]) . ")" }
-sub _obj { $_[0] =~ /0x([\w]+)/; $1 }
+sub _d { "threaded(" . _o($_[0]) . ")" }
 
 sub new
 {
 	my ( $class, $cb, @param) = @_;
 	my $self = $class-> SUPER::new(\&init);
+	$self-> autorestart(0);
 	$self-> {thread_code}  = $cb;
 	$self-> {thread_param} = \@param;
 	return $self;
@@ -32,10 +32,10 @@ sub thread_init
 {
 	my ( $self, $r, $cb, @param) = @_;
 	$SIG{KILL} = \&thread_kill;
-	warn _t($self), ": thr started\n" if $DEBUG;
+	warn _d($self), ": thread(", threads->tid, ") started\n" if $DEBUG;
 	my @ret;
 	eval { @ret = $cb->($r, @param) if $cb };
-	warn _t($self), ": thr ended: [@ret]\n" if $DEBUG;
+	warn _d($self), ": thread(", threads->tid, ") ended: [@ret]\n" if $DEBUG;
 	CORE::close($r);
 	die $@ if $@;
 	return @ret;
@@ -44,18 +44,15 @@ sub thread_init
 sub on_read
 {
 	my $self = shift;
-	warn _t($self), ": thread signalled to close\n" if $DEBUG;
+	warn _d($self), ": am closing on read\n" if $DEBUG;
 	$self-> {close_on_read} = undef;
-	$self-> close;
+	return $self-> close;
 }
 
 sub init
 {
 	my $self = shift;
 
-	return 'thread has exited' if $self-> {has_been_run};
-
-	$self-> {has_been_run}++;
 	$self-> {thread_self} = threads-> tid;
 
 	my $r = IO::Handle-> new;
@@ -63,19 +60,16 @@ sub init
 	socketpair( $r, $self-> {handle}, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
 	$self-> {handle}-> blocking(0);
 
-	my $self_id;
-	$self_id = "$self" if $DEBUG;
-
 	($self-> {thread_id}) = threads-> create(
 		\&thread_init, 
-		$self_id, $r, $self-> {thread_code},
+		"$self", $r, $self-> {thread_code},
 		@{ $self-> {thread_param} },
 	);
 	close($r);
 	undef $self-> {thread_code};
 	undef $self-> {thread_param};
 
-	warn _t($self), ": new thread(", _obj($self-> {thread_id}), ")\n" if $DEBUG;
+	warn _d($self), ": new thread(", $self-> {thread_id}->tid, ")\n" if $DEBUG;
 	$self-> set_close_on_read(1);
 }
 
@@ -86,22 +80,22 @@ sub set_close_on_read
 		return if $self-> {close_on_read};
 	 	my $error = unpack('i', getsockopt( $self-> {handle}, SOL_SOCKET, SO_ERROR));
 		if ( $error) {
-			warn _t($self), ": close_on_read aborted because handle is invalid\n" if $DEBUG;
+			warn _d($self), ": close_on_read aborted, handle is invalid\n" if $DEBUG;
 			$self-> close;
 			return;
 		}
 		if ( $self-> is_stopped) {
-			warn _t($self), ": close_on_read aborted lambda already stopped\n" if $DEBUG;
+			warn _d($self), ": close_on_read aborted, lambda already stopped\n" if $DEBUG;
 			$self-> close;
 			return;
 		}
 		$self-> {close_on_read} = $self-> watch_io( IO_READ, $self-> {handle}, undef, \&on_read);
-		warn _t($self), ": will close on read\n" if $DEBUG;
+		warn _d($self), ": will close on read\n" if $DEBUG;
 	} else {
 		return unless $self-> {close_on_read};
 		$self-> cancel_event( $self-> {close_on_read} );
 		$self-> {close_on_read} = undef;
-		warn _t($self), ": won't close on read\n" if $DEBUG;
+		warn _d($self), ": won't close on read\n" if $DEBUG;
 	}
 }
 
@@ -114,7 +108,7 @@ sub kill
 		$self-> {thread_self} == threads-> tid;
 
 	my $t = $self-> {thread_id};
-	warn _t($self), ": kill(", _obj($t), ")\n" if $DEBUG;
+	warn _d($self), ": kill(", $t->tid, ")\n" if $DEBUG;
 	undef $self-> {thread_id};
 
 	if ( $] < 5.010) {
@@ -132,9 +126,9 @@ WARN
 		$t-> detach;
 		$t-> kill('KILL');
 	} else {
-		warn _t($self), " joining ", _obj($t), "...\n" if $DEBUG;
+		warn _d($self), " joining ", $t-> tid, "...\n" if $DEBUG;
 		$t-> join if $t-> is_joinable;
-		warn _t($self), " done ", _obj($t), "\n" if $DEBUG;
+		warn _d($self), " done ", $t-> tid, "\n" if $DEBUG;
 	}
 }
 
@@ -144,15 +138,11 @@ sub close
 	my $t;
 	return unless $t = $self-> {thread_id};
 	undef $self-> {thread_id};
-	if ( $DEBUG) {
-		warn _t($self), " joining ", _obj($t), "...\n" if $DEBUG;
-		my @r = $t-> join;
-		warn _t($self), " done ", _obj($t), "\n" if $DEBUG;
-		return @r;
-	} else {
-		return $t-> join;
-                # XXX join error
-	}
+	warn _d($self), " joining thread ", $t-> tid, "...\n" if $DEBUG;
+	my @r = ( 1, $t-> join );
+	@r = (undef, $t-> error) if $] >= 5.010 and $t-> error;
+	warn _d($self), " thread ", $t-> tid, " joined ok\n" if $DEBUG;
+	return @r;
 }
 
 sub thread { $_[0]-> {thread_id} }

@@ -1,10 +1,10 @@
-# $Id: HTTP.pm,v 1.39 2008/11/03 09:25:01 dk Exp $
+# $Id: HTTP.pm,v 1.40 2008/11/03 20:58:27 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(http_request);
 
-$DEBUG = $ENV{IO_HTTP_DEBUG};
+our $DEBUG = $IO::Lambda::DEBUG{http};
 
 use strict;
 use warnings;

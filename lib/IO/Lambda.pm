@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.100 2008/11/03 14:54:44 dk Exp $
+# $Id: Lambda.pm,v 1.101 2008/11/03 20:58:27 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM @EXPORT_DEV
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
-	$DEBUG
+	$DEBUG %DEBUG
 );
 $VERSION     = '0.34';
 @ISA         = qw(Exporter);
@@ -31,7 +31,7 @@ $VERSION     = '0.34';
 	io read write readwrite sleep tail tails tailo any_tail
 );
 @EXPORT_DEV    = qw(
-	_subname _d
+	_subname _o _t
 );
 @EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, @EXPORT_DEV);
 %EXPORT_TAGS = (
@@ -41,7 +41,17 @@ $VERSION     = '0.34';
 	dev       => \@EXPORT_DEV,
 	all       => [ @EXPORT_LAMBDA, @EXPORT_STREAM, @EXPORT_CONSTANTS ],
 );
-$DEBUG = $ENV{IO_LAMBDA_DEBUG};
+
+if ( exists $ENV{IO_LAMBDA_DEBUG}) {
+	for my $p ( split ',', $ENV{IO_LAMBDA_DEBUG}) {
+		if ( $p =~ /^([^=]+)=(.*)$/) {
+			$DEBUG{lc $1}=$2;
+		} else {
+			$DEBUG{lc $p}++;
+		}
+	}
+	$DEBUG = $DEBUG{core};
+}
 
 use constant IO_READ         => 4;
 use constant IO_WRITE        => 2;
@@ -76,7 +86,8 @@ my  $_doffs = 0;
 sub _d_in  { $_doffs++ }
 sub _d_out { $_doffs-- if $_doffs }
 sub _d     { ('  ' x $_doffs), _obj(shift), ': ', @_, "\n" }
-sub _obj   { $_[0] =~ /0x([\w]+)/; "lambda($1)." . ( $_[0]->{caller} || '()' ) }
+sub _o     { $_[0] =~ /0x([\w]+)/; $1 }
+sub _obj   { "lambda(". _o($_[0]) . ")." . ( $_[0]->{caller} || '()' ) }
 sub _t     { defined($_[0]) ? ( "time(", $_[0]-time(), ")" ) : () }
 sub _ev
 {
@@ -452,6 +463,13 @@ sub cancel_all_events
 	}
 }
 
+sub autorestart
+{
+	$#_ ?
+		$_[0]-> {autorestart} = $_[0] :
+		( exists($_[0]-> {autorestart}) ?
+			$_[0]-> {autorestart} : 1)
+}
 sub is_stopped  { $_[0]-> {stopped}  }
 sub is_waiting  { not($_[0]->{stopped}) and @{$_[0]->{in}} }
 sub is_passive  { not($_[0]->{stopped}) and not(@{$_[0]->{in}}) }
@@ -818,11 +836,12 @@ sub tail(&)
 		if $THIS-> {override}->{tail};
 	
 	my ( $lambda, @param) = context;
-	$lambda-> reset if $lambda-> is_stopped;
+	$lambda-> reset
+		if $lambda-> is_stopped and $lambda-> autorestart;
 	if ( @param) {
 		$lambda-> call( @param);
 	} else {
-		$lambda-> call if $lambda-> is_active;
+		$lambda-> call unless $lambda-> is_active;
 	}
 	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
 }
@@ -958,7 +977,7 @@ sub sysreader (){ lambda
 		my $n = sysread( $fh, $$buf, $length, length($$buf));
 		if ( $DEBUG) {
 			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
-			warn substr( $$buf, length($$buf) - $n) if $DEBUG > 2 and $n > 0;
+			warn substr( $$buf, length($$buf) - $n) if $DEBUG > 1 and $n > 0;
 		}
 		return undef, $! unless defined $n;
 		return $n;
@@ -978,7 +997,7 @@ sub syswriter (){ lambda
 		my $n = syswrite( $fh, $$buf, $length, $offset);
 		if ( $DEBUG) {
 			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes out of $length" : "error $!"), "\n";
-			warn substr( $$buf, $offset, $n) if $DEBUG > 2 and $n > 0;
+			warn substr( $$buf, $offset, $n) if $DEBUG > 1 and $n > 0;
 		}
 		return undef, $! unless defined $n;
 		return $n;
@@ -1704,6 +1723,9 @@ Issues C<< $lambda-> call(@parameters) >>, then waits for the C<$lambda>
 to complete. Since C<call> can only be done on inactive lambdas, will
 fail if C<@parameters> is not empty and C<$lambda> is already running.
 
+By default, C<tail> resets lambda if is was alredy finished. This
+behavior can be changed by manipulating C<autorestart> property.
+
 =item tails(@lambdas)
 
 Executes when all objects in C<@lambdas> are finished, returns the collected,
@@ -2027,6 +2049,12 @@ Cancels all watchers and switches the lambda to the passive state.
 If there are any lambdas that watch for this object, these will
 be called first.
 
+=item autorestart
+
+If set, gives permission to watchers to reset the lambda if it 
+becomes stopped. C<tail> does that when needed, other watchers
+may too. Is set by default.
+
 =item peek
 
 At any given time, returns stored data that are either passed
@@ -2227,6 +2255,17 @@ L<IO::Lambda::DNS> - asynchronous domain name resolver.
 L<IO::Lambda::SNMP> - SNMP requests lambda style. Requires L<SNMP>.
 
 =back
+
+=head1 DEBUGGING
+
+Various modules can be controlled with the single environment variable,
+C<IO_LAMBDA_DEBUG>, which is treated a comma-separated list of modules.
+For example,
+
+      env IO_LAMBDA_DEBUG=core=2,http perl script.pl
+
+displays debug messages from C<IO::Lambda> (with extra verbosity) and
+from C<IO::Lambda::HTTP>.
 
 =head1 BENCHMARKS
 
