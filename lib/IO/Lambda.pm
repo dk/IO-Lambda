@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.98 2008/11/03 10:05:19 dk Exp $
+# $Id: Lambda.pm,v 1.99 2008/11/03 14:51:33 dk Exp $
 
 package IO::Lambda;
 
@@ -819,7 +819,7 @@ sub tail(&)
 	
 	my ( $lambda, @param) = context;
 	$lambda-> reset if $lambda-> is_stopped;
-	$lambda-> call( @param);
+	$lambda-> call( @param) unless $lambda-> is_active;
 	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
 }
 
@@ -950,6 +950,7 @@ sub sysreader (){ lambda
 
 	this-> watch_io( IO_READ, $fh, $deadline, subname _sysreader => sub {
 		return undef, 'timeout' unless $_[1];
+                local $SIG{PIPE} = 'IGNORE';
 		my $n = sysread( $fh, $$buf, $length, length($$buf));
 		if ( $DEBUG) {
 			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
@@ -969,9 +970,10 @@ sub syswriter (){ lambda
 
 	this-> watch_io( IO_WRITE, $fh, $deadline, subname _syswriter => sub {
 		return undef, 'timeout' unless $_[1];
+                local $SIG{PIPE} = 'IGNORE';
 		my $n = syswrite( $fh, $$buf, $length, $offset);
 		if ( $DEBUG) {
-			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
+			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes out of $length" : "error $!"), "\n";
 			warn substr( $$buf, $offset, $n) if $DEBUG > 2 and $n > 0;
 		}
 		return undef, $! unless defined $n;
