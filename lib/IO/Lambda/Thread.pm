@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.5 2008/11/03 21:04:25 dk Exp $
+# $Id: Thread.pm,v 1.6 2008/11/03 23:21:54 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 
@@ -32,6 +32,7 @@ sub thread_init
 {
 	my ( $self, $r, $cb, @param) = @_;
 	$SIG{KILL} = \&thread_kill;
+	$SIG{PIPE} = 'IGNORE';
 	warn _d($self), ": thread(", threads->tid, ") started\n" if $DEBUG;
 	my @ret;
 	eval { @ret = $cb->($r, @param) if $cb };

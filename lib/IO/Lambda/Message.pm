@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.2 2008/11/03 22:05:57 dk Exp $
+# $Id: Message.pm,v 1.3 2008/11/03 23:21:54 dk Exp $
 
 use strict;
 use warnings;
@@ -125,6 +125,16 @@ sub cancel_queue
 	@{ $self-> {queue} } = ();
 }
 
+
+sub stop
+{
+	my $self = shift;
+	warn _d($self) . ": stop messenger\n" if $DEBUG;
+	$self-> {transport}-> set_close_on_read(1);
+	undef $self-> {queue_handler};
+	undef $self-> {msg_handler};
+}
+
 sub queue_handler
 {
 	my $self = shift;
@@ -142,8 +152,7 @@ sub queue_handler
 		if ( defined $error) {
 			warn _d($self) . " > error $error\n" if $DEBUG;
 			$self-> cancel_queue( undef, $error);	
-			$self-> {transport}-> set_close_on_read(1);
-			this-> reset;
+			$self-> stop;
 			return ( undef, $error);
 		}
 		
@@ -154,8 +163,7 @@ sub queue_handler
 		
 		# stop if it's all
 		unless ( @{$self-> {queue}}) {
-			warn _d($self) . ": stop messenger\n" if $DEBUG;
-			$self-> {transport}-> set_close_on_read(1);
+			$self-> stop;
 			return;
 		}
 
@@ -291,7 +299,6 @@ sub handle
 			( $msg, $error) = $self-> encode([0, $error]);
 			die $error if $error;
 		}
-
 		$self-> write($msg);
 	}
 }

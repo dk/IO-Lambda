@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.2 2008/11/03 20:58:27 dk Exp $
+# $Id: DBI.pm,v 1.3 2008/11/03 23:21:54 dk Exp $
 package IO::Lambda::DBI;
 use base qw(IO::Lambda::Message);
 
@@ -66,7 +66,6 @@ sub dbi_message
 	return lambda { $error } if $error;
 	warn _d($self) . " > $method(@_)\n" if $DEBUG;
 	$self-> new_message( $msg );
-
 }
 
 sub connect { shift-> dbi_message( connect => 0, @_) }
@@ -111,10 +110,10 @@ sub disconnect
 {
 	my $self = shift;
 	die "not connected" unless $self-> {dbh};
-	$self-> {dbh}-> disconnect;
+	my @r = $self-> {dbh}-> disconnect;
 	undef $self-> {dbh};
 	$self-> quit;
-	return 42;
+	return @r;
 }
 
 sub call

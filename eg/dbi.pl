@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.2 2008/11/03 22:05:57 dk Exp $
+#$Id: dbi.pl,v 1.3 2008/11/03 23:21:54 dk Exp $
 
 use IO::Lambda qw(:all);
 use IO::Lambda::DBI;
@@ -25,7 +25,7 @@ my $dbi = IO::Lambda::DBI-> new;
 lambda {
 	context $dbi-> connect('DBI:mysql:database=mysql', '', '');
 	tail {
-		die @_ unless shift;
+		warn(@_), return unless shift;
 		context 
 			check_dbi($dbi),
 			check_dbi($dbi),
@@ -34,3 +34,5 @@ lambda {
 		context $dbi-> disconnect;
 	&tail();
 }}}-> wait;
+
+undef $dbi;
