@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.38 2008/10/25 11:18:19 dk Exp $
+# $Id: HTTP.pm,v 1.39 2008/11/03 09:25:01 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -420,7 +420,7 @@ sub http_read_chunked
 
 	# read chunk size
 	pos( $self-> {buf} ) = $offset;
-	context @ctx = $self-> http_read( qr/\G[\da-f]+\r?\n/i);
+	context @ctx = $self-> http_read( qr/\G[^\r\n]+\r?\n/i);
 	state size => tail {
 		# save this lambda frame
 		@frame = this_frame;
@@ -432,7 +432,10 @@ sub http_read_chunked
 		substr( $self-> {buf}, $offset, length($line), '');
 		pos( $self-> {buf} ) = $offset;
 		$line =~ s/\r?\n//;
+		return undef, "protocol error: chunk size error"
+			unless $line =~ /^[\da-f]+$/;
 		my $size = hex $line;
+		warn "reading chunk $size bytes\n" if $DEBUG;
 		return 1 unless $size;
 
 	# read the chunk itself
@@ -441,6 +444,7 @@ sub http_read_chunked
 		return undef, shift unless shift;
 		$offset += $size + 2; # 2 for CRLF
 		pos( $self-> {buf} ) = $offset;
+		warn "chunk $size bytes ok\n" if $DEBUG;
 		context @ctx;
 		again( @frame);
 	}};
