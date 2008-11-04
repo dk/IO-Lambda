@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.3 2008/11/03 23:21:54 dk Exp $
+# $Id: Message.pm,v 1.4 2008/11/04 07:51:36 dk Exp $
 
 use strict;
 use warnings;
@@ -71,11 +71,12 @@ sub new
 	return $self;	
 }
 
-sub msg_handler
+sub return_message { shift; @_ }
+
+sub new_msg_handler
 {
 	my $self = shift;
 	
-	$self-> {msg_handler} ||= 
 	lambda {
 		my ( undef, $deadline) = @_;
 
@@ -125,26 +126,41 @@ sub cancel_queue
 	@{ $self-> {queue} } = ();
 }
 
+sub start_messenger
+{
+	my $self = shift;
 
-sub stop
+	die "messenger already running" if $self-> {queue_handler};
+	
+	warn _d($self) . ": start messenger\n" if $DEBUG;
+
+	# override transport listener
+	$self-> {transport}-> set_close_on_read(0);
+
+	$self-> {msg_handler} = $self-> new_msg_handler;
+	$self-> {messenger}   = $self-> new_messenger;
+	$self-> {messenger}-> reset;
+	$self-> {messenger}-> start;
+}
+
+sub stop_messenger
 {
 	my $self = shift;
 	warn _d($self) . ": stop messenger\n" if $DEBUG;
 	$self-> {transport}-> set_close_on_read(1);
-	undef $self-> {queue_handler};
+	undef $self-> {messenger};
 	undef $self-> {msg_handler};
 }
 
-sub queue_handler
+sub new_messenger
 {
 	my $self = shift;
-	$self-> {queue_handler} ||= 
 	lambda {
 		warn _d($self) . ": sending msg ",
 			length($self-> {queue}-> [0]-> [2]), " bytes ",
 			_t($self-> {queue}-> [0]-> [3]),
 			"\n" if $DEBUG;
-		context $self-> msg_handler, 
+		context $self-> {msg_handler},
 			$self-> {queue}-> [0]-> [2],
 			$self-> {queue}-> [0]-> [3];
 	tail {
@@ -152,7 +168,7 @@ sub queue_handler
 		if ( defined $error) {
 			warn _d($self) . " > error $error\n" if $DEBUG;
 			$self-> cancel_queue( undef, $error);	
-			$self-> stop;
+			$self-> stop_messenger;
 			return ( undef, $error);
 		}
 		
@@ -163,7 +179,7 @@ sub queue_handler
 		
 		# stop if it's all
 		unless ( @{$self-> {queue}}) {
-			$self-> stop;
+			$self-> stop_messenger;
 			return;
 		}
 
@@ -172,7 +188,7 @@ sub queue_handler
 			length($msg), " bytes ",
 			_t($deadline),
 			"\n" if $DEBUG;
-		context $self-> msg_handler, $msg, $deadline;
+		context $self-> {msg_handler}, $msg, $deadline;
 		again;
 	}}
 }
@@ -194,13 +210,7 @@ sub new_message
 	my $bind  = $outer-> bind;
 	push @{ $self-> {queue} }, [ $outer, $bind, $msg, $deadline ];
 
-	# override transport listener
-	if (1 == @{$self-> {queue}}) {
-		$self-> {transport}-> set_close_on_read(0);
-		warn _d($self) . ": start messenger\n" if $DEBUG;
-		$self-> queue_handler-> reset;
-		$self-> queue_handler-> start;
-	}
+	$self-> start_messenger if 1 == @{$self-> {queue}};
 
 	return $outer;
 }
