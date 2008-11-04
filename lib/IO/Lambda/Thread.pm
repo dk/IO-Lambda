@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.7 2008/11/04 17:52:27 dk Exp $
+# $Id: Thread.pm,v 1.8 2008/11/04 19:04:08 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 
@@ -37,7 +37,7 @@ sub thread_init
 	my @ret;
 	eval { @ret = $cb->($r, @param) if $cb };
 	warn _d($self), ": thread(", threads->tid, ") ended: [@ret]\n" if $DEBUG;
-	CORE::close($r);
+	close($r);
 	die $@ if $@;
 	return @ret;
 }
@@ -46,8 +46,8 @@ sub on_read
 {
 	my $self = shift;
 	warn _d($self), ": am closing on read\n" if $DEBUG;
-	$self-> {close_on_read} = undef;
-	return $self-> close;
+	$self-> {join_on_read} = undef;
+	return $self-> join;
 }
 
 sub init
@@ -71,35 +71,35 @@ sub init
 	undef $self-> {thread_param};
 
 	warn _d($self), ": new thread(", $self-> {thread_id}->tid, ")\n" if $DEBUG;
-	$self-> set_close_on_read(1);
+	$self-> join_on_read(1);
 }
 
-sub set_close_on_read
+sub join_on_read
 {
-	my ( $self, $close_on_read) = @_;
-	if ( $close_on_read) {
-		return if $self-> {close_on_read};
+	my ( $self, $join_on_read) = @_;
+	if ( $join_on_read) {
+		return if $self-> {join_on_read};
 	 	my $error = unpack('i', getsockopt( $self-> {handle}, SOL_SOCKET, SO_ERROR));
 		if ( $error) {
-			warn _d($self), ": close_on_read aborted, handle is invalid\n" if $DEBUG;
-			$self-> close;
+			warn _d($self), ": join_on_read aborted, handle is invalid\n" if $DEBUG;
+			$self-> join;
 			return;
 		}
 		if ( $self-> is_stopped) {
-			warn _d($self), ": close_on_read aborted, lambda already stopped\n" if $DEBUG;
-			$self-> close;
+			warn _d($self), ": join_on_read aborted, lambda already stopped\n" if $DEBUG;
+			$self-> join;
 			return;
 		}
-		$self-> {close_on_read} = $self-> watch_io(
+		$self-> {join_on_read} = $self-> watch_io(
 			IO_READ, $self-> {handle}, 
 			undef, \&on_read
 		);
-		warn _d($self), ": will close on read\n" if $DEBUG;
+		warn _d($self), ": will join on read\n" if $DEBUG;
 	} else {
-		return unless $self-> {close_on_read};
-		$self-> cancel_event( $self-> {close_on_read} );
-		$self-> {close_on_read} = undef;
-		warn _d($self), ": won't close on read\n" if $DEBUG;
+		return unless $self-> {join_on_read};
+		$self-> cancel_event( $self-> {join_on_read} );
+		$self-> {join_on_read} = undef;
+		warn _d($self), ": won't join on read\n" if $DEBUG;
 	}
 }
 
@@ -136,7 +136,7 @@ WARN
 	}
 }
 
-sub close
+sub join
 {
 	my $self = shift;
 	my $t;
@@ -158,7 +158,7 @@ sub DESTROY
 	$self-> SUPER::DESTROY
 		if defined($self-> {thread_self}) and
 		$self-> {thread_self} == threads-> tid;
-	CORE::close($self-> {handle}) if $self-> {handle};
+	close($self-> {handle}) if $self-> {handle};
 	$self-> kill;
 }
 
@@ -230,7 +230,7 @@ Same as C<new> but without a class.
 
 Returns internal thread object
 
-=item close
+=item join
 
 Joins the internal thread. Can be needed for perl versions before 5.10.0,
 that can't kill a thread reliably. 

@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.4 2008/11/04 17:52:27 dk Exp $
+#$Id: dbi.pl,v 1.5 2008/11/04 19:04:08 dk Exp $
 use strict;
 use warnings;
 
@@ -30,7 +30,7 @@ my $t = threaded {
 };
 
 $t-> start;
-$t-> set_close_on_read(0);
+$t-> join_on_read(0);
 
 my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket );
 lambda {
@@ -48,5 +48,5 @@ lambda {
 
 undef $dbi;
 
-$t-> set_close_on_read(1);
-$t-> close;
+$t-> join_on_read(1);
+$t-> join;
