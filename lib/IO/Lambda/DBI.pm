@@ -1,41 +1,43 @@
-# $Id: DBI.pm,v 1.4 2008/11/04 07:09:23 dk Exp $
+# $Id: DBI.pm,v 1.5 2008/11/04 17:52:27 dk Exp $
+package IO::Lambda::DBI::Storable;
+
+use Storable qw(freeze thaw);
+
+sub encode
+{
+	my $self = $_[0];
+	my $msg;
+	eval { $msg = freeze( $_[1] ) };
+	return $@ ? ( undef, $@) : $msg;
+}
+
+sub decode 
+{
+	my $self = $_[0];
+	my $msg;
+	eval { $msg = thaw( $_[1] ); };
+	return $@ ? ( undef, $@) : $msg;
+}
+
 package IO::Lambda::DBI;
-use base qw(IO::Lambda::Message);
+use base qw(
+	IO::Lambda::Message
+	IO::Lambda::DBI::Storable
+);
 
 our $DEBUG = $IO::Lambda::DEBUG{dbi};
-our @EXPORT_OK = qw(message);
 
 use strict;
 use warnings;
 use IO::Lambda qw(:all :dev);
-use IO::Lambda::Thread;
 use IO::Lambda::Message;
 
 sub _d { "dbi(" . _o($_[0]) . ")" }
 
-sub new
+sub parse
 {
-	my $class = shift;
-
-	# XXX support other transports
-	my $transport = IO::Lambda::Thread-> new(
-		\&IO::Lambda::Message::worker,
-		'IO::Lambda::Message::DBI',
-	);
-	$transport-> start;
-
-	my $self = $class-> SUPER::new($transport);
-	warn "new ", _d($self) . "\n" if $DEBUG;
-	return $self;
-}
-
-sub return_message
-{
-	my ( $self, $msg, $error) = @_;
-	if ( defined $error) {
-		warn _d($self), " error: $error\n" if $DEBUG;
-		return ( undef, $error);
-	}
+	my ( $self, $msg) = @_;
+	my $error;
 
 	($msg, $error) = $self-> decode( $msg);
 	if ( defined $error) {
@@ -48,6 +50,7 @@ sub return_message
 		return ( undef, "bad response");
 	}
 
+	# remote eval failed, or similar
 	unless ( shift @$msg) {
 		warn _d($self), " error: @$msg\n" if $DEBUG;
 		return ( undef, @$msg);
@@ -68,21 +71,9 @@ sub dbi_message
 	$self-> new_message( $msg );
 }
 
-sub connect { shift-> dbi_message( connect => 0, @_) }
-sub call    { shift-> dbi_message( call    => wantarray, @_) }
-
-# XXX should DBI protocol call quit, and thus be waited on all eval errors?
-sub disconnect
-{
-	my $self = $_[0];
-	lambda {
-		context $self-> dbi_message('disconnect');
-	tail {
-		return @_ if $self-> {transport}-> is_stopped;
-		context $self-> {transport};
-		&tail();
-	}}
-}
+sub connect    { shift-> dbi_message( connect    => 0,         @_) }
+sub disconnect { shift-> dbi_message( disconnect => 0,         @_) }
+sub call       { shift-> dbi_message( call       => wantarray, @_) }
 
 sub DESTROY {}
 
@@ -95,7 +86,10 @@ sub AUTOLOAD
 }
 
 package IO::Lambda::Message::DBI;
-use base qw(IO::Lambda::Message::Simple);
+use base qw(
+	IO::Lambda::Message::Simple
+	IO::Lambda::DBI::Storable
+);
 
 use DBI;
 

@@ -1,7 +1,10 @@
-#$Id: dbi.pl,v 1.3 2008/11/03 23:21:54 dk Exp $
+#$Id: dbi.pl,v 1.4 2008/11/04 17:52:27 dk Exp $
+use strict;
+use warnings;
 
 use IO::Lambda qw(:all);
 use IO::Lambda::DBI;
+use IO::Lambda::Thread qw(threaded);
 
 sub check_dbi
 {
@@ -21,7 +24,15 @@ sub check_dbi
 	}}
 }
 
-my $dbi = IO::Lambda::DBI-> new;
+my $t = threaded {
+	my $socket = shift;
+	IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
+};
+
+$t-> start;
+$t-> set_close_on_read(0);
+
+my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket );
 lambda {
 	context $dbi-> connect('DBI:mysql:database=mysql', '', '');
 	tail {
@@ -36,3 +47,6 @@ lambda {
 }}}-> wait;
 
 undef $dbi;
+
+$t-> set_close_on_read(1);
+$t-> close;

@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.6 2008/11/03 23:21:54 dk Exp $
+# $Id: Thread.pm,v 1.7 2008/11/04 17:52:27 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 
@@ -90,7 +90,10 @@ sub set_close_on_read
 			$self-> close;
 			return;
 		}
-		$self-> {close_on_read} = $self-> watch_io( IO_READ, $self-> {handle}, undef, \&on_read);
+		$self-> {close_on_read} = $self-> watch_io(
+			IO_READ, $self-> {handle}, 
+			undef, \&on_read
+		);
 		warn _d($self), ": will close on read\n" if $DEBUG;
 	} else {
 		return unless $self-> {close_on_read};
