@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.3 2008/11/03 23:21:54 dk Exp $
+# $Id: DBI.pm,v 1.4 2008/11/04 07:09:23 dk Exp $
 package IO::Lambda::DBI;
 use base qw(IO::Lambda::Message);
 
@@ -71,6 +71,7 @@ sub dbi_message
 sub connect { shift-> dbi_message( connect => 0, @_) }
 sub call    { shift-> dbi_message( call    => wantarray, @_) }
 
+# XXX should DBI protocol call quit, and thus be waited on all eval errors?
 sub disconnect
 {
 	my $self = $_[0];
