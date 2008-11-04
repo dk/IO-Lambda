@@ -17,6 +17,7 @@ lib/IO/Lambda/HTTP/Authen/Negotiate.pm
 lib/IO/Lambda/Thread.pm
 lib/IO/Lambda/Message.pm
 lib/IO/Lambda/DBI.pm
+lib/IO/Lambda/Fork.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t
@@ -32,6 +33,7 @@ t/12_udp.t
 t/13_synthetic.t
 t/14_spawn.t
 t/15_thread.t
+t/16_fork.t
 t/98_pod.t
 t/99_pod_coverage.t
 eg/sequential.pl
@@ -42,6 +44,8 @@ eg/loop.pl
 eg/dns.pl
 eg/webserver.pl
 eg/dbi.pl
+eg/thread.pl
+eg/fork.pl
 eg/bench/tcp-batch
 eg/bench/tcp-lambda.pl
 eg/bench/tcp-poe.pl

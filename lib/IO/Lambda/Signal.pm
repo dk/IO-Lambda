@@ -1,11 +1,14 @@
-# $Id: Signal.pm,v 1.8 2008/11/01 20:38:05 dk Exp $
+# $Id: Signal.pm,v 1.9 2008/11/04 21:19:49 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(signal pid spawn);
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
 
+our $DEBUG = $IO::Lambda::DEBUG{signal};
+
 use strict;
+use Carp;
 use IO::Handle;
 use POSIX ":sys_wait_h";
 use IO::Lambda qw(:all);
@@ -21,8 +24,6 @@ sub empty { 0 == keys %SIGDATA }
 
 sub yield
 {
-	warn "SIG yield\n" if $IO::Lambda::DEBUG;
-
 	for my $v ( values %SIGDATA) {
 		next unless $v-> {signal};
 		for my $r ( @{$v-> {lambdas}}) {
@@ -36,7 +37,7 @@ sub yield
 sub signal_handler
 {
 	my $id = shift;
-	warn "SIG{$id}\n" if $IO::Lambda::DEBUG;
+	warn "SIG{$id}\n" if $DEBUG;
 	return unless exists $SIGDATA{$id};
 	$SIGDATA{$id}-> {signal}++;
 }
@@ -123,9 +124,11 @@ sub new_pid
 {
 	my ( $pid, $deadline) = @_;
 
+	croak 'bad pid' unless $pid =~ /^\d+$/;
+
 	# finished already
 	return IO::Lambda-> new-> call($?)
-		if waitpid($pid, WNOHANG) >= 0;
+		if waitpid($pid, WNOHANG) > 0;
 
 	# wait
 	signal_or_timeout_lambda( 'CHLD', $deadline, 
