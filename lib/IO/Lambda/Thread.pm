@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.11 2008/11/05 19:41:07 dk Exp $
+# $Id: Thread.pm,v 1.12 2008/11/05 20:43:03 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -237,6 +237,10 @@ Same as C<new> but without a class.
 =item thread
 
 Returns internal thread object
+
+=item socket
+
+Returns the associated stream
 
 =item join
 

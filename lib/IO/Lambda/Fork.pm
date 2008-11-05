@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.2 2008/11/05 12:39:21 dk Exp $
+# $Id: Fork.pm,v 1.3 2008/11/05 20:43:03 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -156,3 +156,79 @@ sub DESTROY
 sub forked(&) { __PACKAGE__-> new(_subname(forked => $_[0]) ) }
 
 1;
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+IO::Lambda::Fork - wait for blocking code using a coprocess
+
+=head1 DESCRIPTION
+
+The module implements a lambda wrapper that allows to asynchronously 
+wait for blocking code. The wrapping is done so that the code is
+executed in another process's context. C<IO::Lambda::Fork> inherits
+from C<IO::Lambda>, and thus provides all function of the latter to
+the caller. In particular, it is possible to wait for these objects
+using C<tail>, C<wait>, C<any_tail> etc standard waiter function.
+
+=head1 SYNOPSIS
+
+    use IO::Lambda qw(:lambda);
+    use IO::Lambda::Fork qw(forked);
+
+    lambda {
+        context 0.1, forked {
+	      select(undef,undef,undef,0.8);
+	      return "hello!";
+	};
+        any_tail {
+            if ( @_) {
+                print "done: ", $_[0]-> peek, "\n";
+            } else {
+                print "not yet\n";
+                again;
+            }
+        };
+    }-> wait;
+
+=head1 API
+
+=over
+
+=item new($class, $code)
+
+Creates a new C<IO::Lambda::Fork> object in the passive state.  When the lambda
+will be activated, a new process will start, and C<$code> code will be executed
+in the context of this new process. Upon successfull finish, result of C<$code>
+in list context will be stored on the lambda.
+
+=item kill $sig = 'TERM'
+
+Sends a signal to the process, executing the blocking code.
+
+=item forked($code)
+
+Same as C<new> but without a class.
+
+=item pid
+
+Returns pid of the coprocess.
+
+=item socket
+
+Returns the associated stream
+
+=item join
+
+Blocks until process is finished.
+
+=back
+
+=head1 AUTHOR
+
+Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
+
+=cut

@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 99_pod_coverage.t,v 1.21 2008/11/05 19:41:35 dk Exp $
+# $Id: 99_pod_coverage.t,v 1.22 2008/11/05 20:43:03 dk Exp $
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ plan skip_all => 'Test::Pod::Coverage required for testing POD coverage'
      if $@;
 
 
-plan tests => 7;
+plan tests => 9;
 pod_coverage_ok( 'IO::Lambda' => { trustme => [
 	qr/^(add_\w+|\w+_handler|drive|start|cancel_\w+|remove_loop|set_frame|clear)$/x
 ] });
@@ -25,9 +25,15 @@ pod_coverage_ok( 'IO::Lambda::Signal' => { trustme => [
 	qr/_(handler|signal|lambda)$/x,
 	qr/^new_|yield|empty|remove/
 ]});
-pod_coverage_ok( 'IO::Lambda::Thread'=> { trustme => [
-        qr/^(thread_|init|on_read|.)/, # XXX
-]});
 pod_coverage_ok( 'IO::Lambda::Message' => { trustme => [
         qr/(push|listen|coming|pull|receive|send)/, 
+]});
+pod_coverage_ok( 'IO::Lambda::DBI' => { trustme => [
+        qr/dbi_message|outcoming|prepare/, 
+]});
+pod_coverage_ok( 'IO::Lambda::Thread'=> { trustme => [
+        qr/thread_|init|on_read/, # XXX
+]});
+pod_coverage_ok( 'IO::Lambda::Fork'=> { trustme => [
+        qr/^(forked_|init|on_sigchld|listen)/, # XXX
 ]});

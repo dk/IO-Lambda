@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.8 2008/11/05 19:41:34 dk Exp $
+#$Id: dbi.pl,v 1.9 2008/11/05 20:43:03 dk Exp $
 use strict;
 use warnings;
 
@@ -84,7 +84,7 @@ if ( $mode eq 'thread') {
 	execute($dbi);
 	undef $dbi;
 	
-	$t-> join_on_read(1);
+	$t-> join;
 	undef $t;
 
 } elsif ( $mode eq 'fork') {

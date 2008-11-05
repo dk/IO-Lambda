@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.8 2008/11/05 19:40:09 dk Exp $
+# $Id: Message.pm,v 1.9 2008/11/05 20:43:03 dk Exp $
 
 use strict;
 use warnings;
@@ -386,6 +386,8 @@ sub run
 
 1;
 
+__DATA__
+
 =pod
 
 =head1 NAME
@@ -488,6 +490,29 @@ If set, object is listening for asynchronous events from server.
 =item is_pushing
 
 If set, object is sedning messages to the server.
+
+=back
+
+=head1 IO::Lambda::Message::Simple
+
+The class implements a simple generic protocol dispatcher, that
+executes methods of its own class, and returns the results back
+to the client. The methods have to be defined in the derivative class.
+
+=over
+
+=item new $reader, $writer
+
+Creates a new object that will communicate with clients using 
+given handles, in a blocking fashion.
+
+=item run
+
+Starts the message loop
+
+=item quit
+
+Signals the loop to stop
 
 =back
 
