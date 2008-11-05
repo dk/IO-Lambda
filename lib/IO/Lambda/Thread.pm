@@ -1,16 +1,18 @@
-# $Id: Thread.pm,v 1.8 2008/11/04 19:04:08 dk Exp $
+# $Id: Thread.pm,v 1.9 2008/11/05 12:40:05 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
-
-our $DEBUG = $IO::Lambda::DEBUG{thread};
-	
 use strict;
 use warnings;
-use threads;
 use Exporter;
 use Socket;
 use IO::Handle;
 use IO::Lambda qw(:all :dev);
+
+our $DISABLED;
+eval { require threads; };
+$DISABLED = ( $@ =~ /^(.*?)\n/ ? $1 : $@) if $@;
+
+our $DEBUG = $IO::Lambda::DEBUG{thread};
 
 our @EXPORT_OK = qw(threaded);
 
@@ -52,6 +54,8 @@ sub on_read
 
 sub init
 {
+	return $DISABLED if defined $DISABLED;
+
 	my $self = shift;
 
 	$self-> {thread_self} = threads-> tid;
