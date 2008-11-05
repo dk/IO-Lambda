@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.5 2008/11/04 17:52:27 dk Exp $
+# $Id: DBI.pm,v 1.6 2008/11/05 19:41:07 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -29,12 +29,13 @@ our $DEBUG = $IO::Lambda::DEBUG{dbi};
 
 use strict;
 use warnings;
+use Carp;
 use IO::Lambda qw(:all :dev);
 use IO::Lambda::Message;
 
 sub _d { "dbi(" . _o($_[0]) . ")" }
 
-sub parse
+sub outcoming
 {
 	my ( $self, $msg) = @_;
 	my $error;
@@ -66,14 +67,16 @@ sub dbi_message
 	my ( $self, $method, $wantarray) = ( shift, shift, shift );
 	$wantarray ||= 0;
 	my ( $msg, $error) = $self-> encode([ $method, $wantarray, @_]);
+
 	return lambda { $error } if $error;
 	warn _d($self) . " > $method(@_)\n" if $DEBUG;
-	$self-> new_message( $msg );
+	$self-> new_message( $msg, $self-> {timeout} );
 }
 
 sub connect    { shift-> dbi_message( connect    => 0,         @_) }
 sub disconnect { shift-> dbi_message( disconnect => 0,         @_) }
 sub call       { shift-> dbi_message( call       => wantarray, @_) }
+sub prepare    { croak "prepare() is unimplemented" }
 
 sub DESTROY {}
 
@@ -96,15 +99,16 @@ use DBI;
 sub connect
 {
 	my $self = shift;
-	die "already connected" if $self-> {dbh};
+	die "already connected\n" if $self-> {dbh};
 	$self-> {dbh} = DBI-> connect(@_);
-	return 1;
+	return $DBI::errstr unless $self-> {dbh};
+	return undef;
 }
 
 sub disconnect
 {
 	my $self = shift;
-	die "not connected" unless $self-> {dbh};
+	die "not connected\n" unless $self-> {dbh};
 	my @r = $self-> {dbh}-> disconnect;
 	undef $self-> {dbh};
 	$self-> quit;
@@ -114,7 +118,7 @@ sub disconnect
 sub call
 {
 	my ( $self, $method, @p) = @_;
-	die "not connected" unless $self-> {dbh};
+	die "not connected\n" unless $self-> {dbh};
 	return $self-> {dbh}-> $method(@p);
 }
 

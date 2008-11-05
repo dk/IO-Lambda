@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.10 2008/11/05 15:04:45 dk Exp $
+# $Id: Thread.pm,v 1.11 2008/11/05 19:41:07 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -148,6 +148,8 @@ sub join
 	my $t;
 	return unless $t = $self-> {thread_id};
 	undef $self-> {thread_id};
+	close($self-> {handle}) if $self-> {handle};
+	$self-> {handle} = undef;
 	warn _d($self), " joining thread ", $t-> tid, "...\n" if $DEBUG;
 	my @r = $t-> join;
 	@r = $t-> error if $] >= 5.010 and $t-> error;
