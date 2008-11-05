@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.9 2008/11/05 12:40:05 dk Exp $
+# $Id: Thread.pm,v 1.10 2008/11/05 15:04:45 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -28,28 +28,22 @@ sub new
 	return $self;
 }
 
-sub thread_kill { threads-> exit(0) };
-
 sub thread_init
 {
 	my ( $self, $r, $cb, @param) = @_;
-	$SIG{KILL} = \&thread_kill;
+
+	$SIG{KILL} = sub { threads-> exit(0) };
 	$SIG{PIPE} = 'IGNORE';
 	warn _d($self), ": thread(", threads->tid, ") started\n" if $DEBUG;
+
 	my @ret;
 	eval { @ret = $cb->($r, @param) if $cb };
+
 	warn _d($self), ": thread(", threads->tid, ") ended: [@ret]\n" if $DEBUG;
 	close($r);
 	die $@ if $@;
-	return @ret;
-}
 
-sub on_read
-{
-	my $self = shift;
-	warn _d($self), ": am closing on read\n" if $DEBUG;
-	$self-> {join_on_read} = undef;
-	return $self-> join;
+	return @ret;
 }
 
 sub init
@@ -76,6 +70,14 @@ sub init
 
 	warn _d($self), ": new thread(", $self-> {thread_id}->tid, ")\n" if $DEBUG;
 	$self-> join_on_read(1);
+}
+
+sub on_read
+{
+	my $self = shift;
+	warn _d($self), ": am closing on read\n" if $DEBUG;
+	$self-> {join_on_read} = undef;
+	return $self-> join;
 }
 
 sub join_on_read

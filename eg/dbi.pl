@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.6 2008/11/05 12:40:34 dk Exp $
+#$Id: dbi.pl,v 1.7 2008/11/05 15:04:45 dk Exp $
 use strict;
 use warnings;
 
@@ -83,7 +83,7 @@ if ( $mode eq 'thread') {
 	undef $dbi;
 	
 	$t-> join_on_read(1);
-	$t-> join;
+	print $t-> join, "\n";
 } elsif ( $mode eq 'fork') {
 	my $t = forked {
 		my $socket = shift;
@@ -98,7 +98,7 @@ if ( $mode eq 'thread') {
 	undef $dbi;
 	
 	$t-> listen(1);
-	$t-> wait;
+	print $t-> wait, "\n";
 } elsif ( $mode eq 'remote') {
 	my $host = shift @ARGV;
 	usage unless defined $host;
