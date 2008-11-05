@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 16_fork.t,v 1.1 2008/11/05 16:06:06 dk Exp $
+# $Id: 16_fork.t,v 1.2 2008/11/05 21:03:02 dk Exp $
 
 use strict;
 use warnings;
@@ -7,7 +7,7 @@ use Test::More;
 use Config;
 
 BEGIN {
-	plan skip_all => 'Fork is not supported'
+	plan skip_all => 'fork is not supported on this platform'
 		if $^O =~ /win32/i;
 };
 
