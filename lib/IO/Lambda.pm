@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.102 2008/11/03 21:04:25 dk Exp $
+# $Id: Lambda.pm,v 1.103 2008/11/05 12:37:32 dk Exp $
 
 package IO::Lambda;
 
@@ -51,6 +51,12 @@ if ( exists $ENV{IO_LAMBDA_DEBUG}) {
 		}
 	}
 	$DEBUG = $DEBUG{core};
+	if ( $DEBUG) {
+		$SIG{__DIE__} = sub {
+			return if $^S;
+			Carp::confess(@_);
+		}
+	}
 }
 
 use constant IO_READ         => 4;
