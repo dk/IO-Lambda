@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.5 2008/11/04 17:52:27 dk Exp $
+# $Id: Message.pm,v 1.6 2008/11/05 12:39:34 dk Exp $
 
 use strict;
 use warnings;
@@ -23,7 +23,8 @@ sub new
 	$opt{writer} ||= syswriter;
 	$opt{buf}    ||= '';
 
-	croak "Invalid transport" unless $r and $w;
+	croak "Invalid read handle" unless $r;
+	croak "Invalid write handle" unless $w;
 
 	my $self = bless {
 		%opt,
