@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.104 2008/11/05 15:04:31 dk Exp $
+# $Id: Lambda.pm,v 1.105 2008/11/05 19:39:32 dk Exp $
 
 package IO::Lambda;
 
@@ -14,7 +14,7 @@ use vars qw(
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM @EXPORT_DEV
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
-	$DEBUG %DEBUG
+	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
 $VERSION     = '0.34';
 @ISA         = qw(Exporter);
@@ -50,12 +50,11 @@ if ( exists $ENV{IO_LAMBDA_DEBUG}) {
 			$DEBUG{lc $p}++;
 		}
 	}
-	$DEBUG = $DEBUG{core} || 0;
-	if ( $DEBUG) {
-		$SIG{__DIE__} = sub {
-			return if $^S;
-			Carp::confess(@_);
-		}
+	$DEBUG_IO     = $DEBUG{io}     || 0;
+	$DEBUG_LAMBDA = $DEBUG{lambda} || 0;
+	$SIG{__DIE__} = sub {
+		return if $^S;
+		Carp::confess(@_);
 	}
 }
 
@@ -160,7 +159,7 @@ sub watch_io
 	weaken $rec->[0];
 	push @{$self-> {in}}, $rec;
 
-	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
+	warn _d( $self, "> ", _ev($rec)) if $DEBUG_IO;
 
 	$LOOP-> watch( $rec );
 
@@ -184,7 +183,7 @@ sub watch_timer
 	weaken $rec->[0];
 	push @{$self-> {in}}, $rec;
 
-	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
+	warn _d( $self, "> ", _ev($rec)) if $DEBUG_IO;
 
 	$LOOP-> after( $rec);
 	
@@ -215,7 +214,7 @@ sub watch_lambda
 
 	$lambda-> start if $lambda-> is_passive;
 
-	warn _d( $self, "> ", _ev($rec)) if $DEBUG;
+	warn _d( $self, "> ", _ev($rec)) if $DEBUG_LAMBDA;
 
 	return $rec;
 }
@@ -337,7 +336,7 @@ sub io_handler
 {
 	my ( $self, $rec) = @_;
 
-	warn _d( $self, '< ', _ev($rec)) if $DEBUG;
+	warn _d( $self, '< ', _ev($rec)) if $DEBUG_IO;
 
 	my $in = $self-> {in};
 	my $nn = @$in;
@@ -345,7 +344,7 @@ sub io_handler
 	die _d($self, 'stray ', _ev($rec))
 		if $nn == @$in or $self != $rec->[WATCH_OBJ];
 
-	_d_in if $DEBUG;
+	_d_in if $DEBUG_IO;
 
 	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
 		$self, 
@@ -353,11 +352,11 @@ sub io_handler
 		@{$self->{last}}
 	) if $rec-> [WATCH_CALLBACK];
 
-	_d_out if $DEBUG;
-	warn $self-> _msg('io') if $DEBUG;
+	_d_out if $DEBUG_IO;
+	warn $self-> _msg('io') if $DEBUG_IO;
 
 	unless ( @$in) {
-		warn _d( $self, 'stopped') if $DEBUG;
+		warn _d( $self, 'stopped') if $DEBUG_LAMBDA;
 		$self-> {stopped}++;
 	}
 }
@@ -367,7 +366,7 @@ sub lambda_handler
 {
 	my ( $self, $rec) = @_;
 
-	warn _d( $self, '< ', _ev($rec)) if $DEBUG;
+	warn _d( $self, '< ', _ev($rec)) if $DEBUG_LAMBDA;
 
 	my $in = $self-> {in};
 	my $nn = @$in;
@@ -384,7 +383,7 @@ sub lambda_handler
 	@$arr = grep { $_ != $rec } @$arr;
 	delete $EVENTS{"$lambda"} unless @$arr;
 
-	_d_in if $DEBUG;
+	_d_in if $DEBUG_LAMBDA;
 				
 	@{$self->{last}} = 
 		$rec-> [WATCH_CALLBACK] ? 
@@ -394,11 +393,11 @@ sub lambda_handler
 			) : 
 			@{$rec-> [WATCH_LAMBDA]-> {last}};
 
-	_d_out if $DEBUG;
-	warn $self-> _msg('tail') if $DEBUG;
+	_d_out if $DEBUG_LAMBDA;
+	warn $self-> _msg('tail') if $DEBUG_LAMBDA;
 
 	unless ( @$in) {
-		warn _d( $self, 'stopped') if $DEBUG;
+		warn _d( $self, 'stopped') if $DEBUG_LAMBDA;
 		$self-> {stopped} = 1;
 	}
 }
@@ -489,7 +488,7 @@ sub reset
 	$self-> cancel_all_events;
 	@{$self-> {last}} = ();
 	delete $self-> {stopped};
-	warn _d( $self, 'reset') if $DEBUG;
+	warn _d( $self, 'reset') if $DEBUG_LAMBDA;
 }
 
 # start the state machine
@@ -499,13 +498,13 @@ sub start
 
 	croak "can't start active lambda, call reset() first" if $self-> is_active;
 
-	warn _d( $self, 'started') if $DEBUG;
+	warn _d( $self, 'started') if $DEBUG_LAMBDA;
 	@{$self->{last}} = $self-> {start}-> ($self, @{$self->{last}})
 		if $self-> {start};
-	warn $self-> _msg('initial') if $DEBUG;
+	warn $self-> _msg('initial') if $DEBUG_LAMBDA;
 
 	unless ( @{$self->{in}}) {
-		warn _d( $self, 'stopped') if $DEBUG;
+		warn _d( $self, 'stopped') if $DEBUG_LAMBDA;
 		$self-> {stopped} = 1;
 	}
 }
@@ -531,7 +530,7 @@ sub terminate
 
 	$self-> cancel_all_events;
 	$self-> {last} = \@error;
-	warn $self-> _msg('terminate') if $DEBUG;
+	warn $self-> _msg('terminate') if $DEBUG_LAMBDA;
 }
 
 # propagate event destruction on all levels
@@ -548,7 +547,7 @@ sub drive
 {
 	my $changed = 1;
 	my $executed = 0;
-	warn "IO::Lambda::drive --------\n" if $DEBUG;
+	warn "IO::Lambda::drive --------\n" if $DEBUG_LAMBDA;
 	while ( $changed) {
 		$changed = 0;
 
@@ -559,9 +558,9 @@ sub drive
 			$changed = 1;
 			$executed++;
 		}
-	warn "IO::Lambda::drive .........\n" if $DEBUG and $changed;
+	warn "IO::Lambda::drive .........\n" if $DEBUG_LAMBDA and $changed;
 	}
-	warn "IO::Lambda::drive +++++++++\n" if $DEBUG;
+	warn "IO::Lambda::drive +++++++++\n" if $DEBUG_LAMBDA;
 
 	return $executed;
 }
@@ -580,7 +579,7 @@ sub yield
 	}
 
 	if ( drive) {
-	# some callbacks we called, don't let them wait in sleep
+		# some callbacks we called, don't let them wait in sleep
 		return 1;
 	}
 
@@ -658,7 +657,7 @@ sub lambda(&)
 		local $METHOD   = \&_lambda_restart;
 		$cb ? $cb-> (@_) : @_;
 	});
-	$l-> {caller} = join(':', (caller)[1,2]) if $DEBUG;
+	$l-> {caller} = join(':', (caller)[1,2]) if $DEBUG_LAMBDA;
 	$l;
 }
 
@@ -689,6 +688,8 @@ sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
 sub this_frame   { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
 sub set_frame    { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
 sub clear        { set_frame() }
+	
+END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
 
 sub state($)
 {
@@ -981,9 +982,9 @@ sub sysreader (){ lambda
 		return undef, 'timeout' unless $_[1];
                 local $SIG{PIPE} = 'IGNORE';
 		my $n = sysread( $fh, $$buf, $length, length($$buf));
-		if ( $DEBUG) {
+		if ( $DEBUG_IO) {
 			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
-			warn substr( $$buf, length($$buf) - $n) if $DEBUG > 1 and $n > 0;
+			warn substr( $$buf, length($$buf) - $n), "\n" if $DEBUG_IO > 1 and $n > 0;
 		}
 		return undef, $! unless defined $n;
 		return $n;
@@ -1001,9 +1002,9 @@ sub syswriter (){ lambda
 		return undef, 'timeout' unless $_[1];
                 local $SIG{PIPE} = 'IGNORE';
 		my $n = syswrite( $fh, $$buf, $length, $offset);
-		if ( $DEBUG) {
+		if ( $DEBUG_IO) {
 			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes out of $length" : "error $!"), "\n";
-			warn substr( $$buf, $offset, $n) if $DEBUG > 1 and $n > 0;
+			warn substr( $$buf, $offset, $n), "\n" if $DEBUG_IO > 1 and $n > 0;
 		}
 		return undef, $! unless defined $n;
 		return $n;
@@ -1146,7 +1147,7 @@ sub resolve
 	undef $rec-> [WATCH_OBJ]; # unneeded references
 
 	unless ( @$in) {
-		warn _d( $self, 'stopped') if $DEBUG;
+		warn _d( $self, 'stopped') if $DEBUG_LAMBDA;
 		$self-> {stopped} = 1;
 	}
 }
@@ -2268,7 +2269,7 @@ Various modules can be controlled with the single environment variable,
 C<IO_LAMBDA_DEBUG>, which is treated a comma-separated list of modules.
 For example,
 
-      env IO_LAMBDA_DEBUG=core=2,http perl script.pl
+      env IO_LAMBDA_DEBUG=io=2,http perl script.pl
 
 displays debug messages from C<IO::Lambda> (with extra verbosity) and
 from C<IO::Lambda::HTTP>.
