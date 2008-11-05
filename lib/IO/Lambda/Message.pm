@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.7 2008/11/05 15:04:08 dk Exp $
+# $Id: Message.pm,v 1.8 2008/11/05 19:40:09 dk Exp $
 
 use strict;
 use warnings;
@@ -22,6 +22,7 @@ sub new
 	$opt{reader} ||= sysreader;
 	$opt{writer} ||= syswriter;
 	$opt{buf}    ||= '';
+	$opt{async}  ||= 0;
 
 	croak "Invalid read handle" unless $r;
 	croak "Invalid write handle" unless $w;
@@ -38,23 +39,26 @@ sub new
 	return $self;	
 }
 
-# send a single message
-sub new_msg_handler
+# () :: (self, msg, deadline) -> error
+sub sender
 {
-	my $self = shift;
-	
-	lambda {
-		my ( undef, $deadline) = @_;
-
-		my $msg = sprintf("%08x",length($_[0])) . $CRLF . $_[0] . $CRLF;
-		warn _d($self), "msg > $msg\n" if $DEBUG > 2;
+	$_[0]->{sender} ||= lambda {
+		my ( $self, undef, $deadline) = @_;
+		my $msg = sprintf("%08x%s%s%s", length($_[1]), $CRLF, $_[1], $CRLF);
+		warn _d($self), "msg > [$msg]\n" if $DEBUG > 1;
 	context 
 		writebuf($self-> {writer}), $self-> {w},
-		\ $msg, $deadline;
+		\ $msg, undef, 0, $deadline;
 	tail {
-		my ( $result, $error) = @_;
-		return ( undef, $error) if defined $error;
+		$_[1]
+	}}
+}
 
+# () :: (self, deadline) -> (msg, error)
+sub receiver
+{
+	$_[0]->{receiver} ||= lambda {
+		my ( $self, $deadline) = @_;
 	context 
 		readbuf($self-> {reader}), $self-> {r}, \$self-> {buf}, 9,
 		$deadline;
@@ -76,42 +80,88 @@ sub new_msg_handler
 		return ( undef, $error) if defined $error;
 		my $msg = substr( $self-> {buf}, 0, $size, '');
 		chop $msg;
-		warn _d($self), "msg < $msg\n" if $DEBUG > 2;
+		warn _d($self), "msg < [$msg]\n" if $DEBUG > 1;
 		return $msg;
-	}}}}
+	}}}
 }
 
-# XXX new_response_handler
+# () :: (self, msg, deadline) -> (response, error)
+sub pusher
+{
+	$_[0]->{pusher} ||= lambda {
+		my ( $self, undef, $deadline) = @_;
+		context $self-> sender, $self, $_[1], $deadline;
+	tail {
+		my ( $result, $error) = @_;
+		return ( undef, $error) if defined $error;
+		context $self-> receiver, $self, $deadline;
+		&tail();
+	}}
+}
+
+# () :: (self, deadline) -> error
+sub incoming { die "abstract call" }
+sub puller
+{
+	$_[0]->{puller} ||= lambda {
+		my ( $self, $deadline) = @_;
+		context $self-> receiver, $self, $deadline;
+	tail {
+		my ( $msg, $error) = @_;
+		return ( undef, $error) if defined $error;
+		$msg = $self-> incoming( $msg);
+
+		context $self-> sender, $self, $msg, $deadline;
+		&tail();
+	}}
+}
+
+sub error
+{
+	return $_[0]-> {error} unless $#_;
+	$_[0]-> {error} = $_[1];
+}
 
 # lambda that sends all available messages in queue
-sub new_queue_handler
+# () :: self -> error
+sub outcoming { $_[1] }
+sub queue_pusher
 {
-	my $self = shift;
-	lambda {
+	$_[0]->{queue_pusher} ||= lambda {
+		my $self = shift;
+
 		warn _d($self) . ": sending msg ",
 			length($self-> {queue}-> [0]-> [2]), " bytes ",
 			_t($self-> {queue}-> [0]-> [3]),
 			"\n" if $DEBUG;
-		context $self-> {msg_handler},
+		context $self-> pusher,
+			$self,
 			$self-> {queue}-> [0]-> [2],
 			$self-> {queue}-> [0]-> [3];
 	tail {
 		my ( $result, $error) = @_;
 		if ( defined $error) {
+			$self-> error($error);
 			warn _d($self) . " > error $error\n" if $DEBUG;
-			$self-> cancel_queue( undef, $error);	
-			$self-> stop_queue_handler;
-			return ( undef, $error);
+			$self-> cancel_queue( undef, $error);
+			return $error;
 		}
 		
 		# signal result to the outer lambda
-		my ( $outer, $bind, $msg, $deadline) = @{ shift @{$self-> {queue}} };
+		my $q = shift @{$self-> {queue}};
+		unless ( $q) {
+			# cancel_queue was called?
+			return;
+		}
+
+		my ( $outer, $bind, $msg, $deadline) = @$q;
 		$outer-> resolve( $bind);
-		$outer-> terminate( $self-> parse( $result));
+		$outer-> terminate( $self-> outcoming( $result));
 		
 		# stop if it's all
 		unless ( @{$self-> {queue}}) {
-			$self-> stop_queue_handler;
+			warn _d($self) . ": push -> listen\n" if $DEBUG;
+			$self-> listen;
 			return;
 		}
 
@@ -120,68 +170,104 @@ sub new_queue_handler
 			length($msg), " bytes ",
 			_t($deadline),
 			"\n" if $DEBUG;
-		context $self-> {msg_handler}, $msg, $deadline;
+		context $self-> pusher, $self, $msg, $deadline;
 		again;
 	}}
 }
 
-sub start_queue_handler
+# () :: self -> error
+sub listener
 {
-	my $self = shift;
+	$_[0]->{listener} ||= lambda {
+		my $self = shift;
+		context $self-> puller, $self;
+	tail {
+		my ( $result, $error) = @_;
+		if ( defined $error) {
+			$self-> error($error);
+			warn _d($self) . " > error $error\n" if $DEBUG;
+			$self-> cancel_queue( undef, $error);	
+			return $error;
+		}
 
-	die "queue_handler already running" if $self-> {messenger};
-	
-	warn _d($self) . ": start queue\n" if $DEBUG;
+		# enough listening, now push
+		if ( @{$self-> {queue}}) {
+			warn _d($self) . ": listen -> push\n" if $DEBUG;
+			$self-> push;
+			return;
+		}
 
-	$self-> {msg_handler}   = $self-> new_msg_handler;
-	$self-> {queue_handler} = $self-> new_queue_handler;
-	$self-> {queue_handler}-> start;
+		again;
+	}}
 }
 
-sub stop_queue_handler
+sub is_pushing   { $_[0]-> {queue_pusher} and $_[0]-> {queue_pusher}-> is_waiting }
+sub is_listening { $_[0]-> {listener}     and $_[0]-> {listener}->     is_waiting }
+
+sub push
 {
-	my $self = shift;
-	warn _d($self) . ": stop queue\n" if $DEBUG;
-	# Technically speaking, these lambdas can be resued just fine.
-	# They are destroyed though because of cyclic references,
-	# because otherwise $self won't go away
-	undef $self-> {queue_handler};
-	undef $self-> {msg_handler};
+	my ( $self, $push) = @_;
+
+	croak "won't start, have errors: $self->{error}" if $self-> {error};
+	croak "won't start, already pushing"   if $self-> is_pushing;
+	croak "won't start, already listening" if $self-> is_listening;
+	warn _d($self) . ": start push\n" if $DEBUG;
+
+	my $q = $self-> queue_pusher;
+	$q-> reset;
+	$q-> call($self);
+	$q-> start;
 }
 
-
-# register a message, return a lambda that will be finihsed as soon
-# as message gets a response.
-sub new_message
+sub listen
 {
-	my ( $self, $msg, $deadline) = @_;
+	my ( $self, $listen) = @_;
 
-	warn _d($self) . " > msg", _t($deadline), " ", length($msg), " bytes\n" if $DEBUG;
-	
-	# won't end until we call resolve
-	my $outer = IO::Lambda-> new;
-	my $bind  = $outer-> bind;
-	push @{ $self-> {queue} }, [ $outer, $bind, $msg, $deadline ];
+	# need explicit consent
+	return unless $self-> {async};
 
-	$self-> start_queue_handler if 1 == @{$self-> {queue}};
+	croak "won't listen, have errors: $self->{error}" if $self-> {error};
+	croak "won't listen, already pushing"   if $self-> is_pushing;
+	croak "won't listen, already listening" if $self-> is_listening;
+	warn _d($self) . ": start listen\n" if $DEBUG;
 
-	return $outer;
+	my $q = $self-> listener;
+	$q-> reset;
+	$q-> call($self);
+	$q-> start;
 }
 
 # cancel all messages, store error on all of them
 sub cancel_queue
-{	
+{
 	my ( $self, @reason) = @_;
 	return unless $self-> {queue};
 	for my $q ( @{ $self-> {queue}}) {
-		my ( $outer, $bind) = @_;
+		my ( $outer, $bind) = @$q;
 		$outer-> resolve( $bind);
 		$outer-> terminate( @reason);
 	}
 	@{ $self-> {queue} } = ();
 }
 
-sub parse { $_[1] }
+# (msg,deadline) :: () -> (result,error)
+sub new_message
+{
+	my ( $self, $msg, $deadline) = @_;
+
+	return lambda { $self-> error } if $self-> error;
+
+	warn _d($self) . " > msg", _t($deadline), " ", length($msg), " bytes\n" if $DEBUG;
+	
+	# won't end until we call resolve
+	my $outer = IO::Lambda-> new;
+	my $bind  = $outer-> bind;
+	CORE::push @{ $self-> {queue} }, [ $outer, $bind, $msg, $deadline ];
+
+	$self-> push(1) if 1 == @{$self-> {queue}} and not $self-> is_listening;
+
+	return $outer;
+}
 
 sub message(&) { new_message(context)-> predicate( shift, \&message, 'message') }
 
@@ -222,7 +308,7 @@ sub read
 
 	chop $buf;
 
-	warn _d($self) . ": ", length($buf), " read\n" if $debug > 1;
+	warn _d($self) . ": ", length($buf), " bytes read\n" if $debug > 1;
 
 	return $buf;
 }
@@ -230,9 +316,9 @@ sub read
 sub write
 {
 	my ( $self, $msg) = @_;
-	warn _d($self) . ": ", length($msg), " written\n" if $debug > 1;
 	printf( { $self-> {w} } "%08x\x0a%s\x0a", length($msg), $msg)
-		or die "can't write to socket: $!"
+		or die "can't write to socket: $!";
+	warn _d($self) . ": ", length($msg), " bytes written\n" if $debug > 1;
 }
 
 sub quit { $_[0]-> {run} = 0 }
@@ -245,14 +331,23 @@ sub run
 	$self-> {w}-> autoflush(1);
 
 	while ( $self-> {run} ) {
-		my ( $msg, $error) = $self-> decode( $self-> read);
+		my ( $msg, $error) = $self-> read;
 		die "bad message: $error" if defined $error;
-		die "bad message" unless 
-			$msg and ref($msg) and ref($msg) eq 'ARRAY' and @$msg > 0;
-
-		my $method = shift @$msg;
+		( $msg, $error) = $self-> decode( $msg);
 
 		my $response;
+		if ( defined $error) {
+			$response = [0, "bad message: $error"];
+			warn _d($self) . ": bad message: $error\n" if $debug;
+			goto SEND;
+		}
+		unless ( $msg and ref($msg) and ref($msg) eq 'ARRAY' and @$msg > 0) {
+			$response = [0, "bad message"];
+			warn _d($self) . ": bad message\n" if $debug;
+			goto SEND;
+		}
+
+		my $method = shift @$msg;
 
 		if ( $self-> can($method)) {
 			my $wantarray = shift @$msg;
@@ -265,20 +360,21 @@ sub run
 				}
 			};
 			if ( $@) {
-				warn _d($self) . ": $method died $@\n" if $debug;
+				warn _d($self) . ": $method / died $@\n" if $debug;
 				$response = [0, $@];
 				$self-> quit;
 			} else {
-				warn _d($self) . ": $method ok\n" if $debug;
+				warn _d($self) . ": $method / ok\n" if $debug;
 				$response = [1, @r];
 			}
 		} else {
 			warn _d($self) . ": no such method: $method\n" if $debug;
 			$response = [0, 'no such method'];
 		};
-
+	SEND:
 		( $msg, $error) = $self-> encode($response);
 		if ( defined $error) {
+			warn _d($self) . ": encode error $error\n" if $debug;
 			( $msg, $error) = $self-> encode([0, $error]);
 			die $error if $error;
 		}
@@ -349,10 +445,17 @@ Custom reader, C<sysreader> by default.
 
 Custom writer, C<syswriter> by default.
 
-=item buf :: $string
+=item buf :: string
 
 If C<$reader> handle was used (or will be needed to be used) in buffered I/O,
 it's buffer can be passed along to the object.
+
+=item async :: boolean
+
+If set, the object will listen for incoming messages from the server, otherwise
+it will only send outcoming messages. By default 0, and the method C<incoming>
+that must handle the incoming message will die. This functionality is designed
+for derived classes, not for the caller.
 
 =back
 
@@ -362,24 +465,29 @@ Registers a message that must be delivered no later than C<$deadline>, and
 returns a lambda that will be ready when the message is responded to.
 The lambda returns the response or the error.
 
-Currently, C<$deadline> effect on message queue is in process of changing,
-because whenever a protocol handler encounters an error, all unsent messages
-will be cancelled (the lambdas will get the notification though), and timeout
-is also, in this regard, an error.
+Timeout is regarded also as protocol error, so on timeout all messages
+will be also purged, so use with care.
 
-=head2 Server-initiated messages
+=item message ($message, $deadline = undef) :: () -> ($response, $error)
 
-XXX
+Predicate version of C<new_message>.
 
-The default protocol doesn't allow to server to send messages on its own.
-Moreover, after the last message is read, the object doesn't listen on the
-reading handle at all. If you need to implement a protocol that has support for
-server-initiated messages, you need to override methods C<start_queue_handler>
-and C<stop_queue_handler> that are called when message handling is started, and
-stopped, respectively.
+=item cancel_queue(@reason)
 
-If the handler that responds to messages must fail, then it must call C<cancel_queue>
-so all queued lambda will get notified.
+Cancels all pending messages, stores C<@reason> in the associated lambdas.
+
+=item error
+
+Returns the last protocol handling error. If set, no new messages are allowed
+to be registered, and listening will also fail.
+
+=item is_listening
+
+If set, object is listening for asynchronous events from server.
+
+=item is_pushing
+
+If set, object is sedning messages to the server.
 
 =back
 
