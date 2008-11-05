@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.3 2008/11/05 20:43:03 dk Exp $
+# $Id: Fork.pm,v 1.4 2008/11/05 21:07:25 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -108,7 +108,7 @@ sub listen
 			warn _d($self), 
 				( $error
 					? ": error $error"
-					: ": read ", length($res), " bytes"
+					: ": eof"
 				), "\n" if $DEBUG;
 		}};
 		$self-> {listen}-> start;
@@ -226,6 +226,13 @@ Returns the associated stream
 Blocks until process is finished.
 
 =back
+
+=head1 BUGS
+
+Doesn't work on Win32, because relies on C<$SIG{CHLD}> which is not getting
+delivered (on 5.10.0 at least). However, since Win32 doesn't have forks anyway,
+Perl emulates them with threads. Use L<IO::Lambda::Threads> instead when
+running on windows.
 
 =head1 AUTHOR
 
