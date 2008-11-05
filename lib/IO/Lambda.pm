@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.103 2008/11/05 12:37:32 dk Exp $
+# $Id: Lambda.pm,v 1.104 2008/11/05 15:04:31 dk Exp $
 
 package IO::Lambda;
 
@@ -50,7 +50,7 @@ if ( exists $ENV{IO_LAMBDA_DEBUG}) {
 			$DEBUG{lc $p}++;
 		}
 	}
-	$DEBUG = $DEBUG{core};
+	$DEBUG = $DEBUG{core} || 0;
 	if ( $DEBUG) {
 		$SIG{__DIE__} = sub {
 			return if $^S;
