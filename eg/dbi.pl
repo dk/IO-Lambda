@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.7 2008/11/05 15:04:45 dk Exp $
+#$Id: dbi.pl,v 1.8 2008/11/05 19:41:34 dk Exp $
 use strict;
 use warnings;
 
@@ -38,7 +38,7 @@ sub check_dbi
 		my $expect = int rand 100;
 		context $dbi-> selectrow_array('SELECT 1 + ?', {}, $expect);
 	tail {
-		return warn(@_) unless shift;
+		return warn("remote db error:@_\n") unless shift;
 		my $ret = -1 + shift;
 		print "$expect -> $ret\n";
 
@@ -54,7 +54,7 @@ sub execute
 	lambda {
 		context $dbi-> connect('DBI:mysql:database=mysql', '', '');
 		tail {
-			warn(@_), return unless shift;
+			return warn("remote db connect error:@_\n") unless shift;
 			context 
 				check_dbi($dbi),
 				check_dbi($dbi),
@@ -64,6 +64,8 @@ sub execute
 		&tail();
 	}}}-> wait;
 }
+
+my %dbopt = ( timeout => 5 );
 
 # run
 
@@ -78,12 +80,13 @@ if ( $mode eq 'thread') {
 	$t-> start;
 	$t-> join_on_read(0);
 	
-	my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket );
+	my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket, %dbopt);
 	execute($dbi);
 	undef $dbi;
 	
 	$t-> join_on_read(1);
-	print $t-> join, "\n";
+	undef $t;
+
 } elsif ( $mode eq 'fork') {
 	my $t = forked {
 		my $socket = shift;
@@ -93,12 +96,12 @@ if ( $mode eq 'thread') {
 	$t-> start;
 	$t-> listen(0);
 	
-	my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket );
+	my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket, %dbopt);
 	execute($dbi);
 	undef $dbi;
 	
 	$t-> listen(1);
-	print $t-> wait, "\n";
+	$t-> wait;
 } elsif ( $mode eq 'remote') {
 	my $host = shift @ARGV;
 	usage unless defined $host;
@@ -106,7 +109,7 @@ if ( $mode eq 'thread') {
 	my $s = IO::Socket::INET-> new("$host:$port");
 	die $! unless $s;
 
-	my $dbi = IO::Lambda::DBI-> new( $s, $s);
+	my $dbi = IO::Lambda::DBI-> new( $s, $s, %dbopt);
 	execute($dbi);
 
 	undef $s;
@@ -118,8 +121,11 @@ if ( $mode eq 'thread') {
 	while ( 1) {
 		my $c = IO::Handle-> new;
 		die $! unless accept( $c, $s);
-		my $loop = IO::Lambda::Message::DBI-> new( $c, $c);
-		$loop-> run;
-		close($c);
+		eval {
+			my $loop = IO::Lambda::Message::DBI-> new( $c, $c);
+			$loop-> run;
+			close($c);
+		};
+		warn $@ if $@;
 	}
 }
