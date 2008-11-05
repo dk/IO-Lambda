@@ -83,3 +83,6 @@
 
 0.34 - 31 Oct 2008
 	add "apologetics" section in pod
+
+0.35 - 5 Nov 2008
+	add Thread,Fork,Message,DBI modules
