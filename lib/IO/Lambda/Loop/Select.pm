@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.13 2008/10/25 11:18:19 dk Exp $
+# $Id: Select.pm,v 1.14 2008/11/05 19:40:40 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -8,6 +8,8 @@ use IO::Lambda qw(:constants);
 use Time::HiRes qw(time);
 
 IO::Lambda::Loop::default('Select');
+
+our $DEBUG = $IO::Lambda::DEBUG{select} || 0;
 
 # IO::Select::select doesn't distinguish between select returning 0 and -1, don't have
 # time to fix that. I'll just use a plain select instead, it'll be faster also.
@@ -58,19 +60,25 @@ sub yield
 				if defined $_->[WATCH_DEADLINE] and 
 				(!defined($t) or $t > $_-> [WATCH_DEADLINE]);
 		}
+		warn "select: fileno $fileno\n" if $DEBUG;
 		$max = $fileno if $max < $fileno;
 		$min = $fileno if !defined($min) or $min > $fileno;
 	}
 	if ( defined $t) {
 		$t -= $ct;
 		$t = 0 if $t < 0;
+		warn "select: timeout=$t\n" if $DEBUG;
+	} elsif ( $DEBUG) {
+		warn "select: no timeout\n";
 	}
 
 	# do select
 	my $n = select( $R, $W, $E, $t);
+	warn "select: $n handles ready\n" if $DEBUG;
 	if ( $n < 0) {
 		if ( $! == EINTR) {
 			# ignore
+			warn "select: EINTR\n" if $DEBUG;
 		} else {
 			die "select() error:$!:$^E" if $n < 0;
 		}
