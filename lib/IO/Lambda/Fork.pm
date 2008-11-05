@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.1 2008/11/04 21:19:49 dk Exp $
+# $Id: Fork.pm,v 1.2 2008/11/05 12:39:21 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -116,7 +116,7 @@ sub listen
 		warn _d($self), ": listening\n" if $DEBUG;
 	} else {
 		return unless $self-> {listen};
-		$self-> cancel_event( $self-> {listen} );
+		$self-> {listen}-> terminate;
 		$self-> {listen} = undef;
 		warn _d($self), ": not listening\n" if $DEBUG;
 	}
