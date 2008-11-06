@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.10 2008/11/05 21:08:10 dk Exp $
+# $Id: Signal.pm,v 1.11 2008/11/06 07:48:35 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -132,7 +132,7 @@ sub new_pid
 
 	# wait
 	signal_or_timeout_lambda( 'CHLD', $deadline, 
-		sub { (waitpid($pid, WNOHANG) < 0) ? () : $?  });
+		sub { (waitpid($pid, WNOHANG) == 0) ? () : $?  });
 }
 
 sub new_process
