@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 16_fork.t,v 1.2 2008/11/05 21:03:02 dk Exp $
+# $Id: 16_fork.t,v 1.3 2008/11/06 16:24:33 dk Exp $
 
 use strict;
 use warnings;
@@ -10,6 +10,8 @@ BEGIN {
 	plan skip_all => 'fork is not supported on this platform'
 		if $^O =~ /win32/i;
 };
+
+alarm(10);
 
 use IO::Lambda qw(:lambda);
 use IO::Lambda::Fork qw(forked);
