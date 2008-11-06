@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.107 2008/11/06 07:52:40 dk Exp $
+# $Id: Lambda.pm,v 1.108 2008/11/06 11:18:17 dk Exp $
 
 package IO::Lambda;
 
@@ -2261,6 +2261,26 @@ L<IO::Lambda::DNS> - asynchronous domain name resolver.
 
 L<IO::Lambda::SNMP> - SNMP requests lambda style. Requires L<SNMP>.
 
+=item * 
+
+L<IO::Lambda::Thread> - run blocking code executed in another thread
+context. Requires perl version greater than 5.8.0, preferably 5.10.0,
+and built with threads.
+
+=item *
+
+L<IO::Lambda::Fork> - run blocking code executed in another
+process context. Doesn't work on win32 for obvious reasons.
+
+=item *
+
+L<IO::Lambda::Message> - base class for message queues over existing
+file handles.
+
+=item *
+
+L<IO::Lambda::DBI> - asynchronous DBI
+
 =back
 
 =head1 DEBUGGING
@@ -2271,8 +2291,11 @@ For example,
 
       env IO_LAMBDA_DEBUG=io=2,http perl script.pl
 
-displays debug messages from C<IO::Lambda> (with extra verbosity) and
-from C<IO::Lambda::HTTP>.
+displays I/O debug messages from C<IO::Lambda> (with extra verbosity) and from
+C<IO::Lambda::HTTP>. C<IO::Lambda> respond for 2 keys: I<io> and I<lambda>.
+I<io> debugs the asynchronous (I/O) operations, I<lambda> debugs the
+synchronous (tail, wait, etc) operations. Keys recognized for the other
+modules: select, dbi,http,signal,message,thread,fork,select.
 
 =head1 BENCHMARKS
 
