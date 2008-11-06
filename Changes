@@ -86,3 +86,6 @@
 
 0.35 - 5 Nov 2008
 	add Thread,Fork,Message,DBI modules
+
+0.36 - 6 Nov 2008
+	portability fixes
