@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.12 2008/11/05 20:43:03 dk Exp $
+# $Id: Thread.pm,v 1.13 2008/11/06 19:55:12 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -10,7 +10,7 @@ use IO::Lambda qw(:all :dev);
 
 our $DISABLED;
 eval { require threads; };
-$DISABLED = ( $@ =~ /^(.*?)\n/ ? $1 : $@) if $@;
+$DISABLED = $@ if $@;
 
 our $DEBUG = $IO::Lambda::DEBUG{thread};
 
