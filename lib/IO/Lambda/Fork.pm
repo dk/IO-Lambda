@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.4 2008/11/05 21:07:25 dk Exp $
+# $Id: Fork.pm,v 1.5 2008/11/06 10:57:46 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -163,7 +163,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Fork - wait for blocking code using a coprocess
+IO::Lambda::Fork - wait for blocking code using coprocesses
 
 =head1 DESCRIPTION
 

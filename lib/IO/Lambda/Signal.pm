@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.11 2008/11/06 07:48:35 dk Exp $
+# $Id: Signal.pm,v 1.12 2008/11/06 10:57:47 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -179,7 +179,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Signal - Wait for pid/signal or timeout
+IO::Lambda::Signal - wait for pids and signals
 
 =head1 DESCRIPTION
 
