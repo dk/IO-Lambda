@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.14 2008/11/07 17:51:08 dk Exp $
+# $Id: Thread.pm,v 1.15 2008/11/07 19:54:53 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -63,22 +63,61 @@ sub new_thread
 	return ($t, $w);
 }
 
-# XXX $thread-> detach/kill when cancelled
+# overridden IO::Lambda methods
+
+sub DESTROY
+{
+	my $self = shift;
+
+	return if defined($self->{tid}) and $self->{tid} != threads-> tid;
+
+	close($self->{socket}) if $self-> {socket};
+	delete @{$self}{qw(socket thread)};
+
+	$self-> SUPER::DESTROY;
+}
+
+sub thread { $_[0]-> {thread} }
+sub socket { $_[0]-> {socket} }
+
 sub threaded(&)
 {
 	my $cb = shift;
 
-	lambda { 
+	# use overridden IO::Lambda, because we need 
+	# give the caller a chance to join
+	# for it, if the lambda gets terminated
+	__PACKAGE__-> new( sub { 
+		# save context
+		my $this  = shift;
+		my @frame = IO::Lambda::save_frame;
+		$this-> set_frame();
+		warn _d($this), " started\n" if $DEBUG;
+
+		# can start a thread?
 		my ( $t, $r) = new_thread( $cb, 1 );
 		return $r unless $t;
 
-		context $r;
-	read {
-		close($r);
-		undef $r;
-		this-> clear;
-		return $t-> join;
-	}}
+		# save this
+		$this-> {tid}    = threads-> tid;
+		$this-> {thread} = $t;
+		$this-> {socket} = $r;
+
+		# now wait
+		context $this-> {socket};
+		read {
+			my $this = this;
+			delete $this-> {thread};
+			close($this-> {socket});
+			delete @{$this}{qw(socket thread)};
+			$this-> clear;
+			warn _d($this), " joining\n" if $DEBUG;
+			$t-> join;
+		};
+
+		# restore context
+		IO::Lambda::set_frame(@frame);
+	});
 }
 
 1;
@@ -158,18 +197,65 @@ Creates a lambda, that will execute C<$code> in a newly created thread.
 The lambda will finish when the C<$code> and the thread are finished,
 and will return results returned by C<$code>.
 
+Note, that this lambda, if C<terminate>'d after between being started and being
+finished, will have no chance to wait for completion of the associated thread,
+and so Perl will complain. To deal with that, obtain the thread object manually
+and wait for the thread:
+
+    my $l = threaded { 42 };
+    $l-> start;
+    ....
+    $l-> terminate;
+
+    # synchronously
+    $l-> thread-> join;
+
+    # or asynchronously
+    context $l-> socket;
+    read { $l-> thread-> join };
+
+=item thread($lambda)
+
+Returns the associated thread object. Valid only for lambdas created with
+C<threaded>.
+
+=item socket($lambda)
+
+Returns the associated communication socket. Valid only for lambdas created
+with C<threaded>. 
+
 =back
 
 =head1 BUGS
 
-If lambdas created by C<threaded> are permaturely cancelled, then
-the associated threas will not be properly waited for. Errors
-like one below may ensue.
+Threading in Perl is fragile, so errors like the following:
+
+   Unbalanced string table refcount: (1) for "GEN1" during global
+   destruction
+
+are due some hidden bugs. They are triggered, in my experience, 
+when a child thread tries to deallocate scalars that it thinks
+belongs to that thread. This can be sometimes avoided with
+explicit cleaning up of scalars that may be visible in threads.
+For example, calls as
+
+   IO::Lambda::clear
+
+and
+
+   undef $my_lambda; # or other scalars, whatever
+
+strangely hush these errors.
+
+Errors like this
 
   Perl exited with active threads:
         1 running and unjoined
         0 finished and unjoined
         0 running and detached
+
+are triggered when child threads weren't properly joined. Make sure
+your lambdas are properly completed.
 
 =head1 SEE ALSO
 

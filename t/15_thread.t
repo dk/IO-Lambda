@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 15_thread.t,v 1.8 2008/11/07 17:51:08 dk Exp $
+# $Id: 15_thread.t,v 1.9 2008/11/07 19:54:53 dk Exp $
 
 use strict;
 use warnings;
@@ -13,7 +13,7 @@ use IO::Lambda::Thread qw(threaded);
 
 plan skip_all => $IO::Lambda::Thread::DISABLED if $IO::Lambda::Thread::DISABLED;
 
-plan tests    => 5;
+plan tests    => 6;
 
 sub sec { select(undef,undef,undef,0.1 * ( $_[0] || 1 )) }
 
@@ -45,3 +45,9 @@ this lambda {
 };
 ok( this-> wait eq '2', 'join some' );
 $t-> wait;
+
+my $l = threaded { 42 };
+$l-> start;
+$l-> terminate;
+my $p = $l-> wait || 'undef';
+ok(( $l-> thread-> join == 42 and $p eq 'undef'), 'abort');

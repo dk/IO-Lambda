@@ -1,10 +1,10 @@
-# $Id: Fork.pm,v 1.6 2008/11/07 17:51:08 dk Exp $
+# $Id: Fork.pm,v 1.7 2008/11/07 19:54:53 dk Exp $
 
 package IO::Lambda::Fork;
 
 use base qw(IO::Lambda);
 
-our $DEBUG = $IO::Lambda::DEBUG{fork};
+our $DEBUG = $IO::Lambda::DEBUG{fork} || 0;
 	
 use strict;
 use warnings;
@@ -34,6 +34,7 @@ sub new_process(&)
 
 	my $pid = fork;
 	unless ( defined $pid) {
+		warn "fork() failed:$!\n" if $DEBUG;
 		close($w);
 		close($r);
 		return ( undef, $! );
@@ -41,11 +42,15 @@ sub new_process(&)
 
 	if ( $pid == 0) {
 		close($w);
+		warn "process($$) started\n" if $DEBUG;
 		eval { $cb-> ($r) if $cb; };
+		warn "process($$) ended\n" if $DEBUG;
 		warn $@ if $@;
 		close($r);
 		POSIX::exit($@ ? 1 : 0);
 	}
+		
+	warn "forked pid=$pid\n" if $DEBUG;
 
 	close($r);
 
@@ -61,11 +66,14 @@ sub process(&)
 		my $pid = fork;
 		return undef, $! unless defined $pid;
 		unless ( $pid) {
+			warn "process($$) started\n" if $DEBUG;
 			eval { $cb->(); };
+			warn "process($$) ended\n" if $DEBUG;
 			warn $@ if $@;
 			POSIX::exit($@ ? 1 : 0);
 		}
 
+		warn "forked pid=$pid\n" if $DEBUG;
 		context $pid;
 		&pid();
 	}
@@ -82,6 +90,7 @@ sub new_forked(&)
 		my $socket = shift;
 		eval { @ret = $cb-> () if $cb };
 		my $msg = $@ ? [ 0, $@ ] : [ 1, @ret ];
+		warn "process($$) ended: [@$msg]\n" if $DEBUG > 1;
 		print $socket freeze($msg);
 	};
 
@@ -112,6 +121,7 @@ sub new_forked(&)
 
 		context $pid;
 	pid {
+		warn "pid($pid): exitcode=$?, [@ret]\n" if $DEBUG > 1;
 		return shift, @ret;
 	}}}
 }
