@@ -89,3 +89,7 @@
 
 0.36,0.37 - 6 Nov 2008
 	portability fixes
+
+0.38 - 7 Nov 2008
+	fix bad race conditions in signal waiting routines
+
