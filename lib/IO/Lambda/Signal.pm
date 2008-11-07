@@ -1,17 +1,17 @@
-# $Id: Signal.pm,v 1.13 2008/11/07 09:36:38 dk Exp $
+# $Id: Signal.pm,v 1.14 2008/11/07 23:42:19 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(signal pid spawn);
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
 
-our $DEBUG = $IO::Lambda::DEBUG{signal};
+our $DEBUG = $IO::Lambda::DEBUG{signal} || 0;
 
 use strict;
 use Carp;
 use IO::Handle;
 use POSIX ":sys_wait_h";
-use IO::Lambda qw(:all);
+use IO::Lambda qw(:all :dev);
 
 my $MASTER = bless {}, __PACKAGE__;
 
@@ -24,14 +24,17 @@ sub empty { 0 == keys %SIGDATA }
 
 sub yield
 {
-	my @v = values %SIGDATA;
-	for my $v ( @v) {
+	my %v = %SIGDATA;
+	for my $id ( keys %v) {
+		my $v = $v{$id};
 		# use mutex in case signal happens right here during handling
 		$v-> {mutex} = 0;
+		warn "  yield sig $id\n" if $DEBUG > 1;
 	AGAIN:  
 		next unless $v-> {signal};
 
 		my @r = @{$v-> {lambdas}};
+		warn "  calling ", scalar(@r), " sig handlers\n" if $DEBUG > 1;
 		for my $r ( @r) {
 			my ( $lambda, $callback, @param) = @$r;
 			$callback-> ( $lambda, @param);
@@ -39,6 +42,7 @@ sub yield
 
 		my $sigs = $v-> {mutex};
 		if ( $sigs) {
+			warn "  caught $sigs signals during yield\n" if $DEBUG > 1;
 			$v-> {signal} = $sigs;
 			$v-> {mutex}  -= $sigs;
 			goto AGAIN;
@@ -68,8 +72,10 @@ sub watch_signal
 			lambdas => [$entry],
 		};
 		$SIG{$id} = sub { signal_handler($id) };
+		warn "install signal handler for $id ", _o($lambda), "\n" if $DEBUG > 1;
 	} else {
 		push @{ $SIGDATA{$id}-> {lambdas} }, $entry;
+		warn "push signal handler for $id ", _o($lambda), "\n" if $DEBUG > 2;
 	}
 }
 
@@ -78,12 +84,16 @@ sub unwatch_signal
 	my ( $id, $lambda) = @_;
 
 	return unless exists $SIGDATA{$id};
+		
+	warn "remove signal handler for $id ", _o($lambda), "\n" if $DEBUG > 2;
 
 	@{ $SIGDATA{$id}-> {lambdas} } = 
 		grep { $$_[0] != $lambda } 
 		@{ $SIGDATA{$id}-> {lambdas} };
 	
 	return if @{ $SIGDATA{$id}-> {lambdas} };
+	
+	warn "uninstall signal handler for $id\n" if $DEBUG > 1;
 
 	if (defined($SIGDATA{$id}-> {save})) {
 		$SIG{$id} = $SIGDATA{$id}-> {save};
@@ -140,13 +150,18 @@ sub new_pid
 	my ( $pid, $deadline) = @_;
 
 	croak 'bad pid' unless $pid =~ /^\-?\d+$/;
+	warn "new_pid($pid) ", _t($deadline), "\n" if $DEBUG;
 	
 	# avoid race conditions
 	my ( $savesig, $signalled);
 	unless ( defined $SIGDATA{CHLD}) {
+		warn "new_pid: install early SIGCHLD detector\n" if $DEBUG > 1;
 		$savesig   = $SIG{CHLD};
 		$signalled = 0;
-		$SIG{CHLD} = sub { $signalled++ };
+		$SIG{CHLD} = sub {
+			warn "new_pid: early SIGCHLD caught\n" if $DEBUG > 1;
+			$signalled++
+		};
 	}
 
 	# finished already
@@ -156,12 +171,18 @@ sub new_pid
 		} else {
 			delete $SIG{CHLD};
 		}
+		warn "new_pid($pid): finished already with $?\n" if $DEBUG > 1;
 		return IO::Lambda-> new-> call($?) 
 	}
 
 	# wait
-	my $p = signal_or_timeout_lambda( 'CHLD', $deadline, 
-		sub { (waitpid($pid, WNOHANG) == 0) ? () : $? });
+	my $p = signal_or_timeout_lambda( 'CHLD', $deadline, sub {
+		my $wp = waitpid($pid, WNOHANG);
+		warn "waitpid($pid) = $wp\n" if $DEBUG > 1;
+		return (( $wp == 0) ? () : $?);
+	});
+
+	warn "new_pid: new lambda(", _o($p), ")\n" if $DEBUG > 1;
 
 	# don't let unwatch_signal() to restore it back to us
 	$SIGDATA{CHLD}-> {save} = $savesig if defined $signalled;
@@ -177,6 +198,8 @@ sub new_pid
 		unwatch_signal( 'CHLD', $p);
 		# Lambda will also never get executed - cancel it
 		$p-> terminate;
+		
+		warn "new_pid($pid): finished with race: $?, ", _o($p), " killed\n" if $DEBUG > 1;
 	
 		return IO::Lambda-> new-> call($?); 
 	}
