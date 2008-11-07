@@ -93,3 +93,6 @@
 0.38 - 7 Nov 2008
 	fix bad race conditions in signal waiting routines
 
+0.39 - 7 Nov 2008
+	finalize thread and fork API
+
