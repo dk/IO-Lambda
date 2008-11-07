@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 16_fork.t,v 1.3 2008/11/06 16:24:33 dk Exp $
+# $Id: 16_fork.t,v 1.4 2008/11/07 17:51:08 dk Exp $
 
 use strict;
 use warnings;
@@ -21,13 +21,13 @@ plan tests    => 5;
 sub sec { select(undef,undef,undef,0.1 * ( $_[0] || 1 )) }
 
 this forked { 42 };
-ok(( join('', this-> wait) eq '042'), 'scalar' );
+ok(( join('', this-> wait) eq '42'), 'scalar' );
 
 this forked { (1,5,18) };
-ok(( join('', this-> wait) eq '018'), 'list' );
+ok(( join('', this-> wait) eq '1518'), 'list' );
 
 this forked { sec; 42 };
-ok(( join('', this-> wait) eq '042'), 'delay' );
+ok(( join('', this-> wait) eq '42'), 'delay' );
 
 this lambda {
 	context
@@ -36,7 +36,7 @@ this lambda {
 		forked { 3 };
 	tails { join('', sort @_) }
 };
-ok( this-> wait eq '000123', 'join all' );
+ok( this-> wait eq '123', 'join all' );
 
 my $t;
 this lambda {
@@ -46,6 +46,6 @@ this lambda {
 		$t = forked { sec(5); 1 };
 	any_tail { join('', sort map { $_-> peek } @_) }
 };
-ok(( join('', this-> wait) eq '02'), 'delay' );
-$t-> join;
-this-> clear;
+ok(( join('', this-> wait) eq '2'), 'delay' );
+
+$t-> wait;

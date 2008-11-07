@@ -1,12 +1,12 @@
-#$Id: dbi.pl,v 1.9 2008/11/05 20:43:03 dk Exp $
+#$Id: dbi.pl,v 1.10 2008/11/07 17:51:08 dk Exp $
 use strict;
 use warnings;
 
 use IO::Socket::INET;
 use IO::Lambda qw(:all);
 use IO::Lambda::DBI;
-use IO::Lambda::Thread qw(threaded);
-use IO::Lambda::Fork qw(forked);
+use IO::Lambda::Thread qw(new_thread);
+use IO::Lambda::Fork qw(new_process);
 use IO::Lambda::Socket;
 
 my $port = 3333;
@@ -72,36 +72,29 @@ my %dbopt = ( timeout => 5 );
 if ( $mode eq 'thread') {
 	die $IO::Lambda::Thread::DISABLED if $IO::Lambda::Thread::DISABLED;
 
-	my $t = threaded {
+	my ($thread, $socket) = new_thread( sub {
 		my $socket = shift;
 		IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
-	};
+	}, 1);
 	
-	$t-> start;
-	$t-> join_on_read(0);
-	
-	my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket, %dbopt);
+	my $dbi = IO::Lambda::DBI-> new( $socket, $socket, %dbopt);
 	execute($dbi);
 	undef $dbi;
 	
-	$t-> join;
-	undef $t;
+	$thread-> join;
 
 } elsif ( $mode eq 'fork') {
-	my $t = forked {
+	my ( $pid, $socket) = new_process {
 		my $socket = shift;
 		IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
 	};
 	
-	$t-> start;
-	$t-> listen(0);
-	
-	my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket, %dbopt);
+	my $dbi = IO::Lambda::DBI-> new( $socket, $socket, %dbopt);
 	execute($dbi);
 	undef $dbi;
-	
-	$t-> listen(1);
-	$t-> wait;
+
+	close($socket);
+	waitpid($pid, 0);
 } elsif ( $mode eq 'remote') {
 	my $host = shift @ARGV;
 	usage unless defined $host;

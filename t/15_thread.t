@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 15_thread.t,v 1.7 2008/11/05 15:04:45 dk Exp $
+# $Id: 15_thread.t,v 1.8 2008/11/07 17:51:08 dk Exp $
 
 use strict;
 use warnings;
@@ -44,5 +44,4 @@ this lambda {
 	any_tail { join('', sort map { $_-> peek } @_) }
 };
 ok( this-> wait eq '2', 'join some' );
-$t-> join;
-this-> clear;
+$t-> wait;

@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.5 2008/11/06 10:57:46 dk Exp $
+# $Id: Fork.pm,v 1.6 2008/11/07 17:51:08 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -11,149 +11,122 @@ use warnings;
 use Exporter;
 use Socket;
 use POSIX;
+use Storable qw(thaw freeze);
 use IO::Handle;
 use IO::Lambda qw(:all :dev);
-use IO::Lambda::Signal;
+use IO::Lambda::Signal qw(pid);
 
-our @EXPORT_OK = qw(forked);
+our @ISA = qw(Exporter);
+our @EXPORT_OK = qw(new_process process new_forked forked);
+our %EXPORT_TAGS = (all => \@EXPORT_OK);
 
 sub _d { "forked(" . _o($_[0]) . ")" }
 
-sub new
+# return pid and socket
+sub new_process(&)
 {
-	my ( $class, $cb, @param) = @_;
-	my $self = $class-> SUPER::new(\&init);
-	$self-> autorestart(0);
-	$self-> {forked_code}  = $cb;
-	$self-> {forked_param} = \@param;
-	$self-> {buf} = undef;
-	return $self;
-}
-
-sub forked_run
-{
-	my ($self,$r) = @_;
-	$SIG{PIPE} = 'IGNORE';
-	warn _d($self), ": forked process $$ started\n" if $DEBUG;
-	my $ret;
-	eval {
-		$ret = $self-> {forked_code}-> (
-			$r,
-			@{$self-> {forked_param}}
-		) if $self-> {forked_code}
-	};
-	warn _d($self), ": forked process $$ ended: [$ret/$@]\n" if $DEBUG;
-	print $r $@ ? $@ : $ret if $@ or defined $ret;
-	close $r;
-	POSIX::exit( $@ ? 1 : 0);
-}
-
-sub on_sigchld
-{
-	my ( $self, $exitcode) = @_;
-	warn _d($self), ": exitcode $exitcode\n" if $DEBUG;
-	$self-> {exitcode} = $exitcode;
-	return ($exitcode, $self-> {buf}) unless $self-> {listen};
-	$self-> watch_lambda( $self-> {listen}, sub {
-		return ($self-> {exitcode}, $self-> {buf});
-	});
-}
-
-sub init
-{
-	my $self = shift;
-
+	my $cb = shift;
+	
 	my $r = IO::Handle-> new;
-	$self-> {handle} = IO::Handle-> new;
-	socketpair( $r, $self-> {handle}, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
-	$self-> {handle}-> blocking(0);
+	my $w = IO::Handle-> new;
+	socketpair( $r, $w, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
+	$w-> blocking(0);
 
-	$self-> {pid} = fork;
-	return ( undef, $! ) unless defined $self-> {pid};
-	$self-> forked_run($r) unless $self-> {pid};
+	my $pid = fork;
+	unless ( defined $pid) {
+		close($w);
+		close($r);
+		return ( undef, $! );
+	}
+
+	if ( $pid == 0) {
+		close($w);
+		eval { $cb-> ($r) if $cb; };
+		warn $@ if $@;
+		close($r);
+		POSIX::exit($@ ? 1 : 0);
+	}
 
 	close($r);
-	undef $self-> {forked_code};
-	undef $self-> {forked_param};
 
-	$self-> watch_lambda(
-		IO::Lambda::Signal::new_pid( $self-> {pid}),
-		\&on_sigchld,
-	);
-
-	warn _d($self), ": new process($self->{pid})\n" if $DEBUG;
-	$self-> listen(1);
+	return ($pid, $w);
 }
 
-sub listen
+# simple fork, return only $? and $!
+sub process(&)
 {
-	my ( $self, $listen) = @_;
-	if ( $listen) {
-		return if $self-> {listen};
-	 	my $error = unpack('i', getsockopt( $self-> {handle}, SOL_SOCKET, SO_ERROR));
-		if ( $error) {
-			warn _d($self), ": listen aborted, handle is invalid\n" if $DEBUG;
-			return;
-		}
-		if ( $self-> is_stopped) {
-			warn _d($self), ": listen aborted, lambda already stopped\n" if $DEBUG;
-			$self-> join;
-			return;
-		}
-		$self-> {listen} = lambda {
-			# wait for EOF
-			context readbuf, $self-> {handle}, \ $self-> {buf}, undef;
-		tail {
-			my ($res, $error) = @_;
-			warn _d($self), 
-				( $error
-					? ": error $error"
-					: ": eof"
-				), "\n" if $DEBUG;
-		}};
-		$self-> {listen}-> start;
+	my $cb = shift;
 
-		warn _d($self), ": listening\n" if $DEBUG;
-	} else {
-		return unless $self-> {listen};
-		$self-> {listen}-> terminate;
-		$self-> {listen} = undef;
-		warn _d($self), ": not listening\n" if $DEBUG;
+	lambda { 
+		my $pid = fork;
+		return undef, $! unless defined $pid;
+		unless ( $pid) {
+			eval { $cb->(); };
+			warn $@ if $@;
+			POSIX::exit($@ ? 1 : 0);
+		}
+
+		context $pid;
+		&pid();
 	}
+	
 }
 
-sub kill
+# return output from a subprocess
+sub new_forked(&)
 {
-	my ( $self, $sig) = @_;
+	my $cb = shift;
 
-	return unless $self-> {pid};
+	my ( $pid, $r) = new_process {
+		my @ret;
+		my $socket = shift;
+		eval { @ret = $cb-> () if $cb };
+		my $msg = $@ ? [ 0, $@ ] : [ 1, @ret ];
+		print $socket freeze($msg);
+	};
 
-	$sig = 'TERM' unless defined $sig;
-	return CORE::kill( $self-> {pid}, $sig);
+	lambda {
+		return undef, undef, $r unless defined $pid;
+	
+		my $buf = '';
+		context readbuf, $r, \ $buf, undef;
+	tail {
+		my ( $ok, $error) = @_;
+		my @ret;
+
+		($ok,$error) = (0,$!) unless close($r);
+
+		unless ( $ok) {
+			@ret = ( undef, $error);
+		} else {
+			my $msg;
+			eval { $msg = thaw $buf };
+			unless ( $msg and ref($msg) and ref($msg) eq 'ARRAY') {
+				@ret = ( undef, $@);
+			} elsif ( 0 == shift @$msg) {
+				@ret = ( undef, @$msg);
+			} else {
+				@ret = ( 1, @$msg);
+			}
+		}
+
+		context $pid;
+	pid {
+		return shift, @ret;
+	}}}
 }
 
-sub join
+# simpler version of new_forked
+sub forked(&)
 {
-	my $self = shift;
-	return unless $self-> {pid};
-	warn _d($self), ": waiting pid $self->{pid}\n" if $DEBUG;
-	waitpid($self->{pid},0);
-	warn _d($self), ": ok\n" if $DEBUG;
+	my $cb = shift;
+	lambda {
+		context &new_forked($cb);
+	tail {
+		my ( $pid, $ok, @ret) = @_;
+		return @ret;
+	}}
 }
-
-sub pid    { $_[0]-> {pid} }
-sub socket { $_[0]-> {handle} }
-
-sub DESTROY
-{
-	my $self = $_[0];
-	$self-> SUPER::DESTROY if defined($self-> {pid});
-	undef $self-> {pid};
-	close($self-> {handle}) if $self-> {handle};
-	$self-> kill;
-}
-
-sub forked(&) { __PACKAGE__-> new(_subname(forked => $_[0]) ) }
 
 1;
 
@@ -167,12 +140,17 @@ IO::Lambda::Fork - wait for blocking code using coprocesses
 
 =head1 DESCRIPTION
 
-The module implements a lambda wrapper that allows to asynchronously 
-wait for blocking code. The wrapping is done so that the code is
-executed in another process's context. C<IO::Lambda::Fork> inherits
-from C<IO::Lambda>, and thus provides all function of the latter to
-the caller. In particular, it is possible to wait for these objects
-using C<tail>, C<wait>, C<any_tail> etc standard waiter function.
+The module implements a lambda wrapper that allows to asynchronously wait for
+blocking code. The wrapping is done so that the code is executed in another
+process's context. C<IO::Lambda::Fork> provides a twofold interface: First, it
+the module can create lambdas that wait for forked child processes. Second, it
+also provides an easier way for simple communication between parent and child
+processes.
+
+Contrary to the usual interaction between a parent and a forked child process,
+this module doesn't hijack the child's stdin and stdout, but uses a shared
+socket between them. That socket, in turn, can be retrieved by the caller
+and used for its own needs.
 
 =head1 SYNOPSIS
 
@@ -198,32 +176,48 @@ using C<tail>, C<wait>, C<any_tail> etc standard waiter function.
 
 =over
 
-=item new($class, $code)
+=item new_process($code, $pass_socket, @param) -> ( $pid, $socket | undef, $error )
 
-Creates a new C<IO::Lambda::Fork> object in the passive state.  When the lambda
-will be activated, a new process will start, and C<$code> code will be executed
-in the context of this new process. Upon successfull finish, result of C<$code>
-in list context will be stored on the lambda.
+Forks a process, and sets up a read-write socket between the parent and the
+child. On success, returns the child's pid and the socket, where the latter is
+passed to C<$code>. On failure, returns undef and C<$!>.
 
-=item kill $sig = 'TERM'
+This function doesn't create a lambda, and doesn't make any preparation neither
+for waiting for the child process, nor for reaping its status. It is therefore
+important to wait for the child process, to avoid zombie processes. It can be done either
+synchronously:
 
-Sends a signal to the process, executing the blocking code.
+    my ( $pid, $reader) = new_process {
+        my $writer = shift;
+        print $writer, "Hello world!\n";
+    };
+    print while <$reader>;
+    close($reader);
+    waitpid($pid, 0);
 
-=item forked($code)
+or asynchronously, using lambdas:
 
-Same as C<new> but without a class.
+    use IO::Lambda::Socket qw(pid new_pid);
+    ...
+    lambda { context $pid; &pid() }-> wait;
+    # or
+    new_pid($pid)-> wait;
 
-=item pid
+=item process($code) :: () -> ($? | undef)
 
-Returns pid of the coprocess.
+Creates a simple lambda that forks a process and executes C<$code> inside it.
+The lambda returns the child exit code.
 
-=item socket
+=item new_forked($code) :: () -> ( $?, ( 1, @results | undef, $error))
 
-Returns the associated stream
+Creates a lambda that waits for C<$code> in a sub-process to be executed,
+and returns its result back to the parent. Returns also the process
+exitcode, C<$code> eval success flag, and results (or an error string).
 
-=item join
+=item forked($code) :: () -> (@results | $error)
 
-Blocks until process is finished.
+A simple wrapper over C<new_forked>, that returns either C<$code> results
+or an error string.
 
 =back
 
@@ -231,8 +225,8 @@ Blocks until process is finished.
 
 Doesn't work on Win32, because relies on C<$SIG{CHLD}> which is not getting
 delivered (on 5.10.0 at least). However, since Win32 doesn't have forks anyway,
-Perl emulates them with threads. Use L<IO::Lambda::Threads> instead when
-running on windows.
+Perl emulates them with threads. Use L<IO::Lambda::Thread> instead when running
+on windows.
 
 =head1 AUTHOR
 

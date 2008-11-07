@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.13 2008/11/06 19:55:12 dk Exp $
+# $Id: Thread.pm,v 1.14 2008/11/07 17:51:08 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -14,163 +14,72 @@ $DISABLED = $@ if $@;
 
 our $DEBUG = $IO::Lambda::DEBUG{thread};
 
-our @EXPORT_OK = qw(threaded);
+our @EXPORT_OK = qw(threaded new_thread);
+our %EXPORT_TAGS = (all => \@EXPORT_OK);
 
 sub _d { "threaded(" . _o($_[0]) . ")" }
 
-sub new
-{
-	my ( $class, $cb, @param) = @_;
-	my $self = $class-> SUPER::new(\&init);
-	$self-> autorestart(0);
-	$self-> {thread_code}  = $cb;
-	$self-> {thread_param} = \@param;
-	return $self;
-}
-
 sub thread_init
 {
-	my ( $self, $r, $cb, @param) = @_;
+	my ( $r, $cb, $pass_handle, @param) = @_;
 
 	$SIG{KILL} = sub { threads-> exit(0) };
 	$SIG{PIPE} = 'IGNORE';
-	warn _d($self), ": thread(", threads->tid, ") started\n" if $DEBUG;
+	warn "thread(", threads->tid, ") started\n" if $DEBUG;
 
 	my @ret;
-	eval { @ret = $cb->($r, @param) if $cb };
+	eval { @ret = $cb-> (( $pass_handle ? $r : ()), @param) if $cb };
 
-	warn _d($self), ": thread(", threads->tid, ") ended: [@ret]\n" if $DEBUG;
+	warn "thread(", threads->tid, ") ended: [@ret]\n" if $DEBUG;
 	close($r);
+	undef $r;
 	die $@ if $@;
 
 	return @ret;
 }
 
-sub init
+sub new_thread
 {
-	return $DISABLED if defined $DISABLED;
+	return undef, $DISABLED if $DISABLED;
 
-	my $self = shift;
-
-	$self-> {thread_self} = threads-> tid;
-
+	my ( @args, $cb, $pass_handle, @param);
+	@args = shift if $_[0] and ref($_[0]) and ref($_[0]) eq 'HASH';
+	( $cb, $pass_handle, @param) = @_;
+	
 	my $r = IO::Handle-> new;
-	$self-> {handle} = IO::Handle-> new;
-	socketpair( $r, $self-> {handle}, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
-	$self-> {handle}-> blocking(0);
+	my $w = IO::Handle-> new;
+	socketpair( $r, $w, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
+	$w-> blocking(0);
 
-	($self-> {thread_id}) = threads-> create(
+	my ($t) = threads-> create(
+		@args,
 		\&thread_init, 
-		"$self", $r, $self-> {thread_code},
-		@{ $self-> {thread_param} },
+		$r, $cb, $pass_handle, @param
 	);
+
 	close($r);
-	undef $self-> {thread_code};
-	undef $self-> {thread_param};
 
-	warn _d($self), ": new thread(", $self-> {thread_id}->tid, ")\n" if $DEBUG;
-	$self-> join_on_read(1);
+	warn "new thread(", $t->tid, ")\n" if $DEBUG;
+	return ($t, $w);
 }
 
-sub on_read
+# XXX $thread-> detach/kill when cancelled
+sub threaded(&)
 {
-	my $self = shift;
-	warn _d($self), ": am closing on read\n" if $DEBUG;
-	$self-> {join_on_read} = undef;
-	return $self-> join;
+	my $cb = shift;
+
+	lambda { 
+		my ( $t, $r) = new_thread( $cb, 1 );
+		return $r unless $t;
+
+		context $r;
+	read {
+		close($r);
+		undef $r;
+		this-> clear;
+		return $t-> join;
+	}}
 }
-
-sub join_on_read
-{
-	my ( $self, $join_on_read) = @_;
-	if ( $join_on_read) {
-		return if $self-> {join_on_read};
-	 	my $error = unpack('i', getsockopt( $self-> {handle}, SOL_SOCKET, SO_ERROR));
-		if ( $error) {
-			warn _d($self), ": join_on_read aborted, handle is invalid\n" if $DEBUG;
-			$self-> join;
-			return;
-		}
-		if ( $self-> is_stopped) {
-			warn _d($self), ": join_on_read aborted, lambda already stopped\n" if $DEBUG;
-			$self-> join;
-			return;
-		}
-		$self-> {join_on_read} = $self-> watch_io(
-			IO_READ, $self-> {handle}, 
-			undef, \&on_read
-		);
-		warn _d($self), ": will join on read\n" if $DEBUG;
-	} else {
-		return unless $self-> {join_on_read};
-		$self-> cancel_event( $self-> {join_on_read} );
-		$self-> {join_on_read} = undef;
-		warn _d($self), ": won't join on read\n" if $DEBUG;
-	}
-}
-
-my $__warned = 0;
-sub kill
-{
-	my $self = $_[0];
-	return unless
-		$self-> {thread_id} and
-		$self-> {thread_self} == threads-> tid;
-
-	my $t = $self-> {thread_id};
-	warn _d($self), ": kill(", $t->tid, ")\n" if $DEBUG;
-	undef $self-> {thread_id};
-
-	if ( $] < 5.010) {
-		warn <<WARN unless $__warned++;
-Perl versions older than 5.10.0 cannot detach and kill threads gracefully.
-IO::Lambda::Thread is designed so that programmer doesn't and shouldn't care
-about waiting for long-running threads, which works only on higher perl
-version. Consider calling \$threaded_lambda->join() to avoid this
-warning, or upgrade to 5.10.0 .
-WARN
-		return;
-	}
-
-	if ( $t-> is_running) {
-		$t-> detach;
-		$t-> kill('KILL');
-	} else {
-		warn _d($self), " joining ", $t-> tid, "...\n" if $DEBUG;
-		$t-> join if $t-> is_joinable;
-		warn _d($self), " done ", $t-> tid, "\n" if $DEBUG;
-	}
-}
-
-sub join
-{
-	my $self = shift;
-	my $t;
-	return unless $t = $self-> {thread_id};
-	undef $self-> {thread_id};
-	close($self-> {handle}) if $self-> {handle};
-	$self-> {handle} = undef;
-	warn _d($self), " joining thread ", $t-> tid, "...\n" if $DEBUG;
-	my @r = $t-> join;
-	@r = $t-> error if $] >= 5.010 and $t-> error;
-	warn _d($self), " thread ", $t-> tid, " joined ok\n" if $DEBUG;
-	return @r;
-}
-
-sub thread { $_[0]-> {thread_id} }
-sub socket { $_[0]-> {handle} }
-
-sub DESTROY
-{
-	my $self = $_[0];
-	$self-> SUPER::DESTROY
-		if defined($self-> {thread_self}) and
-		$self-> {thread_self} == threads-> tid;
-	close($self-> {handle}) if $self-> {handle};
-	$self-> kill;
-}
-
-sub threaded(&) { __PACKAGE__-> new(_subname(threaded => $_[0]) ) }
 
 1;
 
@@ -184,12 +93,11 @@ IO::Lambda::Thread - wait for blocking code using threads
 
 =head1 DESCRIPTION
 
-The module implements a lambda wrapper that allows to asynchronously 
-wait for blocking code. The wrapping is done so that the code is
-executed in another thread's context. C<IO::Lambda::Thread> inherits
-from C<IO::Lambda>, and thus provides all function of the latter to
-the caller. In particular, it is possible to wait for these objects
-using C<tail>, C<wait>, C<any_tail> etc standard waiter function.
+The module implements a lambda wrapper that allows to asynchronously wait for
+blocking code. The wrapping is done so that the code is executed in another
+thread's context. C<IO::Lambda::Thread> provides bidirectional communication
+between threads, which is based on a shared socket between parent and child
+threads. This socket can be used by the caller for its own needs, if necessary.
 
 =head1 SYNOPSIS
 
@@ -215,61 +123,53 @@ using C<tail>, C<wait>, C<any_tail> etc standard waiter function.
 
 =over
 
-=item new($class, $code)
+=item new_thread ( $options = (), $pass_socket, $code, @param) -> ($thread, $socket)
 
-Creates a new C<IO::Lambda::Thread> object in the passive state.  When the lambda
-will be activated, a new thread will start, and C<$code> code will be executed
-in the context of this new thread. Upon successfull finish, result of C<$code>
-in list context will be stored on the lambda.
+A special replacement for C<< thread-> create >>, that not only creates a
+thread, but also creates a socket between the parent and child threads. That
+socket is important for getting an asynchronous notification when the child
+thread has finished, because there is no portable way to get that signal
+otherwise. That means that this socket must be closed and the thread must be
+C<join>'ed to avoid problems. For example:
+    
+    my ( $thread, $reader) = new_thread( $sub {
+        my $writer = shift;
+        print $writer, "Hello world!\n";
+    }, 1 );
+    print while <$reader>;
+    close($reader);
+    $thread-> join;
 
-=item kill
+Note that C<join> is a blocking call, so one might want to be sure that the
+thread is indeed finished before calling it. By default, the child thread will
+close its side of the socket, thus making the parent side readable. However,
+the child code can also hijack the socket for its own needs, so if that
+functionality is needed, one must create an extra layer of communication that
+will ensure that the child code is properly exited, so that the parent can
+reliably call C<join> without blocking.
 
-Sends I<KILL> signal to the thread, executing the blocking code, and detaches
-it.  Due to perl implementations of safe signals, the thread will not be killed
-immediately, but on the next possibility. Given that the module is specifically
-made for waiting on long, blocking calls, it is possible that such possibility
-can appear in rather long time.
+C<$code> is executed in another thread's context, and is passed the communication
+socket ( if C<$pass_socket> is set to 1 ). C<$code> is also passed C<@param>.
+Data returned from the code can be retrieved from C<join>.
 
-=item threaded($code)
+=item threaded($code) :: () -> ( @results )
 
-Same as C<new> but without a class.
-
-=item thread
-
-Returns internal thread object
-
-=item socket
-
-Returns the associated stream
-
-=item join
-
-Joins the internal thread. Can be needed for perl versions before 5.10.0,
-that can't kill a thread reliably. 
+Creates a lambda, that will execute C<$code> in a newly created thread.
+The lambda will finish when the C<$code> and the thread are finished,
+and will return results returned by C<$code>.
 
 =back
 
 =head1 BUGS
 
-Threaded lambdas, just as normal lambdas, should be automatically destroyed
-when their reference count goes down to zero. When they do so, they try to kill
-whatever attached threads they have, using C<threads::detach> and
-C<threads::kill>. However, this doesn't always work, may result in error
-messages such as 
+If lambdas created by C<threaded> are permaturely cancelled, then
+the associated threas will not be properly waited for. Errors
+like one below may ensue.
 
   Perl exited with active threads:
         1 running and unjoined
         0 finished and unjoined
         0 running and detached
-
-which means that some threads are still running. To avoid this problem,
-kill leftover threaded lambdas with C<kill>. 
-
-Note, that a reason that the reference counting does not goes to zero even when
-a lambda goes out of scopy, may be because of the fact that lambda context,
-which switches dynamically for each lambda callback, still contains the lambda.
-C<< $lambda-> clear >> empties the context, and thus any leftover references
-from there.
 
 =head1 SEE ALSO
 
