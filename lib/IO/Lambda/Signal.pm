@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.12 2008/11/06 10:57:47 dk Exp $
+# $Id: Signal.pm,v 1.13 2008/11/07 09:36:38 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -24,13 +24,25 @@ sub empty { 0 == keys %SIGDATA }
 
 sub yield
 {
-	for my $v ( values %SIGDATA) {
+	my @v = values %SIGDATA;
+	for my $v ( @v) {
+		# use mutex in case signal happens right here during handling
+		$v-> {mutex} = 0;
+	AGAIN:  
 		next unless $v-> {signal};
-		for my $r ( @{$v-> {lambdas}}) {
+
+		my @r = @{$v-> {lambdas}};
+		for my $r ( @r) {
 			my ( $lambda, $callback, @param) = @$r;
 			$callback-> ( $lambda, @param);
 		}
-		$v-> {signal} = 0;
+
+		my $sigs = $v-> {mutex};
+		if ( $sigs) {
+			$v-> {signal} = $sigs;
+			$v-> {mutex}  -= $sigs;
+			goto AGAIN;
+		}
 	}
 }
 
@@ -40,6 +52,7 @@ sub signal_handler
 	warn "SIG{$id}\n" if $DEBUG;
 	return unless exists $SIGDATA{$id};
 	$SIGDATA{$id}-> {signal}++;
+	$SIGDATA{$id}-> {mutex}++;
 }
 
 sub watch_signal
@@ -49,6 +62,8 @@ sub watch_signal
 	my $entry = [ $lambda, $callback, @param ];
 	unless ( exists $SIGDATA{$id}) {
 		$SIGDATA{$id} = {
+			mutex   => 0,
+			signal  => 0,
 			save    => $SIG{$id},
 			lambdas => [$entry],
 		};
@@ -125,14 +140,48 @@ sub new_pid
 	my ( $pid, $deadline) = @_;
 
 	croak 'bad pid' unless $pid =~ /^\-?\d+$/;
+	
+	# avoid race conditions
+	my ( $savesig, $signalled);
+	unless ( defined $SIGDATA{CHLD}) {
+		$savesig   = $SIG{CHLD};
+		$signalled = 0;
+		$SIG{CHLD} = sub { $signalled++ };
+	}
 
 	# finished already
-	return IO::Lambda-> new-> call($?)
-		if waitpid($pid, WNOHANG) > 0;
+	if ( waitpid( $pid, WNOHANG) > 0) {
+		if ( defined( $savesig)) {
+			$SIG{CHLD} = $savesig;
+		} else {
+			delete $SIG{CHLD};
+		}
+		return IO::Lambda-> new-> call($?) 
+	}
 
 	# wait
-	signal_or_timeout_lambda( 'CHLD', $deadline, 
-		sub { (waitpid($pid, WNOHANG) == 0) ? () : $?  });
+	my $p = signal_or_timeout_lambda( 'CHLD', $deadline, 
+		sub { (waitpid($pid, WNOHANG) == 0) ? () : $? });
+
+	# don't let unwatch_signal() to restore it back to us
+	$SIGDATA{CHLD}-> {save} = $savesig if defined $signalled;
+
+	# possibly have a race? gracefully remove the lambda
+	if ( $signalled) {
+
+		# Got a signal, but that wasn't our pid. And neither it was
+		# pid that we're watching.
+		return $p if waitpid( $pid, WNOHANG) == 0;
+
+		# Our pid is finished. Unwatch the signal.
+		unwatch_signal( 'CHLD', $p);
+		# Lambda will also never get executed - cancel it
+		$p-> terminate;
+	
+		return IO::Lambda-> new-> call($?); 
+	}
+
+	return $p;
 }
 
 sub new_process
