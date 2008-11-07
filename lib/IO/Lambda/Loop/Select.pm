@@ -1,9 +1,9 @@
-# $Id: Select.pm,v 1.14 2008/11/05 19:40:40 dk Exp $
+# $Id: Select.pm,v 1.15 2008/11/07 21:22:18 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
 use warnings;
-use Errno qw(EINTR);
+use Errno qw(EINTR EAGAIN);
 use IO::Lambda qw(:constants);
 use Time::HiRes qw(time);
 
@@ -76,9 +76,9 @@ sub yield
 	my $n = select( $R, $W, $E, $t);
 	warn "select: $n handles ready\n" if $DEBUG;
 	if ( $n < 0) {
-		if ( $! == EINTR) {
+		if ( $! == EINTR or $! == EAGAIN) {
 			# ignore
-			warn "select: EINTR\n" if $DEBUG;
+			warn "select: $!\n" if $DEBUG;
 		} else {
 			die "select() error:$!:$^E" if $n < 0;
 		}
