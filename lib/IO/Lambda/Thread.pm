@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.15 2008/11/07 19:54:53 dk Exp $
+# $Id: Thread.pm,v 1.16 2008/11/08 09:46:19 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -6,7 +6,7 @@ use warnings;
 use Exporter;
 use Socket;
 use IO::Handle;
-use IO::Lambda qw(:all :dev);
+use IO::Lambda qw(:all :dev swap_frame);
 
 our $DISABLED;
 eval { require threads; };
@@ -88,10 +88,12 @@ sub threaded(&)
 	# give the caller a chance to join
 	# for it, if the lambda gets terminated
 	__PACKAGE__-> new( sub { 
-		# save context
+		# Save context. This is needed because the caller
+		# may have his own this. lambda(&) does the same
+		# protection
 		my $this  = shift;
-		my @frame = IO::Lambda::save_frame;
-		$this-> set_frame();
+		my @frame = swap_frame($this);
+
 		warn _d($this), " started\n" if $DEBUG;
 
 		# can start a thread?
@@ -116,7 +118,7 @@ sub threaded(&)
 		};
 
 		# restore context
-		IO::Lambda::set_frame(@frame);
+		swap_frame(@frame);
 	});
 }
 

@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.112 2008/11/07 19:55:56 dk Exp $
+# $Id: Lambda.pm,v 1.113 2008/11/08 09:46:19 dk Exp $
 
 package IO::Lambda;
 
@@ -12,7 +12,7 @@ use Time::HiRes qw(time);
 use vars qw(
 	$LOOP %EVENTS @LOOPS
 	$VERSION @ISA
-	@EXPORT_OK %EXPORT_TAGS @EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM @EXPORT_DEV
+	@EXPORT_OK %EXPORT_TAGS	@EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM @EXPORT_DEV @EXPORT_MISC
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
@@ -27,13 +27,19 @@ $VERSION     = '0.39';
 	sysreader syswriter getline readbuf writebuf
 );
 @EXPORT_LAMBDA = qw(
-	this context lambda this_frame again state
+	this context lambda again state restartable
 	io read write readwrite sleep tail tails tailo any_tail
+);
+@EXPORT_MISC    = qw(
+	set_frame get_frame swap_frame
 );
 @EXPORT_DEV    = qw(
 	_subname _o _t
 );
-@EXPORT_OK   = (@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, @EXPORT_DEV);
+@EXPORT_OK   = (
+	@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, 
+	@EXPORT_DEV, @EXPORT_MISC,
+);
 %EXPORT_TAGS = (
 	lambda    => \@EXPORT_LAMBDA, 
 	stream    => \@EXPORT_STREAM, 
@@ -683,12 +689,13 @@ sub again
 }
 
 # define context
-sub this         { @_ ? ($THIS, @CONTEXT) = @_ : $THIS }
-sub context      { @_ ? @CONTEXT = @_ : @CONTEXT }
-sub this_frame   { @_ ? ( $METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
-sub set_frame    { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
-sub save_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
-sub clear        { set_frame() }
+sub this        { @_ ? ($THIS, @CONTEXT)    = @_ : $THIS }
+sub context     { @_ ? (@CONTEXT)           = @_ : @CONTEXT }
+sub restartable { @_ ? ($METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
+sub set_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
+sub get_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
+sub swap_frame  { my @f = get_frame; set_frame(@_); @f }
+sub clear       { set_frame() }
 	
 END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
 
@@ -1772,9 +1779,9 @@ is thus equivalent to
 
 C<again> passes the current context to the predicate.
 
-If C<@frame> is provided, then it is treated as result of previous C<this_frame> call.
+If C<@frame> is provided, then it is treated as result of previous C<restartable> call.
 It contains data sufficient to restarting another call, instead of the current.
-See C<this_frame> for details.
+See C<restartable> for details.
 
 =item context @ctx
 
@@ -1798,14 +1805,14 @@ instead of
     my $q = lambda { ... };
     $q-> wait;
 
-=item this_frame(@frame)
+=item restartable(@frame)
 
 If called without parameters, returns the current callback frame, that
 can be later used in C<again>. Otherwise, replaces the internal frame
 variables, that doesn't affect anything immediately, but will be used by C<again>
 that is called without parameters.
 
-This property is only used when the predicate inside which C<this_frame> was
+This property is only used when the predicate inside which C<restartable> was
 fetched, is restartable. Since it is not a requirement for a user-defined
 predicate to be restartable, this property is not universally useful.
 
@@ -1814,7 +1821,7 @@ Example:
     context lambda { 1 };
     tail {
         return if 3 == shift;
-    	my @frame = this_frame;
+    	my @frame = restartable;
         context lambda { 2 };
 	tail {
 	   context lambda { 3 };
@@ -1823,7 +1830,7 @@ Example:
     }
 
 The outermost tail callback will be called twice: first time in the normal course of events,
-and second time as a result of the C<again> call. C<this_frame> and C<again> thus provide
+and second time as a result of the C<again> call. C<restartable> and C<again> thus provide
 a kind of restartable continuations.
 
 =item predicate $lambda, $callback, $method, $name

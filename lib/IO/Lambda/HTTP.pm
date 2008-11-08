@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.40 2008/11/03 20:58:27 dk Exp $
+# $Id: HTTP.pm,v 1.41 2008/11/08 09:46:19 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -423,7 +423,7 @@ sub http_read_chunked
 	context @ctx = $self-> http_read( qr/\G[^\r\n]+\r?\n/i);
 	state size => tail {
 		# save this lambda frame
-		@frame = this_frame;
+		@frame = restartable;
 		# got error
 		my $line = shift;
 		return undef, shift unless defined $line;
