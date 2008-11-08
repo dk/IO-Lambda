@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 16_fork.t,v 1.4 2008/11/07 17:51:08 dk Exp $
+# $Id: 16_fork.t,v 1.5 2008/11/08 08:53:14 dk Exp $
 
 use strict;
 use warnings;
@@ -46,6 +46,6 @@ this lambda {
 		$t = forked { sec(5); 1 };
 	any_tail { join('', sort map { $_-> peek } @_) }
 };
-ok(( join('', this-> wait) eq '2'), 'delay' );
+ok(( join('', this-> wait) eq '2'), 'join some' );
 
 $t-> wait;
