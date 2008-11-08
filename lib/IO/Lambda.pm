@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.113 2008/11/08 09:46:19 dk Exp $
+# $Id: Lambda.pm,v 1.114 2008/11/08 11:39:31 dk Exp $
 
 package IO::Lambda;
 
@@ -2303,7 +2303,7 @@ displays I/O debug messages from C<IO::Lambda> (with extra verbosity) and from
 C<IO::Lambda::HTTP>. C<IO::Lambda> respond for 2 keys: I<io> and I<lambda>.
 I<io> debugs the asynchronous (I/O) operations, I<lambda> debugs the
 synchronous (tail, wait, etc) operations. Keys recognized for the other
-modules: select, dbi,http,signal,message,thread,fork,select.
+modules: select,dbi,http,https,signal,message,thread,fork.
 
 =head1 BENCHMARKS
 
