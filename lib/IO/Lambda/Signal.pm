@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.14 2008/11/07 23:42:19 dk Exp $
+# $Id: Signal.pm,v 1.15 2008/11/08 00:01:37 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -14,6 +14,7 @@ use POSIX ":sys_wait_h";
 use IO::Lambda qw(:all :dev);
 
 my $MASTER = bless {}, __PACKAGE__;
+my %PID = ();
 
 # register yield handler
 IO::Lambda::add_loop($MASTER);
@@ -46,6 +47,18 @@ sub yield
 			$v-> {signal} = $sigs;
 			$v-> {mutex}  -= $sigs;
 			goto AGAIN;
+		}
+	}
+
+
+	# perl5.8.8 has unreliable delivery of signals
+	if ( $] < 5.010 and $SIGDATA{CHLD}) {
+		for my $pid ( keys %PID) {
+			next unless waitpid( $pid, WNOHANG);
+			# fake SIGCHLD
+			$SIGDATA{CHLD}-> {signal}++;
+			warn "send fake CHLD\n" if $DEBUG > 1;
+			last;
 		}
 	}
 }
@@ -107,7 +120,7 @@ sub unwatch_signal
 # or some custom value based on passed callback
 sub signal_or_timeout_lambda
 {
-	my ( $id, $deadline, $condition) = @_;
+	my ( $id, $deadline, $condition, $timeout_cb) = @_;
 
 	my $t;
 	my $q = IO::Lambda-> new;
@@ -128,6 +141,7 @@ sub signal_or_timeout_lambda
 
 	# or wait for timeout
 	$t = $q-> watch_timer( $deadline, sub {
+		$timeout_cb-> () if $timeout_cb;
 		unwatch_signal( $id, $q);
 		$q-> resolve($c);
 		undef $c;
@@ -176,10 +190,15 @@ sub new_pid
 	}
 
 	# wait
+	$PID{$pid}++;
 	my $p = signal_or_timeout_lambda( 'CHLD', $deadline, sub {
 		my $wp = waitpid($pid, WNOHANG);
 		warn "waitpid($pid) = $wp\n" if $DEBUG > 1;
-		return (( $wp == 0) ? () : $?);
+		return if $wp == 0;
+		delete $PID{$pid} unless --$PID{$pid};
+		return $?;
+	}, sub {
+		delete $PID{$pid} unless --$PID{$pid};
 	});
 
 	warn "new_pid: new lambda(", _o($p), ")\n" if $DEBUG > 1;
@@ -194,6 +213,7 @@ sub new_pid
 		# pid that we're watching.
 		return $p if waitpid( $pid, WNOHANG) == 0;
 
+		delete $PID{$pid} unless --$PID{$pid};
 		# Our pid is finished. Unwatch the signal.
 		unwatch_signal( 'CHLD', $p);
 		# Lambda will also never get executed - cancel it
