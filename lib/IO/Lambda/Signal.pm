@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.15 2008/11/08 00:01:37 dk Exp $
+# $Id: Signal.pm,v 1.16 2008/11/08 07:57:03 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -14,7 +14,6 @@ use POSIX ":sys_wait_h";
 use IO::Lambda qw(:all :dev);
 
 my $MASTER = bless {}, __PACKAGE__;
-my %PID = ();
 
 # register yield handler
 IO::Lambda::add_loop($MASTER);
@@ -47,18 +46,6 @@ sub yield
 			$v-> {signal} = $sigs;
 			$v-> {mutex}  -= $sigs;
 			goto AGAIN;
-		}
-	}
-
-
-	# perl5.8.8 has unreliable delivery of signals
-	if ( $] < 5.010 and $SIGDATA{CHLD}) {
-		for my $pid ( keys %PID) {
-			next unless waitpid( $pid, WNOHANG);
-			# fake SIGCHLD
-			$SIGDATA{CHLD}-> {signal}++;
-			warn "send fake CHLD\n" if $DEBUG > 1;
-			last;
 		}
 	}
 }
@@ -120,7 +107,7 @@ sub unwatch_signal
 # or some custom value based on passed callback
 sub signal_or_timeout_lambda
 {
-	my ( $id, $deadline, $condition, $timeout_cb) = @_;
+	my ( $id, $deadline, $condition) = @_;
 
 	my $t;
 	my $q = IO::Lambda-> new;
@@ -141,7 +128,6 @@ sub signal_or_timeout_lambda
 
 	# or wait for timeout
 	$t = $q-> watch_timer( $deadline, sub {
-		$timeout_cb-> () if $timeout_cb;
 		unwatch_signal( $id, $q);
 		$q-> resolve($c);
 		undef $c;
@@ -167,53 +153,50 @@ sub new_pid
 	warn "new_pid($pid) ", _t($deadline), "\n" if $DEBUG;
 	
 	# avoid race conditions
-	my ( $savesig, $signalled);
+	my ( $savesig, $early_sigchld);
 	unless ( defined $SIGDATA{CHLD}) {
 		warn "new_pid: install early SIGCHLD detector\n" if $DEBUG > 1;
-		$savesig   = $SIG{CHLD};
-		$signalled = 0;
+		$savesig       = $SIG{CHLD};
+		$early_sigchld = 0;
 		$SIG{CHLD} = sub {
 			warn "new_pid: early SIGCHLD caught\n" if $DEBUG > 1;
-			$signalled++
+			$early_sigchld++
 		};
 	}
 
 	# finished already
 	if ( waitpid( $pid, WNOHANG) > 0) {
-		if ( defined( $savesig)) {
-			$SIG{CHLD} = $savesig;
-		} else {
-			delete $SIG{CHLD};
+		if ( defined $early_sigchld) {
+			if ( defined( $savesig)) {
+				$SIG{CHLD} = $savesig;
+			} else {
+				delete $SIG{CHLD};
+			}
 		}
 		warn "new_pid($pid): finished already with $?\n" if $DEBUG > 1;
 		return IO::Lambda-> new-> call($?) 
 	}
 
 	# wait
-	$PID{$pid}++;
 	my $p = signal_or_timeout_lambda( 'CHLD', $deadline, sub {
 		my $wp = waitpid($pid, WNOHANG);
 		warn "waitpid($pid) = $wp\n" if $DEBUG > 1;
 		return if $wp == 0;
-		delete $PID{$pid} unless --$PID{$pid};
 		return $?;
-	}, sub {
-		delete $PID{$pid} unless --$PID{$pid};
 	});
 
 	warn "new_pid: new lambda(", _o($p), ")\n" if $DEBUG > 1;
 
 	# don't let unwatch_signal() to restore it back to us
-	$SIGDATA{CHLD}-> {save} = $savesig if defined $signalled;
+	$SIGDATA{CHLD}-> {save} = $savesig if defined $early_sigchld;
 
 	# possibly have a race? gracefully remove the lambda
-	if ( $signalled) {
+	if ( $early_sigchld) {
 
 		# Got a signal, but that wasn't our pid. And neither it was
 		# pid that we're watching.
 		return $p if waitpid( $pid, WNOHANG) == 0;
 
-		delete $PID{$pid} unless --$PID{$pid};
 		# Our pid is finished. Unwatch the signal.
 		unwatch_signal( 'CHLD', $p);
 		# Lambda will also never get executed - cancel it
