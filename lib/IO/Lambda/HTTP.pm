@@ -1,10 +1,10 @@
-# $Id: HTTP.pm,v 1.41 2008/11/08 09:46:19 dk Exp $
+# $Id: HTTP.pm,v 1.42 2008/11/08 10:32:03 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(http_request);
 
-our $DEBUG = $IO::Lambda::DEBUG{http};
+our $DEBUG = $IO::Lambda::DEBUG{http} || 0;
 
 use strict;
 use warnings;
@@ -182,12 +182,13 @@ sub prepare_transport
 		return "bad URI: " . $req-> uri-> as_string;
 	} elsif ( $scheme eq 'https') {
 		unless ( $got_https) {
-			eval { require IO::Lambda::HTTPS; };
+			eval { require IO::Lambda::HTTP::HTTPS; };
 			return  "https not supported: $@" if $@;
 			$got_https++;
 		}
-		$self-> {reader} = IO::Lambda::HTTPS::https_reader();
-		$self-> {writer} = \&IO::Lambda::HTTPS::https_writer;
+		$self-> {reader} = IO::Lambda::HTTP::HTTPS::https_reader();
+		$self-> {writer} = \&IO::Lambda::HTTP::HTTPS::https_writer;
+		warn "https enabled\n" if $DEBUG;
 	} elsif ( $scheme ne 'http') {
 		return "bad URI scheme: $scheme";
 	} else {
@@ -324,13 +325,26 @@ sub handle_connection
 sub handle_request
 {
 	my ( $self, $req) = @_;
+
+	# fixup path
+	if (( $req-> protocol || '') =~ /http\/1.\d/i) {
+		my $u = $req-> uri;
+		$req-> uri( $u-> path);
+	}
+
 	lambda {
 		$self-> {buf} = '';
 		context $self-> handle_request_in_buffer( $req);
-		warn "request: " . $req-> as_string . "\n" if $DEBUG;
+		if ( $DEBUG) {
+			warn "request sent\n";
+			warn $req-> as_string . "\n" if $DEBUG > 1;
+		}
 	tail {
 		my ( undef, $error) = @_; # readbuf style
-		warn "response: " . ( $error ? $error : $self-> {buf}) . "\n" if $DEBUG;
+		if ( $DEBUG) {
+			warn "got response\n";
+			warn (( $error ? $error : $self-> {buf})  . "\n") if $DEBUG > 1;
+		}
 		return defined($error) ? $error : $self-> parse( \ $self-> {buf} );
 	}}
 }
@@ -345,7 +359,7 @@ sub handle_request_in_buffer
 
 	lambda {
 		# send request
-		$req = $req-> as_string;
+		$req = $req-> as_string("\x0d\x0a");
 		context 
 			$self-> {writer}, 
 			$self-> {socket}, \ $req, 

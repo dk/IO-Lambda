@@ -1,5 +1,5 @@
-# $Id: HTTPS.pm,v 1.9 2008/01/25 13:46:04 dk Exp $
-package IO::Lambda::HTTPS;
+# $Id: HTTPS.pm,v 1.10 2008/11/08 10:32:03 dk Exp $
+package IO::Lambda::HTTP::HTTPS;
 
 use strict;
 use warnings;
@@ -7,23 +7,35 @@ use Socket;
 use IO::Socket::SSL;
 use IO::Lambda qw(:lambda :stream);
 
+our $DEBUG = $IO::Lambda::DEBUG{https};
+
 sub https_wrapper
 {
 	my $sock = shift;
 	tail {
 		my ( $bytes, $error) = @_;
+		warn 
+			"SSL on fh(", fileno($sock), ") = ",
+			(defined($bytes) ? "$bytes bytes" : "error $error"),
+			"\n" if $DEBUG;
 		return $bytes if defined $bytes;
 		return $error if $error eq 'timeout';
 	
 		my $v = '';
 		vec( $v, fileno($sock), 1) = 1;
 		if ( $SSL_ERROR == SSL_WANT_READ) {
+			warn "SSL_WANT_READ on fh(", fileno($sock), ")\n" if $DEBUG;
 			select( $v, undef, undef, 0);
 			return again;
 		} elsif ( $SSL_ERROR == SSL_WANT_WRITE) {
+			warn "SSL_WANT_WRITE on fh(", fileno($sock), ")\n" if $DEBUG;
 			select( undef, $v, undef, 0);
 			return again;
 		} else {
+			warn 
+				"SSL retry on fh(", fileno($sock), ") = ",
+				(defined($bytes) ? "$bytes bytes" : "error $error"),
+				"\n" if $DEBUG;
 			return $bytes, $error;
 		}
 	}
@@ -40,6 +52,7 @@ sub https_writer
 
 		# upgrade the socket
 		unless ( $cached) {
+			warn "negotiating SSL on fileno(", fileno($sock), ")\n" if $DEBUG;
 			IO::Socket::SSL-> start_SSL( $sock, SSL_startHandshake => 0 );
 			# XXX Warning, this'll block because IO::Socket::SSL doesn't 
 			# work with non-blocking connects. And I don't really want to 
@@ -51,6 +64,7 @@ sub https_writer
 			return undef, "SSL connect error: " . ( defined($SSL_ERROR) ? $SSL_ERROR : $!)
 				unless $r;
 			$cached = 1;
+			warn "SSL enabled on fileno(", fileno($sock), ")\n" if $DEBUG;
 		}
 
 		context $writer, $sock, $req, $length, $offset, $deadline;
