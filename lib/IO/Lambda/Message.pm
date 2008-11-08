@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.9 2008/11/05 20:43:03 dk Exp $
+# $Id: Message.pm,v 1.10 2008/11/08 09:48:22 dk Exp $
 
 use strict;
 use warnings;
@@ -399,8 +399,8 @@ IO::Lambda::Message - message passing queue
 The module implements a generic message passing protocol, and two generic
 classes that implement the server and the client functionality. The server
 code is implemented in a simple, blocking fashion, and is only capable
-of simple operations. The client API is written in lambda style, where each
-message sent can be asynchronously awaited for.
+of simple operations. The client API is written in lambda style, where
+message completion can be asynchronously awaited for.
 
 =head1 SYNOPSIS
 
