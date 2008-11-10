@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.114 2008/11/08 11:39:31 dk Exp $
+# $Id: Lambda.pm,v 1.115 2008/11/10 13:17:25 dk Exp $
 
 package IO::Lambda;
 
@@ -470,7 +470,6 @@ sub cancel_all_events
 		# global destruction in action! this should be $self, but isn't
 		next unless ref($rec-> [WATCH_LAMBDA]); 
 		$watcher-> lambda_handler( $rec);
-		# push @cancel, $watcher if $cascade; # XXX
 	}
 }
 
