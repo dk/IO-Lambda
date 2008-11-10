@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.115 2008/11/10 13:17:25 dk Exp $
+# $Id: Lambda.pm,v 1.116 2008/11/10 13:58:38 dk Exp $
 
 package IO::Lambda;
 
@@ -2303,6 +2303,11 @@ C<IO::Lambda::HTTP>. C<IO::Lambda> respond for 2 keys: I<io> and I<lambda>.
 I<io> debugs the asynchronous (I/O) operations, I<lambda> debugs the
 synchronous (tail, wait, etc) operations. Keys recognized for the other
 modules: select,dbi,http,https,signal,message,thread,fork.
+
+=head1 MAILING LIST
+
+I<io-lambda-general at lists.sourceforge.net>, thanks to sourceforge.
+Subscribe by visiting L<https://lists.sourceforge.net/lists/listinfo/io-lambda-general>.
 
 =head1 BENCHMARKS
 
