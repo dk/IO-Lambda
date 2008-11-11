@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.116 2008/11/10 13:58:38 dk Exp $
+# $Id: Lambda.pm,v 1.117 2008/11/11 20:49:54 dk Exp $
 
 package IO::Lambda;
 
@@ -58,10 +58,11 @@ if ( exists $ENV{IO_LAMBDA_DEBUG}) {
 	}
 	$DEBUG_IO     = $DEBUG{io}     || 0;
 	$DEBUG_LAMBDA = $DEBUG{lambda} || 0;
+	$IO::Lambda::Loop::DEFAULT = $DEBUG{loop} if $DEBUG{loop};
 	$SIG{__DIE__} = sub {
 		return if $^S;
 		Carp::confess(@_);
-	}
+	} if $DEBUG{die};
 }
 
 use constant IO_READ         => 4;
@@ -1167,7 +1168,7 @@ use vars qw($DEFAULT);
 use strict;
 use warnings;
 
-$DEFAULT = 'Select';
+$DEFAULT = 'Select' unless defined $DEFAULT;
 sub default { $DEFAULT = shift }
 
 sub new
@@ -2299,10 +2300,10 @@ For example,
       env IO_LAMBDA_DEBUG=io=2,http perl script.pl
 
 displays I/O debug messages from C<IO::Lambda> (with extra verbosity) and from
-C<IO::Lambda::HTTP>. C<IO::Lambda> respond for 2 keys: I<io> and I<lambda>.
-I<io> debugs the asynchronous (I/O) operations, I<lambda> debugs the
-synchronous (tail, wait, etc) operations. Keys recognized for the other
-modules: select,dbi,http,https,signal,message,thread,fork.
+C<IO::Lambda::HTTP>. C<IO::Lambda> respond for the following keys: I<io> (async
+operations), I<lambda> (sync operations), I<die> (stack trace), I<loop> (set
+loop module). Keys recognized for the other modules:
+select,dbi,http,https,signal,message,thread,fork.
 
 =head1 MAILING LIST
 
