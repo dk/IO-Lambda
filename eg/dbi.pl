@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.10 2008/11/07 17:51:08 dk Exp $
+#$Id: dbi.pl,v 1.11 2008/11/12 11:47:02 dk Exp $
 use strict;
 use warnings;
 
@@ -110,7 +110,9 @@ if ( $mode eq 'thread') {
 	my $s = IO::Socket::INET-> new(
 		LocalPort => $port,
 		Listen    => 5,
+		ReuseAddr => 1,
 	);
+	die $! unless $s;
 	while ( 1) {
 		my $c = IO::Handle-> new;
 		die $! unless accept( $c, $s);

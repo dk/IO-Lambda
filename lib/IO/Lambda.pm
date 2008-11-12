@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.117 2008/11/11 20:49:54 dk Exp $
+# $Id: Lambda.pm,v 1.118 2008/11/12 11:47:02 dk Exp $
 
 package IO::Lambda;
 
@@ -100,7 +100,7 @@ sub _d_out { $_doffs-- if $_doffs }
 sub _d     { ('  ' x $_doffs), _obj(shift), ': ', @_, "\n" }
 sub _o     { $_[0] =~ /0x([\w]+)/; $1 }
 sub _obj   { "lambda(". _o($_[0]) . ")." . ( $_[0]->{caller} || '()' ) }
-sub _t     { defined($_[0]) ? ( "time(", $_[0]-time(), ")" ) : () }
+sub _t     { defined($_[0]) ? ( "time(", (($_[0] < 1_000_000) ? $_[0] : $_[0]-time()), ")" ) : () }
 sub _ev
 {
 	$_[0] =~ /0x([\w]+)/;

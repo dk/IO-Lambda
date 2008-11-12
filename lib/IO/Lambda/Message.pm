@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.10 2008/11/08 09:48:22 dk Exp $
+# $Id: Message.pm,v 1.11 2008/11/12 11:47:02 dk Exp $
 
 use strict;
 use warnings;
@@ -154,7 +154,7 @@ sub queue_pusher
 			return;
 		}
 
-		my ( $outer, $bind, $msg, $deadline) = @$q;
+		my ( $outer, $bind) = @$q;
 		$outer-> resolve( $bind);
 		$outer-> terminate( $self-> outcoming( $result));
 		
@@ -164,13 +164,14 @@ sub queue_pusher
 			$self-> listen;
 			return;
 		}
+		$q = $self-> {queue}-> [0];
 
 		# fire up the next request
 		warn _d($self) . ": sending msg ",
-			length($msg), " bytes ",
-			_t($deadline),
+			length($q->[2]), " bytes ",
+			_t($q->[3]),
 			"\n" if $DEBUG;
-		context $self-> pusher, $self, $msg, $deadline;
+		context $self-> pusher, $self, $q->[2], $q->[3];
 		again;
 	}}
 }
@@ -206,7 +207,7 @@ sub is_listening { $_[0]-> {listener}     and $_[0]-> {listener}->     is_waitin
 
 sub push
 {
-	my ( $self, $push) = @_;
+	my ( $self) = @_;
 
 	croak "won't start, have errors: $self->{error}" if $self-> {error};
 	croak "won't start, already pushing"   if $self-> is_pushing;
@@ -221,7 +222,7 @@ sub push
 
 sub listen
 {
-	my ( $self, $listen) = @_;
+	my ( $self) = @_;
 
 	# need explicit consent
 	return unless $self-> {async};
@@ -254,17 +255,17 @@ sub cancel_queue
 sub new_message
 {
 	my ( $self, $msg, $deadline) = @_;
-
+ 
 	return lambda { $self-> error } if $self-> error;
 
-	warn _d($self) . " > msg", _t($deadline), " ", length($msg), " bytes\n" if $DEBUG;
+	warn _d($self) . " > msg ", _t($deadline), " ", length($msg), " bytes\n" if $DEBUG;
 	
 	# won't end until we call resolve
 	my $outer = IO::Lambda-> new;
 	my $bind  = $outer-> bind;
 	CORE::push @{ $self-> {queue} }, [ $outer, $bind, $msg, $deadline ];
 
-	$self-> push(1) if 1 == @{$self-> {queue}} and not $self-> is_listening;
+	$self-> push if 1 == @{$self-> {queue}} and not $self-> is_listening;
 
 	return $outer;
 }
@@ -293,7 +294,7 @@ sub read
 	my $self = $_[0];
 
 	my $size = readline($self-> {r});
-	die "bad size" unless $size =~ /^[0-9a-f]+\n$/i;
+	die "bad size" unless defined($size) and $size =~ /^[0-9a-f]+\n$/i;
 	chop $size;
 	$size = 1 + hex $size;
 

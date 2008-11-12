@@ -1,11 +1,17 @@
-# $Id: DBI.pm,v 1.7 2008/11/05 20:43:03 dk Exp $
+# $Id: DBI.pm,v 1.8 2008/11/12 11:47:02 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
 
+my $DEBUG_DUMP = (($IO::Lambda::DEBUG{dbi} || 0) > 1);
+require Data::Dumper if $DEBUG_DUMP;
+
 sub encode
 {
 	my $self = $_[0];
+
+	return Data::Dumper::Dumper($_[1]) if $DEBUG_DUMP;
+
 	my $msg;
 	eval { $msg = freeze( $_[1] ) };
 	return $@ ? ( undef, $@) : $msg;
@@ -14,6 +20,13 @@ sub encode
 sub decode 
 {
 	my $self = $_[0];
+
+	if ( $DEBUG_DUMP) {
+		my $VAR1;
+		eval { eval $_[1] };
+		return $@ ? ( undef, $@) : $VAR1;
+	}
+
 	my $msg;
 	eval { $msg = thaw( $_[1] ); };
 	return $@ ? ( undef, $@) : $msg;
