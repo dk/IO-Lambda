@@ -1,4 +1,4 @@
-# $Id: 17_flock.t,v 1.2 2008/11/14 20:13:56 dk Exp $
+# $Id: 17_flock.t,v 1.3 2008/11/14 20:55:50 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -32,4 +32,5 @@ lambda {
 }-> wait;
 ok( $got_it == 1, "lock ok ($got_it)");
 
+close F;
 unlink 'test.lock';
