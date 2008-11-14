@@ -1,8 +1,8 @@
-# $Id: SNMP.pm,v 1.12 2008/11/01 12:33:37 dk Exp $
+# $Id: SNMP.pm,v 1.13 2008/11/14 13:10:32 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
-	@ISA @EXPORT_OK %EXPORT_OK 
+	@ISA @EXPORT_OK %EXPORT_TAGS 
 	$MASTER %ACTIVE_FDS %PASSIVE_FDS 
 	@TIMER $TIMER_ACTIVE
 );
@@ -10,13 +10,13 @@ use vars qw(
 my @methods = qw(get fget getnext fgetnext set bulkwalk);
 @EXPORT_OK = map { "snmp$_" } @methods;
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
+$DEBUG = $IO::Lambda::DEBUG{snmp} || 0;
 
 use strict;
 use warnings;
 use SNMP;
 use IO::Handle;
 use Exporter;
-use Sub::Name;
 use Time::HiRes qw(time);
 use IO::Lambda qw(:all :dev);
 
