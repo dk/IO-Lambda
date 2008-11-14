@@ -1,4 +1,5 @@
-# $Id: 17_flock.t,v 1.3 2008/11/14 20:55:50 dk Exp $
+#! /usr/bin/perl
+# $Id: 17_flock.t,v 1.4 2008/11/14 21:49:41 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
