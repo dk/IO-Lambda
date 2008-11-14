@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.119 2008/11/14 15:03:46 dk Exp $
+# $Id: Lambda.pm,v 1.120 2008/11/14 20:14:52 dk Exp $
 
 package IO::Lambda;
 
@@ -16,7 +16,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
-$VERSION     = '0.39';
+$VERSION     = '0.40';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -2309,7 +2309,7 @@ displays I/O debug messages from C<IO::Lambda> (with extra verbosity) and from
 C<IO::Lambda::HTTP>. C<IO::Lambda> respond for the following keys: I<io> (async
 operations), I<lambda> (sync operations), I<die> (stack trace), I<loop> (set
 loop module). Keys recognized for the other modules:
-select,dbi,http,https,signal,message,thread,fork.
+select,dbi,http,https,signal,message,thread,fork,poll,flock.
 
 =head1 MAILING LIST
 

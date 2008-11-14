@@ -96,3 +96,5 @@
 0.39 - 7 Nov 2008
 	finalize thread and fork API
 
+0.40 - 14 Nov 2008
+	add Loop::Poll and Flock
