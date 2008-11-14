@@ -1,4 +1,4 @@
-# $Id: Flock.pm,v 1.2 2008/11/14 20:13:56 dk Exp $
+# $Id: Flock.pm,v 1.3 2008/11/14 20:18:26 dk Exp $
 package IO::Lambda::Flock;
 use vars qw($DEBUG @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -28,7 +28,7 @@ sub flock(&)
 	return this-> override_handler('flock', \&flock, shift)
 		if this-> {override}->{flock};
 
-	my $cb = _subname lock => shift;
+	my $cb = _subname flock => shift;
 	my ($fh, %opt) = context;
 	my $deadline = exists($opt{timeout}) ? $opt{timeout} : $opt{deadline};
 
