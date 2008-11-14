@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.118 2008/11/12 11:47:02 dk Exp $
+# $Id: Lambda.pm,v 1.119 2008/11/14 15:03:46 dk Exp $
 
 package IO::Lambda;
 
@@ -1158,6 +1158,12 @@ sub resolve
 		warn _d( $self, 'stopped') if $DEBUG_LAMBDA;
 		$self-> {stopped} = 1;
 	}
+}
+
+sub callout
+{
+	my ( $self, $cb, @param) = @_;
+	@{$self->{last}} = $cb ? $cb-> (@param) : @param;
 }
 
 sub add_loop     { push @LOOPS, shift }
