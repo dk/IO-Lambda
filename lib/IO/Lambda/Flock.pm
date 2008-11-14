@@ -1,4 +1,4 @@
-# $Id: Flock.pm,v 1.1 2008/11/14 15:06:24 dk Exp $
+# $Id: Flock.pm,v 1.2 2008/11/14 20:13:56 dk Exp $
 package IO::Lambda::Flock;
 use vars qw($DEBUG @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -29,9 +29,14 @@ sub flock(&)
 		if this-> {override}->{flock};
 
 	my $cb = _subname lock => shift;
-	my ($fh, $deadline, $shared) = context;
+	my ($fh, %opt) = context;
+	my $deadline = exists($opt{timeout}) ? $opt{timeout} : $opt{deadline};
 
-	poll_event( $cb, \&lock, \&poll_flock, $deadline, $fh, $shared);
+	poll_event(
+		$cb, \&lock, \&poll_flock, 
+		$deadline, $opt{frequency}, 
+		$fh, $opt{shared}
+	);
 }
 
 1;
@@ -54,12 +59,35 @@ The module implements a non-blocking flock(2) wrapper by polling
 
 =over
 
-=item flock($filehandle, $deadline, $shared) -> ($lock_obtained = 1 | $timeout = 0)
+=item flock($filehandle, %options) -> ($lock_obtained = 1 | $timeout = 0)
 
 Waits for lock to be obtained, or expired. If succeeds, the (shared or
 exclusive) lock is already obtained by C<flock($filehandle, LOCK_NB)> call.
+Options:
+
+=over
+
+=item C<timeout> or C<deadline>
+
+These two options are synonyms, both declare when the waiting for the lock
+should give up. If undef, timeout never occurs.
+
+=item shared
+
+If set, C<LOCK_SH> is used, otherwise C<LOCK_EX>.
+
+=item frequency
+
+Defines how often the polling for lock release should occur. If left undefined,
+polling occurs in idle time, when the other events are dispatched.
 
 =back
+
+=back
+
+=head1 SEE ALSO
+
+L<Fcntl>, L<IO::Lambda::Loop::Poll>.
 
 =head1 AUTHOR
 

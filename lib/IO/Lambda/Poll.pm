@@ -1,8 +1,8 @@
-# $Id: Poll.pm,v 1.1 2008/11/14 15:06:24 dk Exp $
+# $Id: Poll.pm,v 1.2 2008/11/14 20:13:56 dk Exp $
 package IO::Lambda::Loop::Poll;
 use vars qw(
 	@ISA @EXPORT_OK %EXPORT_TAGS 
-	$DEBUG @RECORDS @TIMER $TIMER_ACTIVE $MASTER $FREQUENCY
+	$DEBUG @RECORDS @TIMER $TIMER_ACTIVE $MASTER
 );
 
 $DEBUG = $IO::Lambda::DEBUG{poll} || 0;
@@ -14,8 +14,6 @@ use strict;
 use warnings;
 use Time::HiRes qw(time);
 use IO::Lambda qw(:all :dev set_frame get_frame);
-
-$FREQUENCY = 0.2;
 
 $MASTER = bless {}, __PACKAGE__;
 
@@ -77,14 +75,21 @@ sub yield
 
 sub reset_timer
 {
-	my $expires;
+	my ( $expires, $frequency);
 	for my $rec (@RECORDS) {
-		my $deadline = $rec-> {deadline};
-		next unless defined $deadline;
-		$expires = $deadline if not defined($expires) or $expires > $deadline;
+		my ($f,$d) = @{$rec}{qw(frequency deadline)};
+		$frequency = $f if not defined($frequency) or (defined($f) and $frequency > $f);
+		$expires   = $d if not defined($expires)   or (defined($d) and $expires   > $d); 
 	}
 
-	$expires = time + $FREQUENCY if not defined($expires) and @RECORDS;
+	if ( defined $frequency) {
+		$frequency += time;
+		if ( defined $expires) {
+			$expires = $frequency if $expires > $frequency;
+		} elsif ( @RECORDS) {
+			$expires = $frequency;
+		}
+	}
 
 	if ( defined $expires) {
 		if ( $TIMER_ACTIVE) {
@@ -114,19 +119,20 @@ sub reset_timer
 
 sub poll_event
 {
-	my ( $cb, $method, $poller, $deadline, @param ) = @_;
+	my ( $cb, $method, $poller, $deadline, $frequency, @param ) = @_;
 
 	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
 	
 	push @RECORDS, {
-		this     => this,
-		bind     => this-> bind,
-		method   => $method,
-		callback => $cb,
-		context  => [ context ],
-		poller   => $poller,
-		deadline => $deadline,
-		param    => \@param,
+		this      => this,
+		bind      => this-> bind,
+		method    => $method,
+		callback  => $cb,
+		context   => [ context ],
+		poller    => $poller,
+		deadline  => $deadline,
+		param     => \@param,
+		frequency => $frequency,
 	};
 
 	reset_timer;
@@ -195,7 +201,7 @@ provides a layer between them and the lambda framework.
 
 =over
 
-=item poll_event $callback, $method, $poller, $deadline, @param
+=item poll_event $callback, $method, $poller, $deadline, $frequency, @param
 
 Registers a polling event on the current lambda. C<$poller> will be called with
 first parameter as the expiration flag, so it will be up to the porgrammer how
@@ -205,7 +211,10 @@ must not be watched anymore, and the associated lambda must be notified of the
 event. Other parameters are passed to C<$callback>, in free form, according to
 the API that the caller of C<poll_event> implements.
 
-Returns the newly created event record
+C<$frequency> sets up the polling frequency. If undef, then polling occurs
+during idle time, when other events are passing.
+
+Returns the newly created event record.
 
 =item poll_cancel $rec
 
@@ -217,10 +226,6 @@ the graceful remove, use one of the following:
 or
 
     $lambda-> cancel_all_events;
-
-=item $FREQUENCY = 0.2 sec
-
-Sets how often rounds of polls are called.
 
 =back
 
