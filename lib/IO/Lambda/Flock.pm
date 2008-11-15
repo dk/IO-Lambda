@@ -1,4 +1,4 @@
-# $Id: Flock.pm,v 1.3 2008/11/14 20:18:26 dk Exp $
+# $Id: Flock.pm,v 1.4 2008/11/15 22:08:36 dk Exp $
 package IO::Lambda::Flock;
 use vars qw($DEBUG @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -47,7 +47,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::FLock - lambda-style file locking
+IO::Lambda::Flock - lambda-style file locking
 
 =head1 DESCRIPTION
 

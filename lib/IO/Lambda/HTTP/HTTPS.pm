@@ -1,4 +1,4 @@
-# $Id: HTTPS.pm,v 1.10 2008/11/08 10:32:03 dk Exp $
+# $Id: HTTPS.pm,v 1.11 2008/11/15 22:09:34 dk Exp $
 package IO::Lambda::HTTP::HTTPS;
 
 use strict;
@@ -91,7 +91,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::HTTPS - https requests lambda style
+IO::Lambda::HTTP::HTTPS - https requests lambda style
 
 =head1 DESCRIPTION
 
