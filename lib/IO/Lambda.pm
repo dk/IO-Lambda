@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.120 2008/11/14 20:14:52 dk Exp $
+# $Id: Lambda.pm,v 1.121 2008/11/16 20:04:09 dk Exp $
 
 package IO::Lambda;
 
@@ -1278,8 +1278,8 @@ C<IO::Select>, C<IO::Epoll>, C<IO::Kqueue> etc. I won't go deepeer into
 describing pros and contras for programming on this level, this should be more
 or less obvious.
 
-Perl modules of the next abstraction layer are often characterised by two
-things: portability and event loops. While the first layer calls are seldom
+Perl modules of the next abstraction layer are often characterised by
+portability and event loops. While the modules of the first layer are seldom
 portable, and have no event loops, the second layer modules strive to be
 OS-independent, and use callbacks to ease the async IO programming. These
 modules mostly populate the "asynchronous input-output programming frameworks"
@@ -1301,7 +1301,7 @@ C<Prima>, or C<AnyEvent>, depending on the nature of the task.
 C<IO::Lambda> also allows the programmer to build complex protocols, and is
 also based on event loops, callbacks, and is portable. It differs from C<POE>
 in the way the FSMs are declared. Where C<POE> requires an explicit switch from
-one state to another, using (f.ex.) C<post> or C<yield> commands, C<IO::Lambda>
+one state to another, using f.ex. C<post> or C<yield> commands, C<IO::Lambda>
 incorporates the switching directly into the program syntax. Consider C<POE>
 code:
 
@@ -2295,6 +2295,10 @@ file handles.
 
 L<IO::Lambda::DBI> - asynchronous DBI
 
+=item *
+
+L<IO::Lambda::Flock> - flock(2) wrapper
+
 =back
 
 =head1 DEBUGGING
@@ -2306,10 +2310,10 @@ For example,
       env IO_LAMBDA_DEBUG=io=2,http perl script.pl
 
 displays I/O debug messages from C<IO::Lambda> (with extra verbosity) and from
-C<IO::Lambda::HTTP>. C<IO::Lambda> respond for the following keys: I<io> (async
+C<IO::Lambda::HTTP>. C<IO::Lambda> responds for the following keys: I<io> (async
 operations), I<lambda> (sync operations), I<die> (stack trace), I<loop> (set
 loop module). Keys recognized for the other modules:
-select,dbi,http,https,signal,message,thread,fork,poll,flock.
+I<select,dbi,http,https,signal,message,thread,fork,poll,flock>.
 
 =head1 MAILING LIST
 
