@@ -1,4 +1,4 @@
-# $Id: Flock.pm,v 1.4 2008/11/15 22:08:36 dk Exp $
+# $Id: Flock.pm,v 1.5 2008/11/16 21:15:04 dk Exp $
 package IO::Lambda::Flock;
 use vars qw($DEBUG @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -10,7 +10,7 @@ use strict;
 use warnings;
 use Fcntl ':flock';
 use IO::Lambda qw(:all :dev);
-use IO::Lambda::Loop::Poll qw(poll_event);
+use IO::Lambda::Poll qw(poll_event);
 
 sub poll_flock
 {
@@ -33,11 +33,32 @@ sub flock(&)
 	my $deadline = exists($opt{timeout}) ? $opt{timeout} : $opt{deadline};
 
 	poll_event(
-		$cb, \&lock, \&poll_flock, 
+		$cb, \&flock, \&poll_flock, 
 		$deadline, $opt{frequency}, 
 		$fh, $opt{shared}
 	);
 }
+
+
+# The same code can be written way more elegant:
+#
+#	sub flock(&)
+#	{
+#		poller { 
+#			my %opt = @_;
+#			CORE::flock( 
+#				$opt{fh}, 
+#				LOCK_NB | ($opt{shared} ? LOCK_SH : LOCK_EX
+#			);
+#		}
+#		-> call(context)
+#		-> predicate(shift, \&flock, 'flock')
+#	}
+#
+#  but will require another calling style:
+#
+#	context fh => $fh, deadline => 5;
+#	flock { ok }
 
 1;
 
@@ -87,7 +108,7 @@ polling occurs in idle time, when the other events are dispatched.
 
 =head1 SEE ALSO
 
-L<Fcntl>, L<IO::Lambda::Loop::Poll>.
+L<Fcntl>, L<IO::Lambda::Poll>.
 
 =head1 AUTHOR
 

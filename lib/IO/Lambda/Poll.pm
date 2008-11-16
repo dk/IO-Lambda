@@ -1,5 +1,5 @@
-# $Id: Poll.pm,v 1.3 2008/11/16 20:58:50 dk Exp $
-package IO::Lambda::Loop::Poll;
+# $Id: Poll.pm,v 1.4 2008/11/16 21:15:04 dk Exp $
+package IO::Lambda::Poll;
 use vars qw(
 	@ISA @EXPORT_OK %EXPORT_TAGS 
 	$DEBUG @RECORDS @TIMER $TIMER_ACTIVE $MASTER
@@ -25,8 +25,8 @@ END {
 };
 
 # There'll also be a single timer as we need timeouts
-$TIMER[WATCH_OBJ] = bless {}, "IO::Lambda::Loop::Poll::Timer";
-sub IO::Lambda::Loop::Poll::Timer::io_handler
+$TIMER[WATCH_OBJ] = bless {}, "IO::Lambda::Poll::Timer";
+sub IO::Lambda::Poll::Timer::io_handler
 {
 	warn "poll.timer < expired\n" if $DEBUG;
 	$TIMER_ACTIVE = 0;
@@ -183,7 +183,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Loop::Poll - emulate asynchronous behavior by polling
+IO::Lambda::Poll - emulate asynchronous behavior by polling
 
 =head1 DESCRIPTION
 
@@ -192,13 +192,14 @@ provides a layer between them and the lambda framework.
 
 =head1 SYNOPSIS
 
-    use IO::Lambda qw(:all :dev);
-    use IO::Lambda::Loop::Poll qw(poll_event);
-
-    my $poller = poller { check_if_something_is_ready };
+    use IO::Lambda qw(:lambda);
+    use IO::Lambda::Poll qw(poller);
 
     lambda {
-       context $poller, timeout => 5;
+       context 
+          poller { check_if_ready }, 
+	  timeout   => 5,
+	  frequency => 0.1;
     tail {
        print shift() ? "ok\n" : "timeout\n";
     }}
@@ -234,7 +235,7 @@ Returns the newly created event record.
 Example of use:
 
     use IO::Lambda qw(:all :dev);
-    use IO::Lambda::Loop::Poll qw(poll_event);
+    use IO::Lambda::Poll qw(poll_event);
 
     sub check_status(&)
     {

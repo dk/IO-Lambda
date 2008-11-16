@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.121 2008/11/16 20:04:09 dk Exp $
+# $Id: Lambda.pm,v 1.122 2008/11/16 21:15:04 dk Exp $
 
 package IO::Lambda;
 
@@ -2294,6 +2294,10 @@ file handles.
 =item *
 
 L<IO::Lambda::DBI> - asynchronous DBI
+
+=item *
+
+L<IO::Lambda::Poll> - generic polling wrapper
 
 =item *
 
