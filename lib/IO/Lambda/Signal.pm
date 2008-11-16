@@ -1,8 +1,8 @@
-# $Id: Signal.pm,v 1.16 2008/11/08 07:57:03 dk Exp $
+# $Id: Signal.pm,v 1.17 2008/11/16 22:31:42 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(signal pid spawn);
+@EXPORT_OK = qw(signal pid spawn new_signal new_pid new_process);
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
 
 our $DEBUG = $IO::Lambda::DEBUG{signal} || 0;
@@ -19,8 +19,22 @@ my $MASTER = bless {}, __PACKAGE__;
 IO::Lambda::add_loop($MASTER);
 END { IO::Lambda::remove_loop($MASTER) };
 
-sub remove {}
 sub empty { 0 == keys %SIGDATA }
+
+sub remove
+{
+	my $lambda = $_[1];
+	my %rec;
+	keys %SIGDATA;
+	while ( my ($id, $v) = each %SIGDATA) {
+		for my $r (@{$v-> {lambdas}}) {
+			push @{$rec{$id}}, $r-> [0];
+		}
+	}
+	while ( my ($id, $v) = each %rec) {
+		unwatch_signal( $id, $_ ) for @$v;
+	}
+}
 
 sub yield
 {
