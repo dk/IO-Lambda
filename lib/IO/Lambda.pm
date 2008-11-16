@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.122 2008/11/16 21:15:04 dk Exp $
+# $Id: Lambda.pm,v 1.123 2008/11/16 21:39:56 dk Exp $
 
 package IO::Lambda;
 
@@ -1900,7 +1900,7 @@ Let's take a lambda that needs to implement a very simple HTTP/0.9 request:
 
 C<getline> will read from C<$handle> to C<$buf>, and will wake up when new line
 is there. However, what if we need, for example, HTTPS instead of HTTP, where
-reading from socket may involve some writing, and of course some, waiting?
+reading from socket may involve some writing, and of course some waiting?
 Then the first default parameter to getline has to be replaced. By default, 
 
    context getline, $handle, $buf;
@@ -1930,9 +1930,9 @@ instead, that should conform to sysreader signature:
    }
 
 I don't show the actual implementation of a HTTPS read (if you're curious, look
-at L<IO::Lambda::HTTPS> ), but the idea is that inside that reader, it is
+at L<IO::Lambda::HTTP::HTTPS> ), but the idea is that inside that reader, it is
 perfectly fine to do any number of read and write operations, and wait for
-their completion, as long as the lambda will sooner or later return the data.
+their completion, as long as the lambda will sooner or later returns the data.
 C<getline> (or, rather, C<readbuf> that C<getline> is based on) won't care
 about internal states of the reader. 
 
