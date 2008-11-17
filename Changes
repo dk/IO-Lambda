@@ -98,3 +98,6 @@
 
 0.40 - 14 Nov 2008
 	add Loop::Poll and Flock
+
+0.41 - 17 Nov 2008
+	rename Loop::Poll to Poll, add generic poller(&)
