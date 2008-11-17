@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 15_thread.t,v 1.10 2008/11/14 21:06:33 dk Exp $
+# $Id: 15_thread.t,v 1.11 2008/11/17 14:27:22 dk Exp $
 
 use strict;
 use warnings;
@@ -39,9 +39,9 @@ ok( $ret eq '123', "join all ($ret)" );
 my $t;
 this lambda {
 	context
-		0.2,
+		0.8,
 		threaded { 2 },
-		$t = threaded { sec(5); 1 };
+		$t = threaded { sec(10); 1 };
 	any_tail { join('', sort map { $_-> peek } @_) }
 };
 $ret = this-> wait;
