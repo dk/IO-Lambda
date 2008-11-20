@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 17_flock.t,v 1.4 2008/11/14 21:49:41 dk Exp $
+# $Id: 17_flock.t,v 1.5 2008/11/20 08:48:10 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -8,14 +8,21 @@ use IO::Lambda::Flock qw(flock);
 
 alarm(10);
 
-plan tests => 3;
+plan tests => 2;
 
 open G, ">test.lock";
-CORE::flock( \*G, LOCK_EX);
+my $m = CORE::flock( \*G, LOCK_EX);
+unless ( $m) {
+	unlink 'test.lock';
+	plan skip_all => "flock(2) is not functional";
+}
 
 open F, ">test.lock";
 my $l = CORE::flock(\*F, LOCK_EX|LOCK_NB);
-ok( not($l), "initial lock is not obtained");
+if ( $l) {
+	unlink 'test.lock';
+	plan skip_all => "flock(2) is broken";
+}
 
 my $got_it = 2;
 lambda {
