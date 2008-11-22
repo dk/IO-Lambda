@@ -1,4 +1,4 @@
-# $Id: Poll.pm,v 1.4 2008/11/16 21:15:04 dk Exp $
+# $Id: Poll.pm,v 1.5 2008/11/22 16:28:05 dk Exp $
 package IO::Lambda::Poll;
 use vars qw(
 	@ISA @EXPORT_OK %EXPORT_TAGS 
@@ -210,8 +210,8 @@ provides a layer between them and the lambda framework.
 
 =item poller (polling_function :: (%opt -> boolean)) :: (%opt) -> boolean
 
-Accepts anonymous code, that returns a single boolean flag, which shows whether
-polling succeeded or not. Returns a new lambda, that accepts C<'timeout'>,
+Accepts code reference, that returns boolean value, which shows whether
+the polling succeeded or not. Returns a new lambda, that accepts C<'timeout'>,
 C<'deadline'>, and C<'frequency'> options ( see C<poll_event> below for options
 description). The lambda returns 1 if polling succeeds within a given time
 span, or 0 otherwise.  The options passed to the lambda are also passed to the
@@ -220,7 +220,7 @@ polling function.
 =item poll_event $callback, $method, $poller, $deadline, $frequency, @param
 
 Registers a polling event on the current lambda. C<$poller> will be called with
-first parameter as the expiration flag, so it will be up to the porgrammer how
+first parameter as the expiration flag, so it will be up to the programmer how
 to respond if both polling succeeded and timeout occured. C<$poller> must
 return first parameter the success flag, which means, if true, that the event
 must not be watched anymore, and the associated lambda must be notified of the
