@@ -101,3 +101,6 @@
 
 0.41 - 17 Nov 2008
 	rename Loop::Poll to Poll, add generic poller(&)
+
+0.42 - 23 Nov 2008
+	cosmetic changes
