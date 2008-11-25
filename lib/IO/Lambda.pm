@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.125 2008/11/23 18:34:21 dk Exp $
+# $Id: Lambda.pm,v 1.126 2008/11/25 07:51:22 dk Exp $
 
 package IO::Lambda;
 
@@ -16,7 +16,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
-$VERSION     = '0.42';
+$VERSION     = '0.43';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
