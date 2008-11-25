@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 17_flock.t,v 1.5 2008/11/20 08:48:10 dk Exp $
+# $Id: 17_flock.t,v 1.6 2008/11/25 07:47:06 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -7,8 +7,6 @@ use IO::Lambda qw(:all);
 use IO::Lambda::Flock qw(flock);
 
 alarm(10);
-
-plan tests => 2;
 
 open G, ">test.lock";
 my $m = CORE::flock( \*G, LOCK_EX);
@@ -23,6 +21,8 @@ if ( $l) {
 	unlink 'test.lock';
 	plan skip_all => "flock(2) is broken";
 }
+
+plan tests => 2;
 
 my $got_it = 2;
 lambda {
