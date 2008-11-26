@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 17_flock.t,v 1.6 2008/11/25 07:47:06 dk Exp $
+# $Id: 17_flock.t,v 1.7 2008/11/26 14:49:55 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -32,13 +32,20 @@ lambda {
 ok( $got_it == 0, "timeout ok ($got_it)");
 
 $got_it = 2;
+SKIP: {
+
+my $order = '';
 lambda {
 	context \*F, timeout => 2.0, frequency => 0.2;
-	flock { $got_it = ( shift() ? 1 : 0) };
+	flock { $got_it = ( shift() ? 1 : 0); $order .= 'K' };
 	context 0.5;
-	sleep { close G };
+	sleep { close G; $order .= 'O' };
 }-> wait;
-ok( $got_it == 1, "lock ok ($got_it)");
+
+($order eq 'OK') ? 
+	ok( $got_it == 1, "lock ok ($got_it)") : 
+	skip("got a race condition($order)", 1);
+}
 
 close F;
 unlink 'test.lock';
