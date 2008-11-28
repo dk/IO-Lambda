@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.8 2008/11/12 11:47:02 dk Exp $
+# $Id: DBI.pm,v 1.9 2008/11/28 13:14:24 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -173,9 +173,9 @@ waited for
 
 =head1 SYNOPSIS
 
-	use IO::Lambda qw(:all);
-	use IO::Lambda::DBI;
-	use IO::Lambda::Thread qw(threaded);
+    use IO::Lambda qw(:all);
+    use IO::Lambda::DBI;
+    use IO::Lambda::Thread qw(threaded);
 
     # use threads as a transport
     my $t = threaded {
