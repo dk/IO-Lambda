@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.9 2008/11/28 13:14:24 dk Exp $
+# $Id: DBI.pm,v 1.10 2008/11/28 13:18:25 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -175,16 +175,15 @@ waited for
 
     use IO::Lambda qw(:all);
     use IO::Lambda::DBI;
-    use IO::Lambda::Thread qw(threaded);
+    use IO::Lambda::Thread qw(new_thread);
 
     # use threads as a transport
-    my $t = threaded {
+    my ($thread, $socket) = new_thread( sub {
         my $socket = shift;
         IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
-    };
-    $t-> start;
-    $t-> join_on_read(0);
-    my $dbi = IO::Lambda::DBI-> new( $t-> socket, $t-> socket);
+    }, 1);
+	
+    my $dbi = IO::Lambda::DBI-> new($socket, $socket);
 
     # execute a query
     print lambda {
@@ -201,7 +200,7 @@ waited for
     }}}}-> wait, "\n";
 
     # finalize
-    $t-> join;
+    $thread-> join;
 
 =head1 IO::Lambda::DBI
 
