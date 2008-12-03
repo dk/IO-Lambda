@@ -1,4 +1,4 @@
-# $Id: NTLM.pm,v 1.7 2008/10/18 08:41:45 dk Exp $
+# $Id: NTLM.pm,v 1.8 2008/12/03 22:42:05 dk Exp $
 
 package IO::Lambda::HTTP::Authen::NTLM;
 
@@ -41,7 +41,7 @@ sub authenticate
         	$r-> header('Authorization' => "$method ". $ntlm-> challenge($challenge));
 
 		context $self-> handle_connection( $r);
-		&tail;
+		&tail();
 	}}
 }
 
