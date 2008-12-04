@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.129 2008/12/04 11:48:14 dk Exp $
+# $Id: Lambda.pm,v 1.130 2008/12/04 11:54:43 dk Exp $
 
 package IO::Lambda;
 
@@ -2305,10 +2305,10 @@ L<IO::Lambda::Flock> - flock(2) wrapper
 
 =back
 
-=head1 DEBUGGING
+=head2 Debugging
 
 Various modules can be controlled with the single environment variable,
-C<IO_LAMBDA_DEBUG>, which is treated a comma-separated list of modules.
+C<IO_LAMBDA_DEBUG>, which is treated as a comma-separated list of modules.
 For example,
 
       env IO_LAMBDA_DEBUG=io=2,http perl script.pl
@@ -2319,12 +2319,12 @@ operations), I<lambda> (sync operations), I<die> (stack trace), I<loop> (set
 loop module). Keys recognized for the other modules:
 I<select,dbi,http,https,signal,message,thread,fork,poll,flock>.
 
-=head1 MAILING LIST
+=head2 Mailing list
 
 I<io-lambda-general at lists.sourceforge.net>, thanks to sourceforge.
 Subscribe by visiting L<https://lists.sourceforge.net/lists/listinfo/io-lambda-general>.
 
-=head1 BENCHMARKS
+=head2 Benchmarks
 
 =over
 
