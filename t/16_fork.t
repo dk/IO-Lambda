@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 16_fork.t,v 1.7 2008/11/17 14:27:22 dk Exp $
+# $Id: 16_fork.t,v 1.8 2008/12/04 09:08:24 dk Exp $
 
 use strict;
 use warnings;
@@ -7,6 +7,8 @@ use Test::More;
 use Config;
 
 BEGIN {
+	plan skip_all => 'this perl is older than 5.8.0, go away'
+		if $Config{api_version} < 8;
 	plan skip_all => 'fork is not supported on this platform'
 		if $^O =~ /win32/i;
 };

@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.7 2008/11/07 19:54:53 dk Exp $
+# $Id: Fork.pm,v 1.8 2008/12/04 09:08:24 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -237,6 +237,8 @@ Doesn't work on Win32, because relies on C<$SIG{CHLD}> which is not getting
 delivered (on 5.10.0 at least). However, since Win32 doesn't have forks anyway,
 Perl emulates them with threads. Use L<IO::Lambda::Thread> instead when running
 on windows.
+
+Has issues with SIGCHLD on perls < 5.8.0.
 
 =head1 AUTHOR
 
