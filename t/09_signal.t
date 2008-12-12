@@ -1,15 +1,16 @@
 #! /usr/bin/perl
-# $Id: 09_signal.t,v 1.6 2008/11/20 19:31:57 dk Exp $
+# $Id: 09_signal.t,v 1.7 2008/12/12 07:40:53 dk Exp $
 
 use strict;
 use warnings;
 
 use Time::HiRes;
-use Test::More tests => 2;
+use Test::More;
 use IO::Lambda qw(:all);
 use IO::Lambda::Signal qw(:all);
 	
 plan skip_all => "Time::HiRes fails on dragonfly and noone cares" if $^O eq 'dragonfly';
+plan tests    => 2;
 
 # alarm expires
 this lambda {
