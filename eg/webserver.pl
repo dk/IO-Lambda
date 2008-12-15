@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: webserver.pl,v 1.1 2008/08/07 09:23:46 dk Exp $
+# $Id: webserver.pl,v 1.2 2008/12/15 17:50:10 dk Exp $
 #
 =pod
 
@@ -65,19 +65,24 @@ my $serv = lambda {
 			return close($conn);
 		}
 
-		substr( $buf, 0, length($match)) = '';
-		again;
-	
 		# handle request
+		substr( $buf, 0, length($match)) = '';
 		my $req = HTTP::Request-> parse( $match);
 		unless ( $req) {
-			print $conn "bad request\n";
-			return;
+			print $conn "bad request\r\n";
+			return close($conn);
 		}
+	
+		if ( lc($req-> protocol) ne 'http/1.1') {
+			print $conn "404 HTTP/1.1 only\r\n";
+			return close($conn);
+		}
+
+		again;
 
 		# send response
 		my $resp = handle( $req, $session)-> as_string;
-		context writebuf, $conn, \$resp, length($resp), 0, $conn_timeout;
+		context writebuf, $conn, \$resp, length($resp), 1, $conn_timeout;
 		&tail();
 	}}
 };
@@ -87,9 +92,6 @@ sub fail { HTTP::Response-> new( "HTTP/1.1 $_[0]", $_[1] ) }
 sub handle
 {
 	my ( $req, $session) = @_;
-
-	return HTTP::Response-> new( 404, "HTTP/1.1 only")
-		if lc($req-> protocol) ne 'http/1.1';
 
 	return fail(404, "GET request only")
 		if $req-> method ne 'GET';
