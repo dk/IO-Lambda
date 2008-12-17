@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.18 2008/12/17 11:39:05 dk Exp $
+# $Id: Thread.pm,v 1.19 2008/12/17 12:36:36 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -139,7 +139,7 @@ a blocking code. The wrapping is done so that the code is executed in another
 thread's context. C<IO::Lambda::Thread> provides bidirectional communication
 between threads, that is based on a shared socket between parent and child
 threads. The socket can be also used by the caller for its own needs, if necessary
-( see L<IO::Lambda::Message ).
+( see L<IO::Lambda::Message> ).
 
 =head1 SYNOPSIS
 
