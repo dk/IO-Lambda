@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.17 2008/11/16 22:31:42 dk Exp $
+# $Id: Signal.pm,v 1.18 2008/12/17 11:21:12 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -272,8 +272,8 @@ IO::Lambda::Signal - wait for pids and signals
 
 =head1 DESCRIPTION
 
-The module provides access to signal-based callbacks, generic signal listener
-C<signal>, process ID listener C<pid>, and asynchronous version of I<system>
+The module provides access to the signal-based callbacks: generic signal listener
+C<signal>, process ID listener C<pid>, and the asynchronous version of I<system>
 call, C<spawn>.
 
 =head1 SYNOPSIS
@@ -308,28 +308,29 @@ call, C<spawn>.
 
 =item pid ($PID, $TIMEOUT) -> $?|undef
 
-Accepts PID and optional deadline/timeout, returns either process exit status,
+Accepts PID and an optional deadline/timeout, returns either the process' exit status,
 or undef on timeout.  The corresponding lambda is C<new_pid> :
 
    new_pid ($PID, $TIMEOUT) :: () -> $?|undef
 
 =item signal ($SIG, $TIMEOUT) -> boolean
 
-Accepts signal name and optional deadline/timeout, returns 1 if signal was caught,
+Accepts signal name and optional deadline/timeout, returns 1 if the signal was caught,
 or C<undef> on timeout.  The corresponding lambda is C<new_signal> :
 
    new_signal ($SIG, $TIMEOUT) :: () -> boolean
 
 =item spawn (@LIST) -> ( output, $?, $!)
 
-Calls pipe open on C<@LIST>, read all data printed by the child process,
-and waits for the process to finish. Returns three scalars - collected output,
+Calls pipe open on C<@LIST>, reads all data printed by the child process,
+and awaits for the process to finish. Returns three scalars - collected output,
 process exitcode C<$?>, and an error string (usually C<$!>). The corresponding
 lambda is C<new_process> :
 
    new_process (@LIST) :: () -> ( output, $?, $!)
 
-Lambda created by C<new_process> has field C<'pid'> set to the process pid.
+Lambda objects created by C<new_process> have an additional field C<'pid'> 
+initialized with the process pid value.
 
 =back
 
@@ -340,9 +341,9 @@ They do (see L<Win32::Process>) work with win32-specific
 C<WaitforMultipleObjects>, which in turn IO::Lambda doesn't work with.
 
 L<IPC::Run> apparently manages to work on win32 B<and> be compatible with
-C<select>. I don't think that dragging C<IPC::Run> as a dependency here
-worth it, but if you need it, send me a working example so I can at least include
-it here.
+C<select>, by using modules from C<Win32::> namespace. I don't think that
+dragging C<IPC::Run> as a dependency is a good idea, but if you need that, send
+me a working example so I can at least include it here.
 
 =head1 SEE ALSO
 
