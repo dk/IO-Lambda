@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.16 2008/11/08 09:46:19 dk Exp $
+# $Id: Thread.pm,v 1.17 2008/12/17 09:37:52 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -164,7 +164,7 @@ threads. This socket can be used by the caller for its own needs, if necessary.
 
 =over
 
-=item new_thread ( $options = (), $pass_socket, $code, @param) -> ($thread, $socket)
+=item new_thread ( $options = (), $code, $pass_socket, @param) -> ($thread, $socket)
 
 A special replacement for C<< thread-> create >>, that not only creates a
 thread, but also creates a socket between the parent and child threads. That
@@ -182,7 +182,7 @@ C<join>'ed to avoid problems. For example:
     $thread-> join;
 
 Note that C<join> is a blocking call, so one might want to be sure that the
-thread is indeed finished before calling it. By default, the child thread will
+thread indeed is finished before joining it. By default, the child thread will
 close its side of the socket, thus making the parent side readable. However,
 the child code can also hijack the socket for its own needs, so if that
 functionality is needed, one must create an extra layer of communication that
