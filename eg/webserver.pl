@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: webserver.pl,v 1.2 2008/12/15 17:50:10 dk Exp $
+# $Id: webserver.pl,v 1.3 2008/12/17 12:58:55 dk Exp $
 #
 =pod
 
@@ -82,7 +82,7 @@ my $serv = lambda {
 
 		# send response
 		my $resp = handle( $req, $session)-> as_string;
-		context writebuf, $conn, \$resp, length($resp), 1, $conn_timeout;
+		context writebuf, $conn, \$resp, length($resp), 0, $conn_timeout;
 		&tail();
 	}}
 };
