@@ -1,4 +1,4 @@
-# $Id: Poll.pm,v 1.5 2008/11/22 16:28:05 dk Exp $
+# $Id: Poll.pm,v 1.6 2008/12/17 11:04:46 dk Exp $
 package IO::Lambda::Poll;
 use vars qw(
 	@ISA @EXPORT_OK %EXPORT_TAGS 
@@ -187,7 +187,7 @@ IO::Lambda::Poll - emulate asynchronous behavior by polling
 
 =head1 DESCRIPTION
 
-The module can wrap functions, that can only be used in the polling mode, and
+The module wraps functions, that can only be used in the polling mode, and
 provides a layer between them and the lambda framework.
 
 =head1 SYNOPSIS
@@ -210,9 +210,9 @@ provides a layer between them and the lambda framework.
 
 =item poller (polling_function :: (%opt -> boolean)) :: (%opt) -> boolean
 
-Accepts code reference, that returns boolean value, which shows whether
-the polling succeeded or not. Returns a new lambda, that accepts C<'timeout'>,
-C<'deadline'>, and C<'frequency'> options ( see C<poll_event> below for options
+Accepts a code reference, that returns a boolean value, which indicates whether
+a single-shot polling succeeded or not. Returns a new lambda, that accepts C<'timeout'>,
+C<'deadline'>, and C<'frequency'> options ( see C<poll_event> below for the options
 description). The lambda returns 1 if polling succeeds within a given time
 span, or 0 otherwise.  The options passed to the lambda are also passed to the
 polling function.
@@ -228,7 +228,7 @@ event. Other parameters are passed to C<$callback>, in free form, according to
 the API that the caller of C<poll_event> implements.
 
 C<$frequency> sets up the polling frequency. If undef, then polling occurs
-during idle time, when other events are passing.
+during the idle time, when other events are passing.
 
 Returns the newly created event record.
 

@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.11 2008/11/12 11:47:02 dk Exp $
+# $Id: Message.pm,v 1.12 2008/12/17 11:04:46 dk Exp $
 
 use strict;
 use warnings;
@@ -398,10 +398,11 @@ IO::Lambda::Message - message passing queue
 =head1 DESCRIPTION
 
 The module implements a generic message passing protocol, and two generic
-classes that implement the server and the client functionality. The server
-code is implemented in a simple, blocking fashion, and is only capable
-of simple operations. The client API is written in lambda style, where
-message completion can be asynchronously awaited for.
+classes that implement the server and the client functionality. The server code
+is implemented in a simple, blocking fashion, and is expected to be executed
+remotely. The client API is written in lambda style, where message completion
+can be asynchronously awaited for. The communication between server and client
+is done through two file handles of any type ( stream sockets, pipes, etc ).
 
 =head1 SYNOPSIS
 
@@ -420,15 +421,19 @@ message completion can be asynchronously awaited for.
 
 =head1 Message protocol
 
-The message passing protocol is synchronous, any message is expected to be
-replied to. Messages are prepended with simple header, that is a 8-digit
-hexadecimal length of the message, and 1 byte with value 0x0A (newline).
-After the message another 0x0A byte is followed.
+The message passing protocol featured here is synchronous, which means that any
+message initiated either by server or client is expected to be replied to.
+Both server and client can wait for the message reply, but they cannot
+communicate while waiting.
+
+Messages are prepended with simple header, that is a 8-digit hexadecimal length
+of the message, and 1 byte with value 0x0A (newline).  After the message
+another 0x0A byte is followed.
 
 =head1 IO::Lambda::Message
 
-The class implements a generic message passing queue, that allows to add
-asynchronous messages to the queue, and wait until they are responded to.
+The class implements a generic message passing queue, that allows adding
+asynchronous messages to the queue, and wait for the response.
 
 =over
 
@@ -451,25 +456,25 @@ Custom writer, C<syswriter> by default.
 =item buf :: string
 
 If C<$reader> handle was used (or will be needed to be used) in buffered I/O,
-it's buffer can be passed along to the object.
+its buffer can be passed along to the object.
 
 =item async :: boolean
 
 If set, the object will listen for incoming messages from the server, otherwise
-it will only send outcoming messages. By default 0, and the method C<incoming>
-that must handle the incoming message will die. This functionality is designed
-for derived classes, not for the caller.
+it will only initiate outcoming messages. By default set to 0, and the method
+C<incoming> that handles incoming messages, dies. This functionality is
+designed for derived classes, not for the caller.
 
 =back
 
 =item new_message($message, $deadline = undef) :: () -> ($response, $error)
 
-Registers a message that must be delivered no later than C<$deadline>, and
-returns a lambda that will be ready when the message is responded to.
-The lambda returns the response or the error.
+Registers a new message in the queue. The message must be delivered and replied
+to no later than C<$deadline>, and returns a lambda that will be ready when the
+message is responded to. The lambda returns the response or the error.
 
-Timeout is regarded also as protocol error, so on timeout all messages
-will be also purged, so use with care.
+Upon communication error, all queued messages are discarded.  Timeout is regarded
+as a protocol error too, so use the C<$deadline> option with care.
 
 =item message ($message, $deadline = undef) :: () -> ($response, $error)
 
@@ -482,7 +487,7 @@ Cancels all pending messages, stores C<@reason> in the associated lambdas.
 =item error
 
 Returns the last protocol handling error. If set, no new messages are allowed
-to be registered, and listening will also fail.
+to be registered, and listening will fail too.
 
 =item is_listening
 
@@ -490,7 +495,7 @@ If set, object is listening for asynchronous events from server.
 
 =item is_pushing
 
-If set, object is sedning messages to the server.
+If set, object is sending messages to the server.
 
 =back
 
@@ -498,7 +503,7 @@ If set, object is sedning messages to the server.
 
 The class implements a simple generic protocol dispatcher, that
 executes methods of its own class, and returns the results back
-to the client. The methods have to be defined in the derivative class.
+to the client. The methods have to be defined in a derived class.
 
 =over
 
