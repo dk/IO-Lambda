@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.10 2008/11/28 13:18:25 dk Exp $
+# $Id: DBI.pm,v 1.11 2008/12/17 09:44:25 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -223,7 +223,7 @@ See L<IO::Lambda::Message/new>.
 =item connect($dsn, $user, $auth, %attr) :: dbi_result
 
 Proxies C<DBI::connect>. In case of failure, depending on C<RaiseError> flag,
-returns either C<0 | $error> or C<1 | $error>.
+returns either C<(0,$error)> or C<(1,$error)>.
 
 =item disconnect :: dbi_result
 
