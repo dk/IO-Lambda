@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.42 2008/11/08 10:32:03 dk Exp $
+# $Id: HTTP.pm,v 1.43 2008/12/17 10:51:37 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -485,8 +485,8 @@ IO::Lambda::HTTP - http requests lambda style
 =head1 DESCRIPTION
 
 The module exports a single predicate C<http_request> that accepts a
-C<HTTP::Request> object and set of options as parameters. Returns either a
-C<HTTP::Response> on success, or an error string otherwise.
+C<HTTP::Request> object and set of options as parameters. The predicate returns
+either a C<HTTP::Response> on success, or an error string otherwise.
 
 =head1 SYNOPSIS
 
@@ -512,13 +512,13 @@ C<HTTP::Response> on success, or an error string otherwise.
 
 =over
 
-=item http_request $HTTP::Request
+=item http_request $HTTP::Request -> $HTTP::Response
 
 C<http_request> is a lambda predicate that accepts C<HTTP::Request> object in
 the context. Returns either a C<HTTP::Response> object on success, or error
 string otherwise.
 
-=item new $HTTP::Request
+=item new $HTTP::Request :: () -> $HTTP::Response
 
 Stores C<HTTP::Request> object and returns a new lambda that will finish when
 the associated request completes. The lambda will return either a
@@ -533,17 +533,18 @@ C<HTTP::Response> object on success, or an error string otherwise.
 =item async_dns BOOLEAN
 
 If set, hostname will be resolved with L<IO::Lambda::DNS> using asynchronous
-L<Net::DNS>. Note that this method won't be able to account for non-DNS
-(/etc/hosts, NIS) host names.
+capabilities of L<Net::DNS>. Note that this method won't be able to account for
+non-DNS (/etc/hosts, NIS) host names.
 
 If unset (default), hostnames will be resolved in a blocking manner.
 
 =item auth $AUTH
 
-Normally, a request is sent without any authentication. The authentication
-is only tried after a 401 error is returned. To avoid this first stage,
-knowing in advance the type of authentication that shall be accepted by the
-remote, option C<auth> can be used.
+Normally, a request is sent without any authentication. If the request returns
+error 401, then all available methods of authentication are tried. If the type
+of authentication that shall be accepted by the remote is known in advance, the
+non-authenticated request stage can be skipped altogether by explicitly setting
+the C<auth> option:
 
    username => 'user',
    password => 'pass',
@@ -552,18 +553,19 @@ remote, option C<auth> can be used.
 =item conn_cache $LWP::ConnCache = undef
 
 The requestor can optionally use a C<LWP::ConnCache> object to reuse
-connections on per-host per-port basis.  Desired for HTTP/1.1. Required for
-NTLM authentication.  See L<LWP::ConnCache> for details.
+connections on per-host per-port basis. Desired for HTTP/1.1. Required for the
+NTLM/Negotiate authentication.  See L<LWP::ConnCache> for details.
 
 =item deadline SECONDS = undef
 
-Aborts a request and returns C<'timeout'> string if it is not finished
-by the given deadline (in epoch seconds). If undef, no timeouts occur.
+Aborts a request and returns C<'timeout'> string as an error if the request is
+not finished before the deadline (in epoch seconds). If undef, timeout never
+occurs.
 
 =item keep_alive BOOLEAN
 
-If set, all incoming requests are silently converted to use HTTP/1.1, and connections
-are reused. Same as a combination of the following:
+If set, all incoming request objects are silently converted use HTTP/1.1, and 
+connections are automatically reused. Same as combination of the following:
 
    $req-> protocol('HTTP/1.1');
    $req-> headers-> header( Host => $req-> uri-> host);
@@ -575,12 +577,12 @@ Maximum allowed redirects. If 0, no redirection attemps are made.
 
 =item preferred_auth $AUTH|%AUTH
 
-List of preferred authentication methods, used to choose the authentication
-method where there are more than one supported by the server. When the value is
-a string, the given method is tried first, and then all available methods.
-When it is a hash, its values are treated as weight factors, - the method with
-the greatest weight is tried first. Negative values prevent the corresponding
-methods from being tried.
+Sets list of preferred authentication methods, that is used in selection of the
+authentication method when the remote server supports several. When the value
+is a string, then the given method is tried first, and only then all other
+available methods. When it is a hash, the hash values are treated as weight
+factors, such as, the method with the greatest weight is tried first. Negative
+values prevent the corresponding methods from being tried.
 
      # try basic and whatever else
      preferred_auth => 'Basic',
@@ -591,15 +593,15 @@ methods from being tried.
 	 NTLM  => -1,
      },
 
-Note that the current implementation doesn't provide re-trying of
-authentication if either a method or username/password combination fails.
-When at least one method was declared by the remote as supported, and was
-tried and failed, no further retries are made.
+Note that the current implementation does not provide re-trying of
+authentication if a method, or combination of username and password fails.
+When at least one method is declared by the remote as supported, and was tried,
+and subsequently failed, no further authentication retries are made, and the
+request is reported as failed.
 
 =item proxy HOSTNAME | [ HOSTNAME, PORT ]
 
-If set, HOSTNAME (or HOSTNAME and PORT tuple) is used as HTTP proxy
-settings.
+If set, HOSTNAME (or HOSTNAME and PORT tuple) is used as HTTP proxy.
 
 =item timeout SECONDS = undef
 
@@ -610,7 +612,7 @@ Maximum allowed time the request can take. If undef, no timeouts occur.
 =head1 BUGS
 
 Non-blocking connects, and hence the module, don't work on win32 on perl5.8.X
-due to under-implementation in ext/IO.xs .  They do work on 5.10 however. 
+due to under-implementation in ext/IO.xs.  They do work on 5.10 however. 
 
 =head1 SEE ALSO
 

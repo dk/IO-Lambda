@@ -1,4 +1,4 @@
-# $Id: NTLM.pm,v 1.8 2008/12/03 22:42:05 dk Exp $
+# $Id: NTLM.pm,v 1.9 2008/12/17 10:51:39 dk Exp $
 
 package IO::Lambda::HTTP::Authen::NTLM;
 
@@ -53,7 +53,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::HTTP::Authen::NTLM - Library for enabling NTLM authentication (Microsoft) in IO::Lambda
+IO::Lambda::HTTP::Authen::NTLM - library for enabling NTLM authentication in IO::Lambda::HTTP
 
 =head1 SYNOPSIS
 
@@ -96,6 +96,5 @@ Description copy-pasted from L<LWP::Authen::Ntlm> by Gisle Aas.
 =head1 AUTHOR
 
 Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
-
 
 =cut

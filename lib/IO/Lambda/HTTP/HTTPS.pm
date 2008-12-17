@@ -1,4 +1,4 @@
-# $Id: HTTPS.pm,v 1.11 2008/11/15 22:09:34 dk Exp $
+# $Id: HTTPS.pm,v 1.12 2008/12/17 10:51:38 dk Exp $
 package IO::Lambda::HTTP::HTTPS;
 
 use strict;
@@ -95,9 +95,9 @@ IO::Lambda::HTTP::HTTPS - https requests lambda style
 
 =head1 DESCRIPTION
 
-The module is used internally by L<IO::Lambda::HTTP> and is a separate module
-for installations where underlying C<IO::Socket::SSL> and C<Net::SSLeay> modules
-are installed. The module is not to be used directly.
+The module is used internally by L<IO::Lambda::HTTP>, and is a separate module
+for the sake of installations that contain C<IO::Socket::SSL> and
+C<Net::SSLeay> prerequisite modules.  The module is not to be used directly.
 
 =head1 SEE ALSO
 
