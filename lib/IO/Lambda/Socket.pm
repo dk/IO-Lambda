@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.9 2008/11/01 12:33:37 dk Exp $
+# $Id: Socket.pm,v 1.10 2008/12/17 11:39:05 dk Exp $
 use strict;
 use warnings;
 
@@ -156,12 +156,14 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Socket - primitive lambda socket wrappers
+IO::Lambda::Socket - wrapper predicates for socket functions
 
 =head1 DESCRIPTION
 
-This module provides a set of convenient wrappers for sockets as sources of I/O
-events. The module doesn't account for much lower-lever socket machinery, the
+This module provides a set of convenient wrapper predicates for sockets that
+function as sources of asynchronous events. The predicate names are homonyms of
+the underlying socket functions: C<accept>, C<connect>, C<recv>, and C<send>.
+The module doesn't account for much lower-lever socket machinery, the
 programmer is expected to create non-blocking sockets using C<IO::Socket> or
 C<Socket> modules.
 
@@ -258,28 +260,28 @@ UDP
 
 =item accept($socket, $deadline=undef) ->  ($new_socket | undef,$error)
 
-Expects stream C<$socket> in a non-blocking listening state. Executes either
-after connection arrives, or after C<$deadline>.  Returns a new socket serving
-the new connection on success, C<undef> and an error string on failure. The
-error string is either C<timeout> or C<$!>.
+Expects a stream C<$socket> in a non-blocking listening state. Finishes either
+after a new connection arrives, or after C<$deadline> is expired. Returns a new
+socket serving the new connection on success, C<undef> and an error string on
+failure. The error string is either C<timeout> or C<$!>.
 
 See also L<perlfunc/accept>.
 
 =item connect($socket, $deadline=undef) -> (()|$error)
 
-Expects stream C<$socket> in a non-blocking connect state. Executes either
-after connection succeeds, or after C<$deadline>.  Returns no parameters 
-on success, and an error string on failure. The error string is either
-C<timeout> or C<$!> (or C<$^E> on win32).
+Expects stream C<$socket> in a non-blocking connect state. Finishes either
+after the connection succeeds, or after C<$deadline> is expired.  Returns no
+parameters on success, and an error string on failure. The error string is
+either C<timeout> or C<$!> (or C<$^E> on win32).
 
 See also L<perlfunc/connect>.
 
 =item recv($socket, $length, $flags=0, $deadline=undef) -> ($addr,$msg | undef,$error)
 
 Expects a non-blocking datagram C<$socket>. After the socket becomes readable,
-tries to read C<$length> bytes using C<CORE::recv> call. Returns packed address
-and received message on success. Returns C<undef> and an error string on
-failure. The error string is either C<timeout> or C<$!>.
+tries to read C<$length> bytes using C<CORE::recv> call. Returns remote address
+(packed) and the received message on success. Returns C<undef> and an error
+string on failure. The error string is either C<timeout> or C<$!>.
 
 See also L<perlfunc/recv>.
 
@@ -287,7 +289,7 @@ See also L<perlfunc/recv>.
 
 Expects a non-blocking datagram C<$socket>. After the socket becomes writable,
 tries to write C<$msg> using C<CORE::send> call. Depending whether C<$to> is
-defined or not, 4- or 3- parameter versions of C<CORE::send> are used. Returns
+defined or not, 4- or 3- parameter version of C<CORE::send> is used. Returns
 number of bytes sent on success. On failure returns C<undef> and an error
 string. The error string is either C<timeout> or C<$!>.
 

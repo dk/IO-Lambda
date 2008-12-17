@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.17 2008/12/17 09:37:52 dk Exp $
+# $Id: Thread.pm,v 1.18 2008/12/17 11:39:05 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -135,10 +135,11 @@ IO::Lambda::Thread - wait for blocking code using threads
 =head1 DESCRIPTION
 
 The module implements a lambda wrapper that allows to asynchronously wait for
-blocking code. The wrapping is done so that the code is executed in another
+a blocking code. The wrapping is done so that the code is executed in another
 thread's context. C<IO::Lambda::Thread> provides bidirectional communication
-between threads, which is based on a shared socket between parent and child
-threads. This socket can be used by the caller for its own needs, if necessary.
+between threads, that is based on a shared socket between parent and child
+threads. The socket can be also used by the caller for its own needs, if necessary
+( see L<IO::Lambda::Message ).
 
 =head1 SYNOPSIS
 
@@ -167,7 +168,7 @@ threads. This socket can be used by the caller for its own needs, if necessary.
 =item new_thread ( $options = (), $code, $pass_socket, @param) -> ($thread, $socket)
 
 A special replacement for C<< thread-> create >>, that not only creates a
-thread, but also creates a socket between the parent and child threads. That
+thread, but also creates a socket between the parent and child threads. The
 socket is important for getting an asynchronous notification when the child
 thread has finished, because there is no portable way to get that signal
 otherwise. That means that this socket must be closed and the thread must be
@@ -181,10 +182,10 @@ C<join>'ed to avoid problems. For example:
     close($reader);
     $thread-> join;
 
-Note that C<join> is a blocking call, so one might want to be sure that the
-thread indeed is finished before joining it. By default, the child thread will
-close its side of the socket, thus making the parent side readable. However,
-the child code can also hijack the socket for its own needs, so if that
+Note that C<join> is a blocking call, so one needs to be sure that the thread
+indeed is finished before joining it. By default, the child thread will close
+its side of the socket, thus making the parent side readable. However, the
+child code can also hijack the socket for its own needs, so if that
 functionality is needed, one must create an extra layer of communication that
 will ensure that the child code is properly exited, so that the parent can
 reliably call C<join> without blocking.
@@ -199,10 +200,10 @@ Creates a lambda, that will execute C<$code> in a newly created thread.
 The lambda will finish when the C<$code> and the thread are finished,
 and will return results returned by C<$code>.
 
-Note, that this lambda, if C<terminate>'d after between being started and being
-finished, will have no chance to wait for completion of the associated thread,
-and so Perl will complain. To deal with that, obtain the thread object manually
-and wait for the thread:
+Note, that this lambda, if C<terminate>'d between after being started and
+before being finished, will have no chance to wait for completion of the
+associated thread, and so Perl will complain. To deal with that, obtain the
+thread object manually and wait for the thread:
 
     my $l = threaded { 42 };
     $l-> start;
@@ -235,11 +236,10 @@ Threading in Perl is fragile, so errors like the following:
    Unbalanced string table refcount: (1) for "GEN1" during global
    destruction
 
-are due some hidden bugs. They are triggered, in my experience, 
-when a child thread tries to deallocate scalars that it thinks
-belongs to that thread. This can be sometimes avoided with
-explicit cleaning up of scalars that may be visible in threads.
-For example, calls as
+are due some obscure Perl bugs. They are triggered, in my experience, when a
+child thread tries to deallocate scalars that it thinks belongs to that thread.
+This can be sometimes avoided with explicit cleaning up of scalars that may be
+visible in threads.  For example, calls as
 
    IO::Lambda::clear
 
@@ -247,7 +247,7 @@ and
 
    undef $my_lambda; # or other scalars, whatever
 
-strangely hush these errors.
+inexplicably hush these errors.
 
 Errors like this
 
@@ -257,7 +257,8 @@ Errors like this
         0 running and detached
 
 are triggered when child threads weren't properly joined. Make sure
-your lambdas are properly completed.
+your lambdas are finished properly. Use C<env IO_LAMBDA_DEBUG=thread>
+to find out the details.
 
 =head1 SEE ALSO
 

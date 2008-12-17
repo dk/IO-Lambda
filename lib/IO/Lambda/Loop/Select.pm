@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.15 2008/11/07 21:22:18 dk Exp $
+# $Id: Select.pm,v 1.16 2008/12/17 11:39:07 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -266,8 +266,8 @@ Removes a single event record.
 =item watch $RECORD
 
 Stores the IO record. The IO record in an array, with the following 
-layout: [ $OBJECT, $DEADLINE, $CALLBACK, $HANDLE, $FLAGS ]. Loop will
-invoke C<IO::Lambda::io_handler> on C<$OBJECT> either when C<$HANDLE>
+layout: [ $OBJECT, $DEADLINE, $CALLBACK, $HANDLE, $FLAGS ]. Loop
+invokes C<IO::Lambda::io_handler> on C<$OBJECT> either when C<$HANDLE>
 becomes readable/writable etc, depending on C<$FLAGS>, or after C<$DEADLINE>
 is expired. C<$DEADLINE> can be undef, meaning no timeout. C<$FLAGS> is 
 a combination of C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION> values.
@@ -276,7 +276,7 @@ a combination of C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION> values.
 
 Waits for at least one of the stored record to become active, dispatches
 events to C<IO::Lambda::io_handler> for the records that have, then removes
-these records. The invoker must resubmit records in order continue receiving
+these records. The invoker must resubmit new records in order continue receiving
 new events.
 
 =back
