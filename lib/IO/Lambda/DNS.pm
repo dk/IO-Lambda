@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.7 2008/08/09 12:43:30 dk Exp $
+# $Id: DNS.pm,v 1.8 2008/12/17 09:55:16 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -131,21 +131,24 @@ See its man page for details.
 =item new
 
 Constructor C<new> accepts Net::DNS-specific options (see L<OPTIONS> above) and
-query, and returns a lambda. The lambda accepts no parameters, return either IP
-address or response object, depending on the call, or an error string.
+query, and returns a lambda. The lambda accepts no parameters, and returns
+either an IP address or a response object (depending on the call syntax, see
+below), or an error string.
 
-   new ($CLASS, %OPTIONS, $HOSTNAME) :: () -> $IP_ADDRESS|$ERROR
+   new ($CLASS, %OPTIONS, $HOSTNAME) :: () -> ($IP_ADDRESS|$ERROR)
 
-In simple case, accepts C<$HOSTNAME> string, and returns a string, either
-IP address or an error. To distinguish between these use C< /^\d/ > regexp,
-because it is guaranteed that no error message will begin with digit, and no
-IP address will begin with anything other than digit.
+In the simple case, accepts C<$HOSTNAME> string, and returns also a string, either
+an IP address or an error. To distinguish between these use C< /^\d/ > regexp,
+because it is guaranteed that no error message will begin with digit, and no IP
+address will begin with anything other than digit.
 
-   dns (%OPTIONS, ($PACKET | $HOSTNAME $TYPE)) :: () -> $RESPONSE|$ERROR
+   dns (%OPTIONS, ($PACKET | $HOSTNAME, $TYPE)) :: () -> ($RESPONSE|$ERROR)
 
-In complex case, accepts either C<$HOSTNAME> string and C<$TYPE> string, where
-the latter is C<A>, C<MX>, etc DNS query type. See L<Net::DNS::Resolver/new>.
-Returns either C<Net::DNS::RR> object or error string.
+In the complex case, accepts either C<Net::DNS::Packet> object, or C<$HOSTNAME>
+and C<$TYPE> strings, where the latter can be one of C<A>, C<MX>, etc DNS query
+type. See L<Net::DNS::Resolver/bgsend> for the exact syntax.
+
+Returns either a C<Net::DNS::RR> object or an error string.
 
 =item dns
 
