@@ -107,3 +107,6 @@
 
 0.45  - 4 Dec 2008
 	added minor safeguards in tests here and there against bizarre perls and platforms
+
+0.46  - 17 Dec 2008
+	documentation proof-reading

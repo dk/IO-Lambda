@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.130 2008/12/04 11:54:43 dk Exp $
+# $Id: Lambda.pm,v 1.131 2008/12/17 12:35:28 dk Exp $
 
 package IO::Lambda;
 
@@ -16,7 +16,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
-$VERSION     = '0.45';
+$VERSION     = '0.46';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -1249,61 +1249,63 @@ find the word slightly inappropriate, hence C<io>.
 
 =head1 DESCRIPTION
 
-This module is another attempt to fight the horrors of non-blocking I/O
-programming. It tries to bring back the simplicity of the declarative
-programming style, that is only otherwise available when one employs threads,
-coroutines, or co-processes.  Usually coding non-blocking I/O for single
-process, single thread programs requires construction of state machines, often
-fairly complex, which doesn't help the clarity of the code. Not unlike monads
-in functional languages, that enforce order of execution over generally
-orderless functions, this framework helps programmer to express the order of
-execution of I/O callbacks in a coding style that resembles sequential,
-declarative programming.
+This module is another attempt to fight the horrors of non-blocking I/O.  It
+tries to bring back the simplicity of the declarative programming style, that
+is only available when one employs threads, coroutines, or co-processes.
+Usually coding non-blocking I/O for single process, single thread programs
+requires construction of state machines, often fairly complex, which fact
+doesn't help the code clarity, and is the reason why the asynchronous I/O
+programming is often considered 'messy'. Similar to the concept of monads in
+functional languages, that enforce a certain order of execution over generally
+orderless functions, C<IO::Lambda> allows writing I/O callbacks in a style that
+resembles the good old sequential, declarative programming.
 
-The manual begins with code examples, then explains basic assumptions, then
-finally gets of the complex concepts, where the real fun begins. You may skip
-directly there (L<Stream IO>), where functional style mixes with I/O. 
+The manual begins with code examples, then proceeds to explaining basic
+assumptions, then finally gets of the complex concepts, where the real fun
+begins. You can skip directly there (L<Stream IO>), where the functional style
+mixes with I/O. 
 
 =head2 Apologetics
 
 There are many async libraries readily available from CPAN. C<IO::Lambda> is
 yet another one. How is it different from the existing tools? Why using it?  To
 answer these questions, I need to show the evolution of async libraries, to
-show how they grew from simple tools to more complex frameworks.
+explain how they grew from simple tools to complex frameworks.
 
 First, all async libraries are based on OS-level syscalls, like C<select>,
 C<poll>, C<epoll>, C<kqueue>, and C<Win32::WaitForMultipleObjects>. The first
 layer of async libraries provides access to exactly these facilites: there are
 C<IO::Select>, C<IO::Epoll>, C<IO::Kqueue> etc. I won't go deepeer into
-describing pros and contras for programming on this level, this should be more
-or less obvious.
+describing pros and contras for programming on this level, this should be
+obvious.
 
 Perl modules of the next abstraction layer are often characterised by
 portability and event loops. While the modules of the first layer are seldom
 portable, and have no event loops, the second layer modules strive to be
-OS-independent, and use callbacks to ease the async IO programming. These
-modules mostly populate the "asynchronous input-output programming frameworks"
-niche in the perl world. The examples are many: C<IO::Events>, C<EV>,
-C<AnyEvent>, C<IO::NonBlocking>, to name the few. 
+OS-independent, and use callbacks to ease the otherwise convoluted ways async
+I/O would be programmed. These modules mostly populate the "asynchronous
+input-output programming frameworks" niche in the perl world. The examples are
+many: C<IO::Events>, C<EV>, C<AnyEvent>, C<IO::NonBlocking>, C<IO::Multiplex>,
+to name the few. 
 
 Finally, there's the third layer of complexity, which, before C<IO::Lambda>,
 had a single representative: C<POE> (now, to the best of my knowledge,
-C<IO::Async> also falls in this category). Modules of the third layer are based
-on concepts from the second, but introduce a tool to help with the programming
-of complex protocols, something that isn't available in the second layer
-modules: finite state machines. The FSMs machines reduce complexity when
-programming, for example, intricate network protocols, that are best modelled
-as a set of states. Modules from the second layer do not provide much help
-here.  Also, the third layer modules are agnostic of the event loop module: the
-programmer is (almost) free to choose the event loop backend, such as C<Gtk>,
-C<Prima>, or C<AnyEvent>, depending on the nature of the task.
+C<IO::Async> also partially falls in this category). Modules of the third layer
+are based on concepts from the second, but introduce a powerful tool to help
+the programming of complex protocols, something that isn't available in the
+second layer modules: finite state machines (FSMs). The FSMs reduce programming
+complexity, for example, of intricate network protocols, that are best modelled
+as a set of states in a logical circuit. Also, the third layer modules are
+agnostic of the event loop module: the programmer is (almost) free to choose
+the event loop backend, such as native C<select>, C<Gtk>, C<EV>, C<Prima>, or
+C<AnyEvent>, depending on the nature of the task.
 
-C<IO::Lambda> also allows the programmer to build complex protocols, and is
-also based on event loops, callbacks, and is portable. It differs from C<POE>
-in the way the FSMs are declared. Where C<POE> requires an explicit switch from
-one state to another, using f.ex. C<post> or C<yield> commands, C<IO::Lambda>
-incorporates the switching directly into the program syntax. Consider C<POE>
-code:
+C<IO::Lambda> allows the programmer to build protocols of arbitrary complexity,
+and is also based on event loops, callbacks, and is portable. It differs from
+C<POE> in the way the FSMs are declared. Where C<POE> requires an explicit
+switch from one state to another, using f.ex. C<post> or C<yield> commands,
+C<IO::Lambda> incorporates the switching directly into the program syntax.
+Consider C<POE> code:
 
    POE::Session-> create(
        inline_states => {
@@ -1316,7 +1318,8 @@ code:
 	   },
    });
 
-and correspodning C<IO::Lambda> code:
+and the correspodning C<IO::Lambda> code (I<state1> and I<state2> are I<predicates>,
+they need to be declared separately):
 
     lambda {
        state1 {
@@ -1326,7 +1329,8 @@ and correspodning C<IO::Lambda> code:
        }}
     }
 
-Here, the programming style is (deliberately) not much different from the declarative
+In C<IO::Lambda>, the programming style is (deliberately) not much different
+from the declarative
 
     print "state1\n";
     print "state2\n";
@@ -1334,12 +1338,12 @@ Here, the programming style is (deliberately) not much different from the declar
 as much as the nature of asynchronous programming allows that.
 
 To sum up, the intended use of C<IO::Lambda> is for areas where simple
-callback-based libraries require much additional work, and where state machines
+callback-based libraries require lots of additional work, and where state machines
 are beneficial. Complex protocols like HTTP, parallel execution of several
 tasks, strict control of task and protocol hierarchy - this is the domain where
 C<IO::Lambda> works best.
 
-=head2 Reading lines from a filehandle
+=head2 Example: reading lines from a filehandle
 
 Given C<$filehandle> is non-blocking, the following code creates a lambda
 object (later, simply a I<lambda>) that reads from the handle until EOF or an
@@ -1496,33 +1500,36 @@ See tests and additional examples in directory C<eg/> for more information.
 
 =head2 Events and states
 
-A lambda is an C<IO::Lambda> object, that waits for IO and timeout events, and
+A lambda is an C<IO::Lambda> object, that waits for I/O and timeout events, and
 for events generated when other lambdas are completed. On each such event a
 callback is executed. The result of the execution is saved, and passed on to the
 next callback, when the next event arrives.
 
 Life cycle of a lambda goes through three modes: passive, waiting, and stopped.
-A lambda that is just created, or was later reset with C<reset> call, is in
-passive state.  When the lambda is started, the only callback associated with the
-lambda will be executed:
+A lambda that is just created, or was later reset with C<reset> call, is in the
+passive state.  When the lambda gets started, the only executed code will be
+the callback associated with the lambda:
 
     $q = lambda { print "hello world!\n" };
     # not printed anything yet
-    $q-> wait; # <- here will
+    $q-> wait; # <- here it will
 
-Lambdas are usually not started explicitly; the function that waits for a
-lambda, also starts it. C<wait>, the synchronous waiter, and C<tail>/C<tails>,
-the asynchronous ones, start passive lambdas when called. Lambda is I<finished>
-when there are no more events to listen to. The example lambda above will
-finish right after C<print> statement.
+Lambdas are usually not started explicitly. Usually, the function that can wait
+for a lambda, starts it too. C<wait>, the synchronous waiter, and
+C<tail>/C<tails>, the asynchronous ones, start passive lambdas when called.
+A lambda is I<finished> when there are no more events to listen to. The lambda
+in the example above will finish right after C<print> statement.
 
 Lambda can listen to events by calling I<predicates>, that internally subscribe
-the lambda object to corresponding file handles, timers, and other lambdas.
-There are only those three types of events that basically constitute everything
-needed for building a state machine driven by external events, in particular,
-by non-blocking I/O. Parameters passed to predicates with explicit C<context>
-call, not by perl subroutine call convention. In the example below,
-lambda watches for file handle readability:
+the lambda object to the corresponding file handles, timers, and other lambdas.
+Most of the expressive power of C<IO::Lambda> lies in the predicates, such as
+C<read>, C<write>, C<sleep> etc (not to be confused with CORE::read etc
+functions!). Predicates are different from normal perl subroutines in the way
+how they receive their parameters. The only parameter they receive in the
+normal way, is the associated callback, while all other parameters are passed
+to it through the alternate stack, by the explicit C<context> call. 
+
+In the example below, lambda watches for file handle readability:
 
     $q = lambda {
         context \*SOCKET;
@@ -1531,16 +1538,15 @@ lambda watches for file handle readability:
     };
     # and here is nothing printed yet
 
-Such lambda, when started, will switch to the waiting state, - will be waiting
-for the socket. The lambda will finish only after the callback associated with
-C<read> predicate is called.
+Such lambda, when started, will switch to the waiting state, which means that
+it will be waiting for the socket. The lambda will finish only after the
+callback associated with C<read> predicate is called.  Of course, new event
+listeners can be created inside all callbacks, on each state. This fact constitutes
+another large benefit of C<IO::Lambda>, as it allows to program FSMs
+dynamically.
 
-Of course, new events can be created inside all callbacks, on each state. This
-style resembles a dynamic programming of sorts, when the state machine is not
-hard-coded in advance, but is built as soon as code that gets there is executed.
-
-The events can be created either by explicitly calling predicates, or by
-restarting the last predicate with C<again> call. For example, code
+The new event listeners can be created either by explicitly calling predicates,
+or by restarting the last predicate with the C<again> call. For example, code
 
      read { int(rand 2) ? print 1 : again }
 
@@ -1548,18 +1554,19 @@ will print indeterminable number of ones.
 
 =head2 Contexts
 
-Each lambda callback (further on, merely lambda) executes in its own, private
-context. The context here means that all predicates register callbacks on an
-implicitly given lambda object, and keep the passed parameters on the context
-stack. The fact that context is preserved between states, helps building terser
-code with series of IO calls:
+All callbacks associated with a lambda object (further on, merely lambda)
+execute in one, private context, also associated to the lambda. The context
+here means that all predicates register callbacks on an implicitly given lambda
+object, and keep the passed parameters on the context stack. The fact that
+the context is preserved between states, helps building terser code with series of
+IO calls:
 
     context \*SOCKET;
     write {
     read {
     }}
 
-is actually a shorter form for
+is actually the shorter form for
 
     context \*SOCKET;
     write {
@@ -1567,8 +1574,8 @@ is actually a shorter form for
     read {
     }}
 
-And as the context is kept, the current lambda object is also, in C<this>
-property. The code above is actually
+And as the context is bound to the current closure, the current lambda object
+is too, in C<this> property. The code above is actually
 
     my $self = this;
     context \*SOCKET;
@@ -1591,29 +1598,30 @@ which means that explicitly setting C<this> will always clear the context.
 
 =head2 Data and execution flow
 
-A lambda is initially called with arguments passed from outside. These
+A lambda is initially called with some arguments passed from the outside. These
 arguments can be stored using the C<call> method; C<wait> and C<tail> also
 issue C<call> internally, thus replacing any previous data stored by C<call>.
 Inside the lambda these arguments are available as C<@_>.
 
-Whatever is returned by a predicate callback (including C<lambda> predicate),
-will be passed as C<@_> to the next callback, or to the outside, if the lambda
-is finished. The result of a finished lambda is available by C<peek> method,
-that returns either all array of data available in the array context, or first
-item in the array otherwise. C<wait> returns the same data as C<peek> does.
+Whatever is returned by a predicate callback (including the C<lambda> predicate
+itself), will be passed further on as C<@_> to the next callback, or to the
+outside, if the lambda is finished. The result of the finished lambda is
+available by C<peek> method, that returns either all array of data available in
+the array context, or first item in the array otherwise. C<wait> returns the
+same data as C<peek> does.
 
 When more than one lambda watches for another lambda, the latter will get its
 last callback results passed to all the watchers. However, when a lambda
 creates more than one state that derive from the current state, a forking
-behaviour of sorts, the latest stored results will get overwritten by the first
-executed callback, so constructions like
+behaviour of sorts, the latest stored results gets overwritten by the first
+executed callback, so constructions such as
 
     read  { 1 + shift };
     write { 2 + shift };
     ...
     wait(0)
 
-will eventually return 3, but whether it will be 1+2 or 2+1, is not known.
+will eventually return 3, but whether it will be 1+2 or 2+1, is undefined.
 
 C<wait> is not the only function that synchronises input and output data.
 C<wait_for_all> method waits for all lambdas, including the caller, to finish.
@@ -1681,7 +1689,7 @@ plus-minus half a second.
 
 All predicates receive their parameters from the context stack, or simply the
 I<context>. The only parameter passed to them by using perl call, is the callback
-itself.  Predicates can also be called without a callback, in which case, they
+itself. Predicates can also be called without a callback, in which case, they
 will pass further data that otherwise would be passed as C<@_> to the
 callback. Thus, a predicate can be called either as
 
@@ -1690,6 +1698,7 @@ callback. Thus, a predicate can be called either as
 or 
 
     &read(); # no callback
+    &read;   # DANGEROUS!! same as &read(@_)
 
 Predicates can either be used after explicit exporting
 
@@ -1724,9 +1733,9 @@ Exactly same as C<read>, but executes when C<$filehandle> becomes writable.
 
 =item readwrite($flags, $filehandle, $deadline = undef)
 
-Executes either when C<$filehandle> satisfies any of the condition C<$flags>,
+Executes either when C<$filehandle> satisfies any of the condition in C<$flags>,
 or after C<$deadline>. C<$flags> is a combination of three integer constants,
-C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION>, that are imported with
+C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION>, that are imported by
 
    use IO::Lambda qw(:constants);
 
@@ -1801,7 +1810,7 @@ If really needed, use C<this(this)> syntax.
 If called with no parameters, returns the current lambda.
 Otherwise, replaces both the current lambda and the current context.
 Can be useful either when juggling with several lambdas, or as a
-convenience over C<my> variables, for example,
+convenience hack over C<my> variables, for example,
 
     this lambda { ... };
     this-> wait;
@@ -1855,14 +1864,14 @@ Example: convert existing C<getline> constructor into a predicate:
 
 =head2 Stream IO
 
-The whole point of this module is to help building complex protocols in a
-clear, consequent programming style. Consider how perl's low-level C<sysread>
-and C<syswrite> relate to its higher-level C<readline>, where the latter not
-only does the buffering, but also recognizes C<$/> as input record separator.
-The section above described lower-level lambda I/O predicates, that are only
-useful for C<sysread> and C<syswrite>; this section tells about higher-level
-lambdas that relate to these low-level ones, as the aforementioned C<readline>
-relates to C<sysread>.
+The whole point of this module is to help building protocols or arbitrary
+complexity in a clear, consequent programming style. Consider how perl's
+low-level C<sysread> and C<syswrite> relate to its higher-level C<readline>,
+where the latter not only does the buffering, but also recognizes C<$/> as
+input record separator.  The section above described lower-level lambda I/O
+predicates, that are only useful for C<sysread> and C<syswrite>; this section
+tells about higher-level lambdas that relate to these low-level ones, as the
+aforementioned C<readline> relates to C<sysread>.
 
 All functions in this section return the lambda, that does the actual work.
 Not unlike as a class constructor returns a newly created class instance, these
@@ -1885,8 +1894,9 @@ C<ioresult>'s first scalar is defined on success, and is not otherwise.  In the
 latter case, the second scalar contains the error, usually either C<$!> or
 C<'timeout'> (if C<$deadline> was set).
 
-Before describing the actual functions, consider the code that uses them.
-Let's take a lambda that needs to implement a very simple HTTP/0.9 request:
+Before describing the actual functions, consider the code that may benefit from
+using them.  Let's take a lambda that needs to implement a very simple HTTP/0.9
+request:
 
    lambda {
        my $handle = shift;
@@ -1898,7 +1908,7 @@ Let's take a lambda that needs to implement a very simple HTTP/0.9 request:
        do_request($handle, $1);
    }}
 
-C<getline> will read from C<$handle> to C<$buf>, and will wake up when new line
+C<getline> reads from C<$handle> to C<$buf>, and wakes up when a new line
 is there. However, what if we need, for example, HTTPS instead of HTTP, where
 reading from socket may involve some writing, and of course some waiting?
 Then the first default parameter to getline has to be replaced. By default, 
@@ -1910,7 +1920,7 @@ is the same as
    my $reader = sysreader;	  
    context getline($reader), $handle, \$buf;
 
-where C<sysreader> creates a lambda C<$reader>, that given C<$handle>, waits
+where C<sysreader> creates a lambda C<$reader>, that given C<$handle>, awaits
 when it becomes readable, and reads from it. C<getline>, in turn, repeatedly
 calls C<$reader>, until the whole line is read.
 
@@ -1929,15 +1939,15 @@ instead, that should conform to sysreader signature:
        }
    }
 
-I don't show the actual implementation of a HTTPS read (if you're curious, look
-at L<IO::Lambda::HTTP::HTTPS> ), but the idea is that inside that reader, it is
-perfectly fine to do any number of read and write operations, and wait for
-their completion, as long as the lambda will sooner or later returns the data.
-C<getline> (or, rather, C<readbuf> that C<getline> is based on) won't care
-about internal states of the reader. 
+I don't show the actual implementation of a HTTPS reader (if you're curious,
+look at L<IO::Lambda::HTTP::HTTPS> ), but the idea is that inside that reader,
+it is perfectly fine to do any number of read and write operations, and wait
+for their completion too, as long as the upper-level lambda will sooner or
+later gets the data.  C<getline> (or, rather, C<readbuf> that C<getline> is
+based on) won't care about internal states of the reader. 
 
-Note: check out F<t/06_stream.t> that emulates reading and writing in this
-fashion.
+Check out F<t/06_stream.t> that emulates reading and writing implemented 
+in this fashion.
 
 =over
 
@@ -1961,8 +1971,8 @@ bytes written, or C<$!> otherwise.
 
 Creates a lambda that is able to perform buffered reads from C<$fh>, either
 using custom lambda C<reader>, or using one newly generated by C<sysreader>.
-The lambda when called, will read continually from C<$fh> into C<$buf>, and
-will either fail on timeout, I/O error, or end of file, or succeed if C<$cond>
+The lambda, when called, reads continually from C<$fh> into C<$buf>, and
+either fails on timeout, I/O error, or end of file, or succeeds if C<$cond>
 condition matches.
 
 The condition C<$cond> is a "smart match" of sorts, and can be one of:
@@ -1981,7 +1991,7 @@ C<\G> is encouraged here.
 
 =item coderef :: ($buf -> BOOL)
 
-The lambda will succeed if coderef called with C<$buf> returns true value.
+The lambda succeeds if coderef called with C<$buf> returns true value.
 
 =item undef
 
@@ -1993,9 +2003,9 @@ of file is reported as an error, with literal C<"eof"> string.
 =item writebuf($writer) :: ($fh, $$buf, $length, $offset, $deadline) -> ioresult
 
 Creates a lambda that is able to perform buffered writes to C<$fh>, either
-using custom lambda C<writer>, or using one newly generated by C<syswriter>.
-That lambda, in turn, will write continually C<$buf> (from C<$offset>,
-C<$length> bytes) and will either fail on timeout or I/O error, or succeed when
+using custom lambda C<writer>, or using one generated by C<syswriter>.
+That writer lambda, in turn, writes continually C<$buf> (from C<$offset>,
+C<$length> bytes) and either fails on timeout or I/O error, or succeeds when
 C<$length> bytes are written successfully.
 
 =item getline($reader) :: ($fh, $$buf, $deadline) -> ioresult
@@ -2015,7 +2025,7 @@ with or without lambdas, on top of the object API, without accessing the
 internals.
 
 The object API is mostly targeted to developers that need to connect
-third-party asynchronous events with the lambda interface.
+third-party asynchronous event libraries with the lambda interface.
 
 =over
 
@@ -2026,26 +2036,25 @@ will be called once, after the lambda gets active.
 
 =item watch_io($flags, $handle, $deadline, $callback)
 
-Registers an IO event listener that will call C<$callback> either after
-C<$handle> will satisfy condition of C<$flags> ( a combination of IO_READ,
+Registers an IO event listener that calls C<$callback> either after
+C<$handle> satisfies condition of C<$flags> ( a combination of IO_READ,
 IO_WRITE, and IO_EXCEPTION bits), or after C<$deadline> time is passed. If
-C<$deadline> is undef, will watch for the file handle indefinitely.
+C<$deadline> is undef, watches for the file handle indefinitely.
 
-The callback will be called with first parameter as integer set of IO_XXX
-flags, or 0 if timed out. Other parameters, as with the other callbacks, will
-be passed the result of the last called callback. The result of the callback
-will be stored and passed on to the next callback.
+The callback is called with first parameter as integer set of IO_XXX flags, or
+0 if the callback was timed out. Other parameters, as it is the case with the
+other callbacks, are passed the result of the last called callback attached to
+the same lambda. The result of this callback will then be stored and passed on
+to the next callback in the same fashion.
 
 =item watch_timer($deadline, $callback)
 
-Registers a timer listener that will call C<$callback> after
-C<$deadline> time.
+Registers a timer listener that calls C<$callback> after C<$deadline> time.
 
 =item watch_lambda($lambda, $callback)
 
-Registers a listener that will call C<$callback> after C<$lambda>,
-a C<IO::Lambda> object is finished. If C<$lambda> is in passive state,
-it will be started first.
+Registers a listener that calls C<$callback> after C<$lambda>, a C<IO::Lambda>
+object is finished. If C<$lambda> is in passive state, it is started first.
 
 =item is_stopped
 
@@ -2057,8 +2066,8 @@ Reports whether lambda has any registered callbacks left or not.
 
 =item is_passive
 
-Reports if lambda wasn't run yet, -- either after C<new>
-or C<reset>.
+Reports if lambda wasn't run yet. Is true when the lambda is in a state
+after either C<new> or C<reset> are called.
 
 =item is_active
 
@@ -2074,7 +2083,7 @@ be called first.
 
 If set, gives permission to watchers to reset the lambda if it 
 becomes stopped. C<tail> does that when needed, other watchers
-may too. Is set by default.
+are allowed to do that too. Is set by default.
 
 =item peek
 
@@ -2103,8 +2112,9 @@ be stored and available for later calls by C<peek>.
 
 Cancels all watchers and resets lambda to the stopped state. Does the same to
 all lambdas the caller lambda watches after, recursively. Useful where
-explicit, long-lived lambdas shouldn't be subject to global destruction, which
-kills objects in random order; C<destroy> kills them in some order, at least.
+explicit, long-lived lambdas shouldn't be subject to the global destruction,
+which kills objects in random order; C<destroy> kills them in some order, at
+least.
 
 =item wait @args
 
@@ -2114,14 +2124,13 @@ C<@args> are not used.
 
 =item wait_for_all @lambdas
 
-Waits for caller lambda and C<@lambdas> to finish. Returns
-collection of C<peek> results for all objects. The results
-are unordered.
+Waits for caller lambda and C<@lambdas> to finish. Returns collection of
+C<peek> results for all objects. The results are unordered.
 
 =item wait_for_any @lambdas
 
-Waits for at least one lambda from list of caller lambda and C<@lambdas> to
-finish.  Returns list of finished objects.
+Waits for at least one lambda from the list of caller lambda and C<@lambdas> to
+finish. Returns list of finished objects.
 
 =item yield $nonblocking = 0
 
@@ -2145,7 +2154,7 @@ individual C<resolve>.
 
 =item resolve $event
 
-Removes C<$event> from the internal waiting list. If lambda has no more
+Removes C<$event> from the internal waiting list. If a lambda has no more
 events to wait, notifies eventual lambdas that wait to the objects, and
 then stops.
 
@@ -2277,9 +2286,9 @@ L<IO::Lambda::SNMP> - SNMP requests lambda style. Requires L<SNMP>.
 
 =item * 
 
-L<IO::Lambda::Thread> - run blocking code executed in another thread
-context. Requires perl version greater than 5.8.0, preferably 5.10.0,
-and built with threads.
+L<IO::Lambda::Thread> - run blocking code executed in another thread.
+Requires perl version greater than 5.8.0, preferably 5.10.0,
+built with threads.
 
 =item *
 
@@ -2307,7 +2316,7 @@ L<IO::Lambda::Flock> - flock(2) wrapper
 
 =head2 Debugging
 
-Various modules can be controlled with the single environment variable,
+Various sub-modules can be controlled with the single environment variable,
 C<IO_LAMBDA_DEBUG>, which is treated as a comma-separated list of modules.
 For example,
 
