@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.12 2008/12/17 09:46:48 dk Exp $
+# $Id: DBI.pm,v 1.13 2008/12/17 10:08:16 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -166,10 +166,10 @@ IO::Lambda::DBI - asynchronous DBI
 
 =head1 DESCRIPTION
 
-The module implements asynchronous DBI proxy object, that can remote DBI calls
-using any given stream - sockets, pipes, etc. All calls to DBI methods are
-implemented as method calls to the object, that return lambdas, which shall be
-waited for
+The module implements asynchronous DBI proxy object, that remotes DBI calls
+using any given file handle, such as stream sockets, pipes, etc. All calls to
+DBI methods are implemented as method calls to the object, which return
+lambdas, that shall be subsequently called and awaited for completion.
 
 =head1 SYNOPSIS
 
@@ -209,9 +209,9 @@ All remoted methods return lambdas of type
    dbi_result :: () -> ( 1, @result | 0, $error )
 
 where depending on the first returned item in the array, the other items are
-either DBI method result, or an error.
+either DBI method results, or an error.
 
-The class handles AUTOLOAD methods as proxy methods, so calls like
+The class handles AUTOLOAD methods as proxy methods, so calls such as
 C<< $dbh-> selectrow_array >> are perfectly legal.
 
 =over
