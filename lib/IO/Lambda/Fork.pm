@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.8 2008/12/04 09:08:24 dk Exp $
+# $Id: Fork.pm,v 1.9 2008/12/17 10:37:37 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -146,21 +146,19 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Fork - wait for blocking code using coprocesses
+IO::Lambda::Fork - wait for blocking code in children processes
 
 =head1 DESCRIPTION
 
-The module implements a lambda wrapper that allows to asynchronously wait for
-blocking code. The wrapping is done so that the code is executed in another
-process's context. C<IO::Lambda::Fork> provides a twofold interface: First, it
-the module can create lambdas that wait for forked child processes. Second, it
-also provides an easier way for simple communication between parent and child
-processes.
+The module implements the lambda wrapper that allows to wait asynchronously for
+blocking code in another process' context. C<IO::Lambda::Fork> provides a
+twofold interface for that: the lambda interface, that can wait for the forked
+child processes, and an easier way for simple communication between these.
 
-Contrary to the usual interaction between a parent and a forked child process,
-this module doesn't hijack the child's stdin and stdout, but uses a shared
-socket between them. That socket, in turn, can be retrieved by the caller
-and used for its own needs.
+Contrary to the classical stdin-stdout interaction between parent and child
+processes, this module establishes a stream socket and uses it instead. The
+socket can also be used by the caller for its own needs ( see
+L<IO::Lambda::Message> ).
 
 =head1 SYNOPSIS
 
@@ -190,12 +188,12 @@ and used for its own needs.
 
 Forks a process, and sets up a read-write socket between the parent and the
 child. On success, returns the child's pid and the socket, where the latter is
-passed to C<$code>. On failure, returns undef and C<$!>.
+passed further to C<$code>. On failure, returns undef and C<$!>.
 
-This function doesn't create a lambda, and doesn't make any preparation neither
-for waiting for the child process, nor for reaping its status. It is therefore
-important to wait for the child process, to avoid zombie processes. It can be done either
-synchronously:
+This function does not create a lambda, neither makes any preparations for
+waiting for the child process, nor for reaping its status. It is therefore
+important for the caller itself to wait for the child process, to avoid zombie
+processes. That can be done either synchronously:
 
     my ( $pid, $reader) = new_process {
         my $writer = shift;
@@ -205,7 +203,7 @@ synchronously:
     close($reader);
     waitpid($pid, 0);
 
-or asynchronously, using lambdas:
+or asynchronously, using C<waitpid> wrappers from C<IO::Lambda::Socket>:
 
     use IO::Lambda::Socket qw(pid new_pid);
     ...
@@ -220,9 +218,10 @@ The lambda returns the child exit code.
 
 =item new_forked($code) :: () -> ( $?, ( 1, @results | undef, $error))
 
-Creates a lambda that waits for C<$code> in a sub-process to be executed,
-and returns its result back to the parent. Returns also the process
-exitcode, C<$code> eval success flag, and results (or an error string).
+Creates a lambda that awaits for C<$code> in a sub-process to be executed, then
+returns the code' result back to the parent. Returns also the process exitcode,
+C<$code> eval success flag, and an array of code results or an error string, if
+any.
 
 =item forked($code) :: () -> (@results | $error)
 
@@ -235,8 +234,8 @@ or an error string.
 
 Doesn't work on Win32, because relies on C<$SIG{CHLD}> which is not getting
 delivered (on 5.10.0 at least). However, since Win32 doesn't have forks anyway,
-Perl emulates them with threads. Use L<IO::Lambda::Thread> instead when running
-on windows.
+Perl emulates them with threads. Consider using L<IO::Lambda::Thread> instead
+when running on windows.
 
 Has issues with SIGCHLD on perls < 5.8.0.
 
