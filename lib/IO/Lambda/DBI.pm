@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.11 2008/12/17 09:44:25 dk Exp $
+# $Id: DBI.pm,v 1.12 2008/12/17 09:46:48 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -83,7 +83,7 @@ sub dbi_message
 
 	return lambda { $error } if $error;
 	warn _d($self) . " > $method(@_)\n" if $DEBUG;
-	$self-> new_message( $msg, $self-> {timeout} );
+	return $self-> new_message( $msg, $self-> {timeout} );
 }
 
 sub connect    { shift-> dbi_message( connect    => 0,         @_) }
