@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.131 2008/12/17 12:35:28 dk Exp $
+# $Id: Lambda.pm,v 1.132 2008/12/18 20:31:37 dk Exp $
 
 package IO::Lambda;
 
@@ -12,11 +12,12 @@ use Time::HiRes qw(time);
 use vars qw(
 	$LOOP %EVENTS @LOOPS
 	$VERSION @ISA
-	@EXPORT_OK %EXPORT_TAGS	@EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM @EXPORT_DEV @EXPORT_MISC
+	@EXPORT_OK %EXPORT_TAGS	@EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM
+	@EXPORT_DEV @EXPORT_MISC @EXPORT_FUNC
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
-$VERSION     = '0.46';
+$VERSION     = '0.47';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -30,6 +31,9 @@ $VERSION     = '0.46';
 	this context lambda again state restartable
 	io read write readwrite sleep tail tails tailo any_tail
 );
+@EXPORT_FUNC = qw(
+	seq par mapcar filter fold
+);
 @EXPORT_MISC    = qw(
 	set_frame get_frame swap_frame
 );
@@ -38,14 +42,15 @@ $VERSION     = '0.46';
 );
 @EXPORT_OK   = (
 	@EXPORT_LAMBDA, @EXPORT_CONSTANTS, @EXPORT_STREAM, 
-	@EXPORT_DEV, @EXPORT_MISC,
+	@EXPORT_DEV, @EXPORT_MISC, @EXPORT_FUNC
 );
 %EXPORT_TAGS = (
+	func      => \@EXPORT_FUNC, 
 	lambda    => \@EXPORT_LAMBDA, 
 	stream    => \@EXPORT_STREAM, 
 	constants => \@EXPORT_CONSTANTS,
 	dev       => \@EXPORT_DEV,
-	all       => [ @EXPORT_LAMBDA, @EXPORT_STREAM, @EXPORT_CONSTANTS ],
+	all       => [ @EXPORT_LAMBDA, @EXPORT_STREAM, @EXPORT_CONSTANTS, @EXPORT_FUNC ],
 );
 
 if ( exists $ENV{IO_LAMBDA_DEBUG}) {
@@ -977,6 +982,97 @@ sub any_tail(&)
 #
 ################################################################
 
+# seq() :: (@l) -> @m
+sub seq
+{
+	lambda {
+		my @q = @_;
+		my @ret;
+		return unless @q;
+		context shift @q;
+	tail {
+		push @ret, @_;
+		return @ret unless @q;
+		context shift @q;
+		again;
+	}}
+}
+
+# fold($l) :: @b -> @c
+# $l :: ($a,@b) -> @c
+sub fold
+{
+	my $l = shift;
+	lambda {
+		my @q = @_;
+		context $l, shift(@q), shift(@q);
+	tail {
+		return @_ unless @q;
+		context $l, shift(@q), @_;
+		again;
+	}}
+}
+
+# par($max = 0) :: (@l) -> @m
+sub par
+{
+	my $max = $_[0] || 0;
+
+	lambda {
+		my @q = @_;
+		my @ret;
+		$max = @q if $max < 0 or $max > @q;
+		context map {
+			lambda {
+				return unless @q;
+				context shift @q;
+			tail {
+				push @ret, @_;
+				return unless @q;
+				context shift @q;
+				again;
+			}}
+		} 1 .. $max;
+		tails { @ret }
+	}
+}
+
+# mapcar($l) :: (@p) -> @r
+sub mapcar
+{
+	my $lambda = shift;
+	lambda {
+		my @ret;
+		my @p = @_;
+		return unless @p;
+		context $lambda, shift @p;
+	tail {
+		push @ret, @_;
+		return @ret unless @p;
+		context $lambda, shift @p;
+		again;
+	}}
+}
+
+# filter($l) :: (@p) -> @r
+sub filter
+{
+	my $lambda = shift;
+	lambda {
+		my @ret;
+		return unless @_;
+		my @p = @_;
+		my $p = shift @p;
+		context $lambda, $p;
+	tail {
+		push @ret, $p if shift;
+		return @ret unless @p;
+		$p = shift @p;
+		context $lambda, $p;
+		again;
+	}}
+}
+
 # sysread lambda wrapper
 #
 # ioresult    :: ($result, $error)
@@ -1206,7 +1302,7 @@ IO::Lambda - non-blocking I/O in lambda style
 The code below executes parallel HTTP requests
 
    use strict;
-   use IO::Lambda qw(:lambda);
+   use IO::Lambda qw(:lambda :func);
    use IO::Socket::INET;
 
    # create a lambda object
@@ -1244,8 +1340,12 @@ The code below executes parallel HTTP requests
       }
    }-> wait;
 
+   # crawl for all urls but 10 parallel connections max
+   print par( 10, map { http( $_, '/') } @urls)-> wait;
+
 Note: C<io> and C<lambda> are synonyms - I personally prefer C<lambda> but some
-find the word slightly inappropriate, hence C<io>.
+find the word slightly inappropriate, hence C<io>. See however L<Higher-order
+functions> to see why it is more C<lambda> than C<io>.
 
 =head1 DESCRIPTION
 
@@ -1261,9 +1361,9 @@ orderless functions, C<IO::Lambda> allows writing I/O callbacks in a style that
 resembles the good old sequential, declarative programming.
 
 The manual begins with code examples, then proceeds to explaining basic
-assumptions, then finally gets of the complex concepts, where the real fun
-begins. You can skip directly there (L<Stream IO>), where the functional style
-mixes with I/O. 
+assumptions, then finally gets to the complex concepts, where the real fun
+begins. You can skip directly there (L<Stream IO>, L<Higher-order functions>),
+where the functional style mixes with I/O. 
 
 =head2 Apologetics
 
@@ -1868,7 +1968,7 @@ The whole point of this module is to help building protocols or arbitrary
 complexity in a clear, consequent programming style. Consider how perl's
 low-level C<sysread> and C<syswrite> relate to its higher-level C<readline>,
 where the latter not only does the buffering, but also recognizes C<$/> as
-input record separator.  The section above described lower-level lambda I/O
+input record separator.  The section above described lower-level lambda I/
 predicates, that are only useful for C<sysread> and C<syswrite>; this section
 tells about higher-level lambdas that relate to these low-level ones, as the
 aforementioned C<readline> relates to C<sysread>.
@@ -1949,6 +2049,10 @@ based on) won't care about internal states of the reader.
 Check out F<t/06_stream.t> that emulates reading and writing implemented 
 in this fashion.
 
+These function are imported with 
+  
+   use IO::Lambda qw(:stream);
+
 =over
 
 =item sysreader() :: ($fh, $$buf, $length, $deadline) -> ioresult
@@ -2012,6 +2116,77 @@ C<$length> bytes are written successfully.
 
 Same as C<readbuf>, but succeeds when a string of bytes ended by a newline
 is read.
+
+=back
+
+=head2 Higher-order functions
+
+Functions described in this section justify the I<lambda> in C<IO::Lambda>.
+Named deliberately after the classic function names, they provide a similar
+interface.
+
+These function are imported with 
+  
+   use IO::Lambda qw(:func);
+
+=over
+
+=item seq() :: @a -> @b
+
+Create a new lambda that executes all lambdas passed to it in C<@a>
+sequentially, one after another. The lambda returns results collected from the
+executed lambdas.
+
+  print seq-> wait( map { my $k = $_; lambda { $k } } 1..5);
+  12345
+
+=item fold($lambda) :: @b -> @c; $lambda :: ($a,@b) -> @c
+
+Given a C<$lambda>, returns another lambda that accepts array C<@b>, and runs
+pairwise its members through C<$lambda>. Results of repeated execution of
+C<$lambda> is returned.
+
+   print fold( lambda { $_[0] + $_[1] } )-> wait( 1..4 );
+   10
+
+=item par($max = 0) :: @a -> @b
+
+Given a limit C<$max>, returns a single new lambda that accpets lambdas in
+C<@a> to be executed in parallel, but so that number of lambdas that run
+simultaneously never goes higher than the limit.  The lambda returns results
+collected from the executed lambdas.
+
+If C<$max> is undefined or 0, behaves similar to a lambda version of C<tails>,
+i.e., all of the lambdas are run in parallel.
+
+The code below prints 123, then sleeps, then 456, then sleeps, then 789.
+
+  par(3)-> wait( map {
+      my $k = $_;
+      lambda {
+          context 0.5;
+	  sleep { print $k, "\n" }
+      }
+  } 1..9);
+
+=item mapcar($lambda) :: @p -> @r
+
+Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
+sequentially executes C<$lambda> with each parameter from the array.  The
+lambda returns results collected from the executed lambdas.
+
+   print mapcar( lambda { 1 + shift })-> wait(1..5);
+   23456
+
+=item filter($lambda) :: @p -> @r
+
+Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
+sequentially executes C<$lambda> with each parameter from the array.  Depending
+on the result of the execution, parameters either returned or not returned back
+to the caller. 
+
+   print filter(lambda { shift() % 2 })-> wait(1..5);
+   135
 
 =back
 

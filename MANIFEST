@@ -38,6 +38,7 @@ t/15_thread.t
 t/16_fork.t
 t/17_flock.t
 t/18_poll.t
+t/19_functional.t
 t/98_pod.t
 t/99_pod_coverage.t
 eg/sequential.pl
