@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 19_functional.t,v 1.1 2008/12/18 20:32:14 dk Exp $
+# $Id: 19_functional.t,v 1.2 2008/12/18 21:40:03 dk Exp $
 
 use strict;
 use warnings;
