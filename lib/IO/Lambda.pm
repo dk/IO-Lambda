@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.134 2008/12/19 13:45:38 dk Exp $
+# $Id: Lambda.pm,v 1.135 2008/12/19 16:32:54 dk Exp $
 
 package IO::Lambda;
 
@@ -1292,7 +1292,7 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda - non-blocking I/O in lambda style
+IO::Lambda - non-blocking I/O as lambda calculus
 
 =head1 SYNOPSIS
 
@@ -2162,10 +2162,9 @@ C<$lambda> is returned.
 
 =item curry(@a -> $l) :: @a -> @b
 
-C<translate> accepts a function that returns a lambda, and
-possible parameters to it. Returns a new lambda, that will
-execute the inner lambda, and returns its result as is. 
-For example,
+C<curry> accepts a function that returns a lambda, and possible parameters to
+it. Returns a new lambda, that will execute the inner lambda, and returns its
+result as is.  For example,
 
    context $lambda, $a, $b, $c;
    tail { ... }
