@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.136 2008/12/19 16:38:22 dk Exp $
+# $Id: Lambda.pm,v 1.137 2008/12/19 22:39:24 dk Exp $
 
 package IO::Lambda;
 
@@ -1360,7 +1360,10 @@ resembles the good old sequential, declarative programming.
 The manual begins with code examples, then proceeds to explaining basic
 assumptions, then finally gets to the complex concepts, where the real fun
 begins. You can skip directly there (L<Stream IO>, L<Higher-order functions>),
-where the functional style mixes with I/O. 
+where the functional style mixes with I/O. If, on the contrary, you are
+intimidated by the module's ambitions, you can skip to L<Simple use> for a more
+gentle introduction. Those, who are interested how the module is different from
+the other I/O frameworks, please continue reading.
 
 =head2 Apologetics
 
@@ -1439,6 +1442,60 @@ callback-based libraries require lots of additional work, and where state machin
 are beneficial. Complex protocols like HTTP, parallel execution of several
 tasks, strict control of task and protocol hierarchy - this is the domain where
 C<IO::Lambda> works best.
+
+=head2 Simple use
+
+This section is for those who don't need all of the module's powerful
+machinery. Simple callback-driven programming examples show how to use the
+module for unsophisticated tasks, using concepts similar to the other I/O
+frameworks. It is possible to use the module on this level only, however one
+must be aware that by doing so, the real power of the higher-order abstraction
+is not used.
+
+C<IO::Lambda>, like all I/O multiplexing libraries, provides functions for
+registering callbacks, that in turn are called when a timeout occurs, or when a
+file handle is ready for reading and/or writing. See below code examples that
+demonstrate how to program on this level of abstraction.
+
+=over
+
+=item Combination of two timeouts and an IO_READ event
+
+   use IO::Lambda qw(:constants);
+
+   my $obj = IO::Lambda-> new;
+
+   # Either 3 or time + 3 will do. See "Time" section for more info
+   $obj-> watch_timer( 3, sub { print "I've slept 3 seconds!\n" });
+
+   # I/O flags is a combination of IO_READ, IO_WRITE, and IO_EXCEPTION.
+   # Timeout is either 5 or time + 5, too.
+   $obj-> watch_io( IO_READ, \*STDIN, 5, sub {
+   	my ( $self, $ok) = @_;
+	print $ok ?
+	    "stdin is readable!\n" : 
+	    "stdin is not readable within 5 seconds\n";
+   });
+
+   # main event loop is stopped when there are no lambdas and no 
+   # pending events
+   IO::Lambda::run;
+
+=item Waiting for another lambda to complete
+   
+   use IO::Lambda;
+
+   my $a = IO::Lambda-> new;
+   $a-> watch_timer( 3, sub { print "I've slept 3 seconds!\n" });
+
+   my $b = IO::Lambda-> new;
+   # A lambda can wait for more than one event or lambda.
+   # A lambda can be awaited by more than one lambda.
+   $b-> watch_lambda( $a, sub { print "lambda #1 is finished!\n"});
+
+   IO::Lambda::run;
+
+=back
 
 =head2 Example: reading lines from a filehandle
 
