@@ -40,6 +40,16 @@ It only makes sense to write to the standard output, and read from standard inpu
 That is because the former is opened only for writing, and the latter only for reading.
 However, files can usually be opened for both.
 
+=head1 HYPE
+
+IO::Lambda finally became a framework, where both I/O and lambda calculus are
+represented in equal shares. Contrary to the majority of I/O frameworks,
+implemented in declarative languages, IO::Lambda is much more than a callback
+and event wrapper. The module relies heavily on concepts borrowed from
+functional languages, and brings back the simplicity of the declarative
+programming style, that is only available when one employs threads, coroutines,
+or co-processes.
+
 =head1 AUTHOR
 
 Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
