@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.133 2008/12/19 00:16:00 dk Exp $
+# $Id: Lambda.pm,v 1.134 2008/12/19 13:45:38 dk Exp $
 
 package IO::Lambda;
 
@@ -1032,7 +1032,7 @@ sub filter($)
 	}}
 }
 
-# translate(@a -> $l) :: @a -> @b
+# curry(@a -> $l) :: @a -> @b
 sub curry(&)
 {
 	my $cb = $_[0];
@@ -1043,7 +1043,7 @@ sub curry(&)
 }
 
 # seq() :: (@l) -> @m
-sub seq { mapcar curry { shift }}
+sub seq { mapcar curry { shift } }
 
 # par($max = 0) :: (@l) -> @m
 sub par
