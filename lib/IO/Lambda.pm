@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.137 2008/12/19 22:39:24 dk Exp $
+# $Id: Lambda.pm,v 1.138 2008/12/19 22:45:26 dk Exp $
 
 package IO::Lambda;
 
@@ -1608,7 +1608,7 @@ talk_redirect() will have exactly the same properties as talk() does
 	}
     }
 
-=head2 Working example
+=head2 Full example code
 
     use strict;
     use IO::Lambda qw(:lambda);
