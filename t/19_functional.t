@@ -1,12 +1,12 @@
 #! /usr/bin/perl
-# $Id: 19_functional.t,v 1.3 2008/12/19 00:16:00 dk Exp $
+# $Id: 19_functional.t,v 1.4 2008/12/19 11:11:35 dk Exp $
 
 use strict;
 use warnings;
 use Test::More;
 use IO::Lambda qw(:lambda :func);
 
-plan tests => 7;
+plan tests => 8;
 
 my $seq = seq;
 ok('12345' eq join('', $seq-> wait( map { my $k = $_; lambda { $k } } 1..5 )), 'seq1');
@@ -40,4 +40,5 @@ ok( '135'   eq join('', filter( lambda { shift() % 2 })-> wait(1..5)), 'filter')
 
 my $fold = fold lambda { $_[0] + $_[1] };
 ok( 10 == $fold-> wait(1..4), 'fold');
-ok( 14 == curry { $fold, 2..5 }-> wait, 'curry fold');
+ok( 14 == curry { $fold, 2..5     }-> wait(6), 'curry fold1');
+ok( 20 == curry { $fold, 2..5, @_ }-> wait(6), 'curry fold2');
