@@ -112,4 +112,4 @@
 	documentation proof-reading
 
 0.47  - 18 Dec 2008
-	add higher-order functions: seq, par, mapcar, filter, fold
+	add higher-order functions: seq, par, mapcar, filter, fold, curry

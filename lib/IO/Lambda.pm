@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.132 2008/12/18 20:31:37 dk Exp $
+# $Id: Lambda.pm,v 1.133 2008/12/19 00:16:00 dk Exp $
 
 package IO::Lambda;
 
@@ -32,7 +32,7 @@ $VERSION     = '0.47';
 	io read write readwrite sleep tail tails tailo any_tail
 );
 @EXPORT_FUNC = qw(
-	seq par mapcar filter fold
+	seq par mapcar filter fold curry 
 );
 @EXPORT_MISC    = qw(
 	set_frame get_frame swap_frame
@@ -848,7 +848,6 @@ sub predicate
 	);
 }
 
-
 # tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
 sub tail(&)
 {
@@ -982,25 +981,9 @@ sub any_tail(&)
 #
 ################################################################
 
-# seq() :: (@l) -> @m
-sub seq
-{
-	lambda {
-		my @q = @_;
-		my @ret;
-		return unless @q;
-		context shift @q;
-	tail {
-		push @ret, @_;
-		return @ret unless @q;
-		context shift @q;
-		again;
-	}}
-}
-
 # fold($l) :: @b -> @c
 # $l :: ($a,@b) -> @c
-sub fold
+sub fold($)
 {
 	my $l = shift;
 	lambda {
@@ -1012,6 +995,55 @@ sub fold
 		again;
 	}}
 }
+
+# mapcar($l) :: (@p) -> @r
+sub mapcar($)
+{
+	my $lambda = shift;
+	lambda {
+		my @ret;
+		my @p = @_;
+		return unless @p;
+		context $lambda, shift @p;
+	tail {
+		push @ret, @_;
+		return @ret unless @p;
+		context $lambda, shift @p;
+		again;
+	}}
+}
+
+# filter($l) :: (@p) -> @r
+sub filter($)
+{
+	my $lambda = shift;
+	lambda {
+		my @ret;
+		return unless @_;
+		my @p = @_;
+		my $p = shift @p;
+		context $lambda, $p;
+	tail {
+		push @ret, $p if shift;
+		return @ret unless @p;
+		$p = shift @p;
+		context $lambda, $p;
+		again;
+	}}
+}
+
+# translate(@a -> $l) :: @a -> @b
+sub curry(&)
+{
+	my $cb = $_[0];
+	lambda {
+		context $cb->(@_);
+		&tail();
+	}
+}
+
+# seq() :: (@l) -> @m
+sub seq { mapcar curry { shift }}
 
 # par($max = 0) :: (@l) -> @m
 sub par
@@ -1037,41 +1069,6 @@ sub par
 	}
 }
 
-# mapcar($l) :: (@p) -> @r
-sub mapcar
-{
-	my $lambda = shift;
-	lambda {
-		my @ret;
-		my @p = @_;
-		return unless @p;
-		context $lambda, shift @p;
-	tail {
-		push @ret, @_;
-		return @ret unless @p;
-		context $lambda, shift @p;
-		again;
-	}}
-}
-
-# filter($l) :: (@p) -> @r
-sub filter
-{
-	my $lambda = shift;
-	lambda {
-		my @ret;
-		return unless @_;
-		my @p = @_;
-		my $p = shift @p;
-		context $lambda, $p;
-	tail {
-		push @ret, $p if shift;
-		return @ret unless @p;
-		$p = shift @p;
-		context $lambda, $p;
-		again;
-	}}
-}
 
 # sysread lambda wrapper
 #
@@ -1308,7 +1305,7 @@ The code below executes parallel HTTP requests
    # create a lambda object
    sub http
    {
-      my ( $host, $url) = @_;
+      my $host = shift;
 
       my $socket = IO::Socket::INET-> new( 
          PeerAddr => $host, 
@@ -1318,7 +1315,7 @@ The code below executes parallel HTTP requests
       lambda {
          context $socket;
       write {
-         print $socket "GET $url HTTP/1.0\r\n\r\n";
+         print $socket "GET /index.html HTTP/1.0\r\n\r\n";
          my $buf = '';
       read {
          return $buf unless 
@@ -1328,20 +1325,20 @@ The code below executes parallel HTTP requests
    }
 
    # fire up a single lambda and wait until it completes
-   print http( 'www.perl.com', '/')-> wait;
+   print http('www.perl.com')-> wait;
 
    # fire up a lambda that waits for two http requests in parallel
+   my @hosts = ('www.perl.com', 'www.google.com');
    lambda {
-      context
-         http( 'www.perl.com', '/'),
-         http( 'www.google.com', '/');
-      tails {
-         print @_;
-      }
+      context map { http($_) } @hosts;
+      tails { print @_ }
    }-> wait;
 
-   # crawl for all urls but 10 parallel connections max
-   print par( 10, map { http( $_, '/') } @urls)-> wait;
+   # crawl for all urls in parallel, but keep 10 parallel connections max
+   print par(10)-> wait(map { http($_) } @hosts);
+   
+   # crawl for all urls sequentially
+   print mapcar( curry { http(shift) })-> wait(@hosts);
 
 Note: C<io> and C<lambda> are synonyms - I personally prefer C<lambda> but some
 find the word slightly inappropriate, hence C<io>. See however L<Higher-order
@@ -2131,14 +2128,28 @@ These function are imported with
 
 =over
 
-=item seq() :: @a -> @b
+=item mapcar($lambda) :: @p -> @r
 
-Create a new lambda that executes all lambdas passed to it in C<@a>
-sequentially, one after another. The lambda returns results collected from the
-executed lambdas.
+Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
+sequentially executes C<$lambda> with each parameter from the array.  The
+lambda returns results collected from the executed lambdas.
 
-  print seq-> wait( map { my $k = $_; lambda { $k } } 1..5);
-  12345
+   print mapcar( lambda { 1 + shift })-> wait(1..5);
+   23456
+
+C<mapcar> can be used for organizing simple loops:
+
+   mapcar(curry { sendmail(shift) })-> wait(@email_addresses);
+
+=item filter($lambda) :: @p -> @r
+
+Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
+sequentially executes C<$lambda> with each parameter from the array.  Depending
+on the result of the execution, parameters either returned or not returned back
+to the caller. 
+
+   print filter(lambda { shift() % 2 })-> wait(1..5);
+   135
 
 =item fold($lambda) :: @b -> @c; $lambda :: ($a,@b) -> @c
 
@@ -2148,6 +2159,32 @@ C<$lambda> is returned.
 
    print fold( lambda { $_[0] + $_[1] } )-> wait( 1..4 );
    10
+
+=item curry(@a -> $l) :: @a -> @b
+
+C<translate> accepts a function that returns a lambda, and
+possible parameters to it. Returns a new lambda, that will
+execute the inner lambda, and returns its result as is. 
+For example,
+
+   context $lambda, $a, $b, $c;
+   tail { ... }
+
+where C<$lambda> accepts three parameters, can be rewritten as
+
+   $m = curry { $lambda, $a, $b };
+   context $m, $c;
+   tail { ... }
+
+=item seq() :: @a -> @b
+
+Create a new lambda that executes all lambdas passed to it in C<@a>
+sequentially, one after another. The lambda returns results collected from the
+executed lambdas.
+
+  sub seq { mapcar curry { shift }}
+  print seq-> wait( map { my $k = $_; lambda { $k } } 1..5);
+  12345
 
 =item par($max = 0) :: @a -> @b
 
@@ -2168,25 +2205,6 @@ The code below prints 123, then sleeps, then 456, then sleeps, then 789.
 	  sleep { print $k, "\n" }
       }
   } 1..9);
-
-=item mapcar($lambda) :: @p -> @r
-
-Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
-sequentially executes C<$lambda> with each parameter from the array.  The
-lambda returns results collected from the executed lambdas.
-
-   print mapcar( lambda { 1 + shift })-> wait(1..5);
-   23456
-
-=item filter($lambda) :: @p -> @r
-
-Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
-sequentially executes C<$lambda> with each parameter from the array.  Depending
-on the result of the execution, parameters either returned or not returned back
-to the caller. 
-
-   print filter(lambda { shift() % 2 })-> wait(1..5);
-   135
 
 =back
 
