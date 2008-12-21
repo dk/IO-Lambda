@@ -1,10 +1,10 @@
 #! /usr/bin/perl
-# $Id: 06_stream.t,v 1.1 2008/01/25 13:46:21 dk Exp $
+# $Id: 06_stream.t,v 1.2 2008/12/21 10:07:28 dk Exp $
 
 use strict;
 use warnings;
 use Time::HiRes qw(time);
-use Test::More tests => 4;
+use Test::More tests => 5;
 use IO::Lambda qw(:all);
 
 my $reader = lambda {
@@ -23,8 +23,11 @@ my $reader = lambda {
 };
 
 my $wrcount = 0;
+my $writer_cb;
 my $writer = lambda {
 	my ( $fh, $buf, $len, $ofs) = @_;
+
+	$writer_cb->() if $writer_cb;
 
 	return 0 if $len < 1;
 	$len = 1; # write only 1 byte at a time 
@@ -65,3 +68,14 @@ $buf = "hello world";
 this writebuf($writer);
 this-> wait( $fh, \$buf);
 ok( length($buf) == $wrcount, 'writebuf');
+
+# undef length writebuf
+$buf = "1";
+$writer_cb = sub {
+	$buf .= "2";
+	$writer_cb = undef;
+};
+$wrcount = 0;
+this writebuf($writer);
+this-> wait( $fh, \$buf);
+ok(( $buf eq '12' and length($buf) == $wrcount), 'dynamic writebuf');
