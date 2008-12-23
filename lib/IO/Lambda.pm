@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.139 2008/12/21 10:07:27 dk Exp $
+# $Id: Lambda.pm,v 1.140 2008/12/23 22:39:28 dk Exp $
 
 package IO::Lambda;
 
@@ -2103,7 +2103,7 @@ instead, that should conform to sysreader signature:
        }
    }
 
-I don't show the actual implementation of a HTTPS reader (if you're curious,
+I'm not showing the actual implementation of a HTTPS reader (if you're curious,
 look at L<IO::Lambda::HTTP::HTTPS> ), but the idea is that inside that reader,
 it is perfectly fine to do any number of read and write operations, and wait
 for their completion too, as long as the upper-level lambda will sooner or
@@ -2113,7 +2113,7 @@ based on) won't care about internal states of the reader.
 Check out F<t/06_stream.t> that emulates reading and writing implemented 
 in this fashion.
 
-These function are imported with 
+These functions are imported with 
   
    use IO::Lambda qw(:stream);
 
@@ -2215,8 +2215,8 @@ C<mapcar> can be used for organizing simple loops:
 
 Given a C<$lambda>, creates another lambda, that accepts array C<@p>, and
 sequentially executes C<$lambda> with each parameter from the array.  Depending
-on the result of the execution, parameters either returned or not returned back
-to the caller. 
+on the result of the execution, parameters are either returned, or not returned
+back to the caller. 
 
    print filter(lambda { shift() % 2 })-> wait(1..5);
    135
@@ -2247,7 +2247,7 @@ where C<$lambda> accepts three parameters, can be rewritten as
 
 =item seq() :: @a -> @b
 
-Create a new lambda that executes all lambdas passed to it in C<@a>
+Creates a new lambda that executes all lambdas passed to it in C<@a>
 sequentially, one after another. The lambda returns results collected from the
 executed lambdas.
 
@@ -2257,10 +2257,10 @@ executed lambdas.
 
 =item par($max = 0) :: @a -> @b
 
-Given a limit C<$max>, returns a single new lambda that accpets lambdas in
-C<@a> to be executed in parallel, but so that number of lambdas that run
-simultaneously never goes higher than the limit.  The lambda returns results
-collected from the executed lambdas.
+Given a limit C<$max>, returns a new lambda that accepts lambdas in C<@a> to be
+executed in parallel, but so that number of lambdas that run simultaneously
+never goes higher than the limit.  The lambda returns results collected from
+the executed lambdas.
 
 If C<$max> is undefined or 0, behaves similar to a lambda version of C<tails>,
 i.e., all of the lambdas are run in parallel.
