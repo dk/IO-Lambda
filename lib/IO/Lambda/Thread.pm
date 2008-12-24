@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.19 2008/12/17 12:36:36 dk Exp $
+# $Id: Thread.pm,v 1.20 2008/12/24 19:23:10 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -188,7 +188,8 @@ its side of the socket, thus making the parent side readable. However, the
 child code can also hijack the socket for its own needs, so if that
 functionality is needed, one must create an extra layer of communication that
 will ensure that the child code is properly exited, so that the parent can
-reliably call C<join> without blocking.
+reliably call C<join> without blocking (see L<IO::Lambda::Message>, that 
+is destined exactly for this use).
 
 C<$code> is executed in another thread's context, and is passed the communication
 socket ( if C<$pass_socket> is set to 1 ). C<$code> is also passed C<@param>.
