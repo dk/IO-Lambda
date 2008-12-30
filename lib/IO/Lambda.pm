@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.140 2008/12/23 22:39:28 dk Exp $
+# $Id: Lambda.pm,v 1.141 2008/12/30 20:16:11 dk Exp $
 
 package IO::Lambda;
 
@@ -865,6 +865,20 @@ sub tail(&)
 	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
 }
 
+# dummy sub for empty calls for tails() family
+sub _empty
+{
+	my ($name, $method, $cb) = @_;
+	my @ctx = context;
+	$THIS-> watch_lambda( IO::Lambda-> new, sub {
+		local *__ANON__ = "IO::Lambda::".$name."::callback";
+		@CONTEXT  = @ctx;
+		$METHOD   = $method;
+		$CALLBACK = $cb;
+		$cb-> ();
+	}) if $cb;
+}
+
 # tails(@lambdas) -- wait for all lambdas to finish
 sub tails(&)
 {
@@ -874,7 +888,7 @@ sub tails(&)
 	my $cb = _subname tails => $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
-	croak "no tails" unless @lambdas;
+	return _empty(tails => \&tails, $cb) unless @lambdas;
 
 	my @ret;
 	my $watcher;
@@ -902,7 +916,7 @@ sub tailo(&)
 	my $cb = _subname tailo => $_[0];
 	my @lambdas = context;
 	my $n = $#lambdas;
-	croak "no tails" unless @lambdas;
+	return _empty(tailo => \&tailo, $cb) unless @lambdas;
 
 	my @ret;
 	my $watcher;
@@ -938,7 +952,7 @@ sub any_tail(&)
 	my $cb = _subname any_tail => $_[0];
 	my ( $deadline, @lambdas) = context;
 	my $n = $#lambdas;
-	croak "no tails" unless @lambdas;
+	return _empty(any_tail => \&any_tail, $cb) unless @lambdas;
 
 	my ( @ret, @watchers);
 	my $timer;

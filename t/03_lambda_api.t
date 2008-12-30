@@ -1,9 +1,9 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.12 2008/11/08 09:46:19 dk Exp $
+# $Id: 03_lambda_api.t,v 1.13 2008/12/30 20:16:12 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 14;
+use Test::More tests => 15;
 use IO::Lambda qw(:lambda);
 
 alarm(10);
@@ -115,3 +115,5 @@ this lambda {
 ok(( 'moo' eq this-> wait && $i == -1), 'restart read');
 
 }
+
+ok( 0 == scalar(@_ = lambda { tails { @_ } }-> wait) , 'empty tails');
