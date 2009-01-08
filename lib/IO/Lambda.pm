@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.142 2009/01/08 15:23:25 dk Exp $
+# $Id: Lambda.pm,v 1.143 2009/01/08 15:24:41 dk Exp $
 
 package IO::Lambda;
 
@@ -1829,11 +1829,11 @@ or by using the package syntax,
    use IO::Lambda;
    IO::Lambda::lambda { ... };
 
-=over
-
 Note: If you know concept of continuation-passing style, this is exactly how
 conditions work, except that closures are used instead of continuations
 (Brock Wilcox:thanks!) .
+
+=over
 
 =item lambda()
 
