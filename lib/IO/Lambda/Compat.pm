@@ -1,10 +1,15 @@
-# $Id: Compat.pm,v 1.1 2009/01/08 15:23:26 dk Exp $
+# $Id: Compat.pm,v 1.2 2009/01/08 15:29:22 dk Exp $
 use strict;
 
-package IO::Lambda;
+package IO::Lambda::Compat;
 
-use IO::Lambda qw(:dev);
+use strict;
+use warnings;
 
+use Exporter;
+use IO::Lambda qw(:all :dev);
+use vars qw(@ISA @EXPORT);
+@ISA    = qw(Exporter);
 @EXPORT = qw(read write sleep readwrite predicate);
 
 # readwrite($flags,$handle,$deadline)
@@ -27,7 +32,7 @@ sub read(&)
 		if this-> {override}->{read};
 
 	my @c = context;
-	$THIS-> add_watch( 
+	this-> add_watch( 
 		_subname(read => shift), \&read, IO_READ, 
 		@c[0,1,0,1]
 	)
@@ -38,7 +43,6 @@ sub write(&)
 {
 	return this-> override_handler('write', \&write, shift)
 		if this-> {override}->{write};
-	
 	my @c = context;
 	this-> add_watch( 
 		_subname(write => shift), \&write, IO_WRITE, 
