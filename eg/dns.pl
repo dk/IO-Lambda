@@ -1,4 +1,4 @@
-# $Id: dns.pl,v 1.2 2008/08/07 19:36:15 dk Exp $
+# $Id: dns.pl,v 1.3 2009/01/08 15:23:25 dk Exp $
 use strict;
 use IO::Lambda::DNS qw(:all);
 use IO::Lambda qw(:lambda);
@@ -22,7 +22,7 @@ sub show
 	}
 }
 
-# style one -- dns_query() is a predicate
+# style one -- dns_query() is a condition
 lambda {
 	for my $site ( map { "www.$_.com" } qw(google yahoo perl)) {
 		context $site,

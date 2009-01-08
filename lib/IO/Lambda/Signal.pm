@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.18 2008/12/17 11:21:12 dk Exp $
+# $Id: Signal.pm,v 1.19 2009/01/08 15:23:26 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -254,10 +254,10 @@ pid {
 	return ($buf, shift);
 }}}}
 
-# predicates
-sub signal (&) { new_signal (context)-> predicate(shift, \&signal, 'signal') }
-sub pid    (&) { new_pid    (context)-> predicate(shift, \&pid,    'pid') }
-sub spawn  (&) { new_process-> call(context)-> predicate(shift, \&spawn,  'spawn') }
+# condition
+sub signal (&) { new_signal (context)-> condition(shift, \&signal, 'signal') }
+sub pid    (&) { new_pid    (context)-> condition(shift, \&pid,    'pid') }
+sub spawn  (&) { new_process-> call(context)-> condition(shift, \&spawn,  'spawn') }
 
 
 1;

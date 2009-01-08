@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 17_flock.t,v 1.7 2008/11/26 14:49:55 dk Exp $
+# $Id: 17_flock.t,v 1.8 2009/01/08 15:23:27 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -39,7 +39,7 @@ lambda {
 	context \*F, timeout => 2.0, frequency => 0.2;
 	flock { $got_it = ( shift() ? 1 : 0); $order .= 'K' };
 	context 0.5;
-	sleep { close G; $order .= 'O' };
+	timeout { close G; $order .= 'O' };
 }-> wait;
 
 ($order eq 'OK') ? 

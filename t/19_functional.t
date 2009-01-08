@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 19_functional.t,v 1.4 2008/12/19 11:11:35 dk Exp $
+# $Id: 19_functional.t,v 1.5 2009/01/08 15:23:28 dk Exp $
 
 use strict;
 use warnings;
@@ -22,7 +22,7 @@ sub xl
 	lambda {
 		context 0.1;
 		$curr++;
-	sleep {
+	timeout {
 		$max = $curr if $max < $curr;
 		$curr--;
 		return $id;

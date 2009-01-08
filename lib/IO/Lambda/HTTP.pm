@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.43 2008/12/17 10:51:37 dk Exp $
+# $Id: HTTP.pm,v 1.44 2009/01/08 15:23:26 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -19,7 +19,7 @@ use Time::HiRes qw(time);
 sub http_request(&) 
 {
 	__PACKAGE__-> new(context)-> 
-		predicate(shift, \&http_request, 'http_request')
+		condition(shift, \&http_request, 'http_request')
 }
 
 sub new
@@ -369,7 +369,7 @@ sub handle_request_in_buffer
 		return undef, $error if $error;
 
 		context $self-> {socket}, $self-> {deadline};
-	read {
+	readable {
 		# request sent, now wait for data
 		return undef, 'timeout' unless shift;
 		
@@ -484,8 +484,8 @@ IO::Lambda::HTTP - http requests lambda style
 
 =head1 DESCRIPTION
 
-The module exports a single predicate C<http_request> that accepts a
-C<HTTP::Request> object and set of options as parameters. The predicate returns
+The module exports a single condition C<http_request> that accepts a
+C<HTTP::Request> object and set of options as parameters. The condition returns
 either a C<HTTP::Response> on success, or an error string otherwise.
 
 =head1 SYNOPSIS
@@ -514,7 +514,7 @@ either a C<HTTP::Response> on success, or an error string otherwise.
 
 =item http_request $HTTP::Request -> $HTTP::Response
 
-C<http_request> is a lambda predicate that accepts C<HTTP::Request> object in
+C<http_request> is a lambda condition that accepts C<HTTP::Request> object in
 the context. Returns either a C<HTTP::Response> object on success, or error
 string otherwise.
 

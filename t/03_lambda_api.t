@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.13 2008/12/30 20:16:12 dk Exp $
+# $Id: 03_lambda_api.t,v 1.14 2009/01/08 15:23:26 dk Exp $
 
 use strict;
 use warnings;
@@ -34,25 +34,25 @@ ok( 47 == this-> wait, 'rerun lambda');
 
 this lambda {
 	context 0.01;
-	sleep { 'moo' };
+	timeout { 'moo' };
 };
-ok( 'moo' eq this-> wait, 'sleep');
+ok( 'moo' eq this-> wait, 'timeout');
 
 this lambda {
 	context lambda {};
 	tail {
 		context 0.01;
-		sleep { 'moo' };
+		timeout { 'moo' };
 	};
 };
-ok( 'moo' eq this-> wait, 'tail sleep');
+ok( 'moo' eq this-> wait, 'tail timeout');
 
 $i = 2;
 this lambda {
 	context 0.01;
-	sleep { $i-- ? again : 'moo' };
+	timeout { $i-- ? again : 'moo' };
 };
-ok(( 'moo' eq this-> wait && $i == -1), 'restart sleep');
+ok(( 'moo' eq this-> wait && $i == -1), 'restart timeout');
 
 this lambda {
     context lambda { 1 };
@@ -71,7 +71,7 @@ ok( '3' eq this-> wait, 'frame restart');
 this lambda {
 	context 
 		lambda { 1 }, 
-		lambda { context 0.1; sleep { 2 }},
+		lambda { context 0.1; timeout { 2 }},
 		lambda { 3 };
 	tailo { join '', @_ }
 };
@@ -81,7 +81,7 @@ this lambda {
 	context 
 		0.1, 
 		lambda { 1 }, 
-		lambda { context 1.0; sleep { 2 }},
+		lambda { context 1.0; timeout { 2 }},
 		lambda { 3 };
 	any_tail { join '', sort map { $_-> peek } @_ };
 };
@@ -93,7 +93,7 @@ SKIP: {
 
 this lambda {
 	context \*FH;
-	read { 'moo' };
+	readable { 'moo' };
 };
 ok( 'moo' eq this-> wait, 'read');
 
@@ -102,7 +102,7 @@ this lambda {
 	context lambda {};
 	tail {
 		context \*FH;
-		read { 'moo' };
+		readable { 'moo' };
 	};
 };
 ok( 'moo' eq this-> wait, 'tail read');
@@ -110,7 +110,7 @@ ok( 'moo' eq this-> wait, 'tail read');
 $i = 2;
 this lambda {
 	context \*FH;
-	read { $i-- ? again : 'moo' };
+	readable { $i-- ? again : 'moo' };
 };
 ok(( 'moo' eq this-> wait && $i == -1), 'restart read');
 

@@ -1,4 +1,4 @@
-# $Id: Flock.pm,v 1.6 2008/12/17 10:05:06 dk Exp $
+# $Id: Flock.pm,v 1.7 2009/01/08 15:23:26 dk Exp $
 package IO::Lambda::Flock;
 use vars qw($DEBUG @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -52,7 +52,7 @@ sub flock(&)
 #			);
 #		}
 #		-> call(context)
-#		-> predicate(shift, \&flock, 'flock')
+#		-> condition(shift, \&flock, 'flock')
 #	}
 #
 #  but will require another calling style:

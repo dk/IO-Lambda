@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.14 2008/12/17 11:39:04 dk Exp $
+# $Id: SNMP.pm,v 1.15 2009/01/08 15:23:26 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -198,7 +198,7 @@ IO::Lambda::SNMP - snmp requests lambda style
 
 =head1 DESCRIPTION
 
-The module exports a set of predicates: snmpget, snmpfget, snmpgetnext,
+The module exports a set of conditions: snmpget, snmpfget, snmpgetnext,
 snmpfgetnext, snmpset, and snmpbulkwalk, that behave like the corresponding
 SNMP:: non-blocking counterpart functions. See L<SNMP> for descriptions of
 their parameters and results.

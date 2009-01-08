@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.21 2008/12/24 19:25:24 dk Exp $
+# $Id: Thread.pm,v 1.22 2009/01/08 15:23:26 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -107,7 +107,7 @@ sub threaded(&)
 
 		# now wait
 		context $this-> {socket};
-		read {
+		readable {
 			my $this = this;
 			delete $this-> {thread};
 			close($this-> {socket});
@@ -216,7 +216,7 @@ thread object manually and wait for the thread:
 
     # or asynchronously
     context $l-> socket;
-    read { $l-> thread-> join };
+    readable { $l-> thread-> join };
 
 =item thread($lambda)
 

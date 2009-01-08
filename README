@@ -14,9 +14,9 @@ be collected under single subroutine. For example, a dumbed down HTTP protocol
 can be described like in the following scheme:
 
 
-	write {
+	writable {
 		print $fh or die;
-		read {
+		readable {
 			sysread $fh or die;
 			read_again;
 		}
@@ -31,10 +31,10 @@ Below is a full-functioning code:
 	my $q = lambda {
 		my ( $socket, $url) = @_;
 		context $socket;
-		write {
+		writable {
 			print $socket "GET $url HTTP/1.0\r\n\r\n";
 			my $buf = '';
-			read {
+			readable {
 				return $buf unless 
 					sysread( $socket, $buf, 1024, length($buf));
 				again;

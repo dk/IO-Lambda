@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.12 2008/12/17 11:04:46 dk Exp $
+# $Id: Message.pm,v 1.13 2009/01/08 15:23:26 dk Exp $
 
 use strict;
 use warnings;
@@ -270,7 +270,7 @@ sub new_message
 	return $outer;
 }
 
-sub message(&) { new_message(context)-> predicate( shift, \&message, 'message') }
+sub message(&) { new_message(context)-> condition( shift, \&message, 'message') }
 
 package IO::Lambda::Message::Simple;
 
@@ -478,7 +478,7 @@ as a protocol error too, so use the C<$deadline> option with care.
 
 =item message ($message, $deadline = undef) :: () -> ($response, $error)
 
-Predicate version of C<new_message>.
+Condition version of C<new_message>.
 
 =item cancel_queue(@reason)
 

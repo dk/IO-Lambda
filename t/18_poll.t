@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 18_poll.t,v 1.1 2008/11/16 22:30:40 dk Exp $
+# $Id: 18_poll.t,v 1.2 2009/01/08 15:23:27 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -48,7 +48,7 @@ this lambda {
 	context $poller, timeout => 1.0, frequency => 0.1;
 	tail { $polled = shift };
 	context 0.1;
-	sleep { $ready = 1 };
+	timeout { $ready = 1 };
 };
 this-> wait;
 ok( $polled == 1, "poller not timed out");

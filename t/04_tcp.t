@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 04_tcp.t,v 1.13 2008/08/08 07:37:50 dk Exp $
+# $Id: 04_tcp.t,v 1.14 2009/01/08 15:23:26 dk Exp $
 
 use strict;
 use warnings;
@@ -30,7 +30,7 @@ sub session
 	lambda {
 		my $buf  = '';
 		context $conn, 0.3;
-	read {
+	readable {
 		unless ( shift) {
 			print $conn "timeout\n";
 			return 'timed out';
@@ -49,7 +49,7 @@ sub session
 
 my $server = lambda {
 	context $serv_sock;
-	read {
+	readable {
 		my $conn = IO::Handle-> new;
 
 		accept( $conn, $serv_sock) or die "accept() error:$!";
@@ -82,7 +82,7 @@ sub sock
 # test that connection works at all
 this lambda {
 	context sock;
-	write { "can write" };
+	writable { "can write" };
 };
 ok( this-> wait eq 'can write', 'got write');
 
@@ -90,7 +90,7 @@ ok( this-> wait eq 'can write', 'got write');
 this lambda {
 	my $c = sock;
 	context $c;
-	write {
+	writable {
 		print $c "moo";
 		context getline, $c, \(my $buf = '');
 		tail {
@@ -109,9 +109,9 @@ sub conn
 	lambda {
 		my $c = sock;
 		context $c;
-		write {
+		writable {
 			print $c "moo$id";
-			read {
+			readable {
 				$_ = <$c>;
 				chomp;
 				close $c;
@@ -130,9 +130,9 @@ ok(this-> wait eq '4+5+6+7', 'parallel connections');
 
 this lambda {
 	my $c = sock;
-	context $c      and write {
-	context 0.5     and sleep {
-	context $c      and read  {
+	context $c      and writable  {
+	context 0.5     and timeout   {
+	context $c      and readable  {
 	my $resp = <$c>;
 	chomp $resp;
 	close $c;

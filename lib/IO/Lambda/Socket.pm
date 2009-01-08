@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.10 2008/12/17 11:39:05 dk Exp $
+# $Id: Socket.pm,v 1.11 2009/01/08 15:23:26 dk Exp $
 use strict;
 use warnings;
 
@@ -156,12 +156,12 @@ __DATA__
 
 =head1 NAME
 
-IO::Lambda::Socket - wrapper predicates for socket functions
+IO::Lambda::Socket - wrapper condition for socket functions
 
 =head1 DESCRIPTION
 
-This module provides a set of convenient wrapper predicates for sockets that
-function as sources of asynchronous events. The predicate names are homonyms of
+This module provides a set of convenient wrapper conditions for sockets that
+function as sources of asynchronous events. The condition names are homonyms of
 the underlying socket functions: C<accept>, C<connect>, C<recv>, and C<send>.
 The module doesn't account for much lower-lever socket machinery, the
 programmer is expected to create non-blocking sockets using C<IO::Socket> or

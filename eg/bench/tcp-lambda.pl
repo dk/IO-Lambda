@@ -1,4 +1,4 @@
-# $Id: tcp-lambda.pl,v 1.2 2008/08/07 19:36:15 dk Exp $
+# $Id: tcp-lambda.pl,v 1.3 2009/01/08 15:23:25 dk Exp $
 # An echo client-server benchmark
 use strict;
 use IO::Lambda qw(:all);
@@ -37,7 +37,7 @@ sub session
 
 my $server = lambda {
 	context $serv_sock;
-	read {
+	readable {
 		my $conn = IO::Handle-> new;
 
 		accept( $conn, $serv_sock) or die "accept() error:$!";
@@ -70,9 +70,9 @@ for my $id ( 1..$CYCLES) {
 	this lambda {
 		my $sock = sock;
 		context $sock;
-		write {
+		writable {
 			print $sock "can write $id\n";
-		read {
+		readable {
 			close $sock;
 		}};
 	};

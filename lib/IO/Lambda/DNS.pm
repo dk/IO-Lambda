@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.8 2008/12/17 09:55:16 dk Exp $
+# $Id: DNS.pm,v 1.9 2009/01/08 15:23:26 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -52,7 +52,7 @@ lambda {
 	return "send error: " . $obj-> errorstring unless $sock;
 
 	context $sock, $timeout;
-read {
+readable {
 	unless ( shift) {
 		return 'connect timeout' if $retries-- <= 0;
 		return this-> start; # restart the whole lambda
@@ -81,7 +81,7 @@ read {
 	return $packet;
 }}}
 
-sub dns(&) { IO::Lambda::DNS-> new(context)-> predicate(shift, \&dns, 'dns') }
+sub dns(&) { IO::Lambda::DNS-> new(context)-> condition(shift, \&dns, 'dns') }
 
 1;
 
@@ -97,7 +97,7 @@ IO::Lambda::DNS - DNS queries lambda style
 
 The module provides access to asynchronous DNS queries through L<Net::DNS>.
 Two function doing the same operation are featured: constructor C<new> and
-predicate C<dns>.
+condition C<dns>.
 
 =head1 SYNOPSIS
 
@@ -152,7 +152,7 @@ Returns either a C<Net::DNS::RR> object or an error string.
 
 =item dns
 
-Predicate wrapper over C<new>.
+Condition wrapper over C<new>.
 
    dns (%OPTIONS, $HOSTNAME) -> $IP_ADDRESS|$ERROR
    dns (%OPTIONS, ($PACKET | $HOSTNAME $TYPE)) -> $RESPONSE|$ERROR
