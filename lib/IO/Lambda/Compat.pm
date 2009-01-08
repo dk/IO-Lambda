@@ -1,4 +1,4 @@
-# $Id: Compat.pm,v 1.2 2009/01/08 15:29:22 dk Exp $
+# $Id: Compat.pm,v 1.3 2009/01/08 15:33:04 dk Exp $
 use strict;
 
 package IO::Lambda::Compat;
@@ -67,9 +67,21 @@ sub sleep(&)
 
 IO::Lambda::Compat - compatibility with pre-v1.00 version API
 
+=head1 SYNOPSIS
+
+   use IO::Lambda qw(:lambda);
+   use IO::Lambda::Compat;
+
+   lambda {
+      context $socket;
+      read { }
+   }
+
 =head1 DESCRIPTION
 
 The module exports the following names, which were renamed in IO::Lambda
 after version 1.01: read, write, sleep, readwrite, predicate.
+Issue C<use IO::Lambda::Compat> to make older programs compatible with
+the newer API.
 
 =cut

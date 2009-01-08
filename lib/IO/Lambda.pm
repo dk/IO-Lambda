@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.143 2009/01/08 15:24:41 dk Exp $
+# $Id: Lambda.pm,v 1.144 2009/01/08 15:33:04 dk Exp $
 
 package IO::Lambda;
 
@@ -1407,6 +1407,9 @@ where the functional style mixes with I/O. If, on the contrary, you are
 intimidated by the module's ambitions, you can skip to L<Simple use> for a more
 gentle introduction. Those, who are interested how the module is different from
 the other I/O frameworks, please continue reading.
+
+Warning: API in version 1.01 has slightly changed. See L<IO::Lambda::Compat>
+for dealing with program written usign the older API.
 
 =head2 Simple use
 
