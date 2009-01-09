@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.16 2008/12/17 11:39:07 dk Exp $
+# $Id: Select.pm,v 1.17 2009/01/09 12:05:52 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -80,7 +80,21 @@ sub yield
 			# ignore
 			warn "select: $!\n" if $DEBUG;
 		} else {
-			die "select() error:$!:$^E" if $n < 0;
+			# find out the rogue handles
+			if ( $DEBUG > 1) {
+				my $h = $R | $W | $E;
+				for ( my $i = 0; $i < length($h); $i++) {
+					my $v = '';
+					for ( my $j = 0; $j < 8; $j++) {
+						my $fd = $i * 8 + $j;
+						next unless vec($h,$fd,1);
+						vec($v,$fd,1) = 1;
+						next if select($v,$v,$v,0) >= 0;
+						warn "select: bad handle #$fd\n";
+					}
+				}
+			}
+			die "select() error:$!:$^E";
 		}
 	}
 	
