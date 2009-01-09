@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.16 2009/01/09 10:34:26 dk Exp $
+# $Id: SNMP.pm,v 1.17 2009/01/09 12:07:19 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -47,6 +47,7 @@ sub yield
 {
 	warn "snmp.yield\n" if $DEBUG;
 	SNMP::MainLoop(1e-6);
+	reshuffle_fds();
 }
 # Use the same $MASTER for the lambda emulator and do not call anything in the handler,
 # but do that in yield()
@@ -147,8 +148,6 @@ sub snmpcallback
 	$q-> terminate(@_);
 	undef $c;
 	undef $q;
-
-	reshuffle_fds();
 }
 
 
