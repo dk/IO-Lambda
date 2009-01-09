@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.15 2009/01/08 15:23:26 dk Exp $
+# $Id: SNMP.pm,v 1.16 2009/01/09 10:34:26 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -72,7 +72,7 @@ sub reshuffle_fds
 	# kill old handles
 	my %all = map { $_ => 1 } @fds;
 	for my $old ( grep { not exists $all{$_} } keys %ACTIVE_FDS) {
-		$IO::Lambda::LOOP-> cancel_event( delete $ACTIVE_FDS{$old});
+		$IO::Lambda::LOOP-> remove_event( delete $ACTIVE_FDS{$old});
 		warn "snmp.remove: $old\n" if $DEBUG;
 	}
 
