@@ -1,19 +1,19 @@
 =head1 NAME
 
-A gentle introduction to asynchronous programming and IO::Lambda
+A gentle introduction to asynchronous programming and IO::Lambda.
 
 =head1 Introduction to input/output
 
 =head2 Files and handles
 
-Perl I/O system is built mostly around libc runtime library. All input/output
-notions are therefore inherited from C, and such terms are I<handle>,
-I<buffered I/O>, I<socket> etc are identical to the terms used in broader
-contexts, and are not dependent on the language. Standard input and output,
-sockets, file handles, - these entites are provided and handled by libc, and
-Perl inherits their functionality, sometimes extending it, sometimes using
-system-specific additional functionality, but always treating them as libc
-objects.
+Perl I/O system is built mostly around I<libc> runtime library. All
+input/output notions are therefore inherited from C, and such terms are
+I<handle>, I<buffered I/O>, I<socket> etc are identical to the terms used in
+broader contexts, and are not dependent on the language. Standard input and
+output, sockets, file handles, - these entites are provided and handled by
+I<libc>, and Perl inherits their functionality, sometimes extending it,
+sometimes using system-specific additional functionality, but always treating
+them as I<libc> objects.
 
 Perl was originally developed under Unix. One of the promintent Unix ideology
 features is the famous statement "everything as a file". By that, access to
@@ -26,7 +26,7 @@ means a kernel resource, that a program can access by obtaining a file handle,
 and reading, writing, and doing file-specific operations through it.
 
 There are several standard ways for interacting with files, all provided by
-libc. There are operations inherent to all types of files, such as opening and
+I<libc>. There are operations inherent to all types of files, such as opening and
 closing, operations that only make sense on sockets, such as sending and
 receiving datagrams, and operations that execute system- or file- specific
 commands, such as ejecting a CD-ROM, implemented through an C<ioctl> call.
@@ -46,6 +46,18 @@ It only makes sense to write to the standard output, and read from standard
 input.  That is because the former is opened only for writing, and the latter
 only for reading.  However, many types of files can usually be opened for both
 operations. 
+
+File handles themselves, as provided by C<libs>, are unique positive integers.
+Even though this fact is rarely needed in Perl, because of power of the I/O
+handles associated to scalars and globs such as STDIN, Perl provides function
+C<fileno> that can extract that number. Also, by default, STDIN is tied to file
+handle 0, STDOUT to 1, and STDERR to 2. The following program closes STDOUT
+handle, and prints to the stream associated with it, by exploiting 
+this fact:
+
+    open NEW_STDOUT, ">&=", 1;
+    close STDOUT;
+    print NEW_STDOUT "hello, world!\n";
 
 The underlying file concepts are not unique to Perl, or C, or any other
 language.  Therefore, when further down declarations such "Windows does not
@@ -74,7 +86,7 @@ L<Term::ReadLine::Gnu>, L<Term::ReadLine::Perl> deal with that quite
 effectively.
 
 While input buffering is traditionally associated with terminals, output
-buffering is implemented by libc, which has different but related APIs for
+buffering is implemented by I<libc>, which has different but related APIs for
 buffered and unbuffered file handles (I<fopen> and I<open>, I<fread> and
 I<read> functions, etc). The buffered output is so often preferred, that
 it made into a default. However certain areas require non-buffered output.
@@ -111,20 +123,169 @@ I/O, however can be told not to buffer, or to change the buffer size.  These
 are C<open>, C<close>, C<read>, C<readline>, C<seek>, C<tell>, C<print>
 (instead of C<write>, which in Perl is not opposite to C<read>, but does
 formatted output, see "perldoc -f write"). There is also a set of lesser-known
-functions, that deal exclusively with non-buffered I/O, as close to libc as
+functions, that deal exclusively with non-buffered I/O, as close to I<libc> as
 possible. Those are: C<sysopen>, C<sysread>, C<syswrite>, C<sysseek>,
 C<sysclose>.  It is mostly these functions that are used when implementing
 socket and pipe interactions. It's not impossible to use the buffered
-functions, by explcitly turning the buffering off, however it is usually not
+functions, by explicitly turning the buffering off, however it is usually not
 done, because these function provide greater control over data transmission,
-which is important when implementing such, often asynchronous, interactions.
+which is useful for such, often asynchronous, interactions.
 
 =head2 Synchronous and asynchronous I/O
+
+POSIX declares two semantics for files, blocking and non-blocking.  The
+semantics mainly differs by how does system behaves when a program isses one of
+I<read>, I<write>, etc calls, when they cannot read or write the requested
+amount of bytes right away. Under such condition, operating files in the blocking
+mode stops execution of the caller program, until the requested data is
+transferred, or error is occured. The non-blocking mode never stops the execution,
+and copies as much data as possible either from or to kernel I/O buffers.
+
+Not only reading and writing calls can behave differently. TCP connect, for 
+example, can be done in two ways. I<connect()> call in the blocking mode
+does not return until the connection is through. In the non-blocking mode,
+if connection couldn't be established immediately (for example on a local
+interface), I<connect()> returns a special error value, EINPROGRESS on unix,
+or EWOULDBLOCK on Windows. Later, the socket can be checked by other calls
+to see whether the connection succeeded or not.
+
+Consider difference in complexity of programming using these two 
+semantics. I deliberately show here low-level socket programming without
+help from any higher-level module. The code is shown for demonstration
+of the concept rather than for any real use.
+
+First, a TCP socket needed to be prepared
+
+    use strict;
+    use Socket;
+    use IO::Handle;
+
+    my $socket = IO::Handle-> new;
+    socket( $socket, PF_INET, SOCK_STREAM, getprotobyname('tcp'))
+        or die "socket() error:$!";
+
+and remote address and port to be chosen:
+
+    my $addr = inet_aton('www.google.com')
+        or die "cannot resolve www.google.com";
+    my $name = sockaddr_in( 80, $addr);
+
+Now, the codepaths differ. The blocking version of the program
+needs only one call:
+
+    connect( $socket, $name) or die "connect() error:$!"
+    print "connection established\n";
+
+However, the non-blocking version is more complex. The socket
+needs to be told that the non-blocking semantics is desired.
+This is done by issuing a C<fcntl()> call:
+
+    use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
+
+    # query existing socket flags
+    my $flags = fcntl( $socket, F_GETFL, 0);
+    die "fcntl() error:$!" unless defined $flags;
+
+    # add non-blocking flag
+    fcntl( $socket, F_SETFL, $flags | O_NONBLOCK)
+       or die "fcntl() error:$!";
+
+The situation is already exacerbated by the fact that on Windows,
+not only sockets are by default non-blocking, but also module
+C<Fcntl> doesn't export the F_GETFL constants. Thus, this part
+has to be wrapped in a condition similar to the following:
+   
+    if ( $^O ne 'MSWin32') {
+    }
+
+Next, the I<connect()> is issued, but it also has to be checked for
+errors:
+
+    use Errno qw(EWOULDBLOCK EINPROGRESS); 
+    my $ok = connect( $socket, $name);
+    $ok = 1 if not($ok) && ($! == EWOULDBLOCK || $! == EINPROGRESS);
+    die "Connect error: $!" unless $ok;
+
+which means that EWOULDBLOCK and EINPROGRESS are not really errors.
+
+Now, while the connection is underway, the program has to use one of the
+standard facility, function C<select()> that accepts zero or more files, and a
+timeout value. The function blocks (no matter whether used on blocking or
+non-blocking files) until either the timeout expires, or system signals that
+data arrived, or can be written to, to at least one of the files.
+
+C<select()> accepts file handles in a form of bit vectors, formatted so that 
+each bit, if is set, corresponds to the file handle number. It also accepts
+three such vectors, one for handles awaiting when they can be read from,
+one for those awaiting when they can be written to, and one for special
+out-of-band messages. They are called correspondingly read, write, and
+exception vectors:
+
+    my $write = '';
+    # TCP connect will be marked as writable when 
+    # either is succeeds, or error occurs
+    vec( $write, fileno( $socket ), 1) = 1;
+
+    # wait for 10 seconds
+    my $n_files = select( undef, $write, undef, 10);
+    die "select() error:$!" if $n_files < 0;
+    die "timeout occured" if $n_files == 0;
+
+C<select()> returns number of files ready, or 0 for timeout, or -1 for
+an error. C<select()> is a fragile call, if at least one of the files
+passed to it is invalid, then the error will be thrown. Moreover,
+depending on the system, the error can be a legitimate error, not
+to be reacted upon. For example errors EAGAIN or EINTR tell that the
+call was interrupted by a signal, and system didn't restart the
+the call, so we have to do that by ourselves:
+    
+    use Errno qw(EINTR EAGAIN);
+
+    # wait for 10 seconds
+    my $time    = time;
+    my $timeout = 10;
+ RESTART:
+    my $n_files = select( undef, $write, undef, $timeout);
+    if ( $n_files < 0) {
+	 # use Time::HiRes qw(time) is recommended
+         die "select() error:$!" unless $! == EINTR or $! == EAGAIN;
+         $timeout = time - $time;
+         goto RESTART;
+    }
+
+The signals themselves also add confusion. By default, C<$SIG{PIPE}> aborts the
+program on I/O error. We need to protect against such condition too, before any
+I/O takes place:
+
+    $SIG{PIPE} = undef;
+
+Now, back to the program. Even if C<select()> returns a positive
+number of files, that doesn't mean that thej connection succeeded.
+To check for that, the socket must be queried directly:
+
+    my $error = unpack('i', getsockopt( $socket, SOL_SOCKET, SO_ERROR));
+    if ($error) {
+          # This trick uses duality of error scalar $! and its
+          # counterpart $^E on Windows. These scalars report (and assign)
+          # error numbers as integers, but in string context return
+          # system-specific error description.
+          if ( $^O eq 'MSWin32') {
+              $^E = $error;
+              die "connect() error: $^E";
+          } else {
+              $! = $error;
+              die "connect() error: $!";
+          }
+    }
+
+Finally, after jumping from all the hoops, the socket is connected.  Of course
+it is impractical to write programs in such low-level, explicit style. Wrapper
+libraries, which are discussed below, are best for these purposes.
 
 =head1 HYPE
 
 IO::Lambda finally became a framework, where both I/O and lambda calculus are
-represented in equal shares. Contrary to the majority of I/O frameworks,
+represented in equal parts. Contrary to the majority of I/O frameworks,
 implemented in declarative languages, IO::Lambda is much more than a callback
 and event wrapper. The module relies heavily on concepts borrowed from
 functional languages, and brings back the simplicity of the declarative
