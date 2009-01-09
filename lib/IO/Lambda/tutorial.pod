@@ -1,44 +1,125 @@
 =head1 NAME
 
-A step-by-step introduction to IO::Lambda
+A gentle introduction to asynchronous programming and IO::Lambda
 
 =head1 Introduction to input/output
 
-=head2 Files, handles, buffered and unbuffered I/O
+=head2 Files and handles
 
 Perl I/O system is built mostly around libc runtime library. All input/output
 notions are therefore inherited from C, and such terms are I<handle>,
 I<buffered I/O>, I<socket> etc are identical to the terms used in broader
-contexts, and are not dependent on the language. Sandard input and outputs,
+contexts, and are not dependent on the language. Standard input and output,
 sockets, file handles, - these entites are provided and handled by libc, and
 Perl inherits their functionality, sometimes extending it, sometimes using
 system-specific additional functionality, but always treating them as libc
 objects.
 
 Perl was originally developed under Unix. One of the promintent Unix ideology
-features is that it regards everything as a file. Devices, hard disks,
-controllers, network sockets, pipes, all spectrum of means of a process
-interacting with the world, is done by reading and writing information from and
-to various files. There are standard means for interacting with files, provided
-by libc. There are operations inherent to all types of files, such as opening
-and closing, operations that only make sense on sockets, such as sending and
+features is the famous statement "everything as a file". By that, access to
+devices, hard disks, controllers, network sockets, pipes, disk files, to all
+spectrum of means for a process to interact with the world, boils down to using
+a small set of common operations, most often reading and writing, that can be
+applied to many types of files. This terminology might cause confusion, because
+nowadays the word "file" is usually attributed to disk files, whereas file here
+means a kernel resource, that a program can access by obtaining a file handle,
+and reading, writing, and doing file-specific operations through it.
+
+There are several standard ways for interacting with files, all provided by
+libc. There are operations inherent to all types of files, such as opening and
+closing, operations that only make sense on sockets, such as sending and
 receiving datagrams, and operations that execute system- or file- specific
 commands, such as ejecting a CD-ROM, implemented through an C<ioctl> call.
 
-Consider a simplest "Hello world" program:
+Consider the simplest "Hello world" program:
 
     perl -le 'print q(Hello world!)'
 
-It sends information to standard output, a special file handle each program
-is guaranteed to have after it has started. Standard output, along with standard
-input and standard error, is a handle internally connected to the terminal, or
-to a pipe if the command is redirected:
+The program sends information to the standard output, a special file handle
+each program is guaranteed to have after it has started. Standard output, along
+with standard input and standard error, is a handle usually connected to the
+controlling terminal, or to a pipe if the command is redirected:
     
     perl -le 'print q(Hello world!)' > out.txt
 
-It only makes sense to write to the standard output, and read from standard input.
-That is because the former is opened only for writing, and the latter only for reading.
-However, files can usually be opened for both.
+It only makes sense to write to the standard output, and read from standard
+input.  That is because the former is opened only for writing, and the latter
+only for reading.  However, many types of files can usually be opened for both
+operations. 
+
+The underlying file concepts are not unique to Perl, or C, or any other
+language.  Therefore, when further down declarations such "Windows does not
+provide non-blocking pipes" should not be understood as if this is Perl's
+limitation. Therefore, Perl documentation often refers to the system
+documentation, and this is where portability issues become important.
+
+=head2 Buffered and unbuffered I/O
+
+There are several layers on which buffering can affest input and output of file handles.
+If a program is being run from a shell prompt, it's input is usually line-buffered,
+which means that input shall be available to the program only after a newline character
+is entered. The following code
+ 
+    print $_ while <STDIN>;
+
+reads whatever input is provided to program's standard input, and prints it
+back to the standard output, line-by-line. However, if it is desired to print
+every character or keystroke as soon as these are entered, without waiting for
+the newline, such program won't work. The terminal must be first switched to
+the so-called "raw" mode.  This trick is used by so many programs, that
+standard libraries like I<libtermcap>, I<libcurses>, and the newer
+I<libncurses> emerged, to provide per-character input in a portable way.  Perl
+itself has no API dedicated to raw input. Additional modules L<Curses>,
+L<Term::ReadLine::Gnu>, L<Term::ReadLine::Perl> deal with that quite
+effectively.
+
+While input buffering is traditionally associated with terminals, output
+buffering is implemented by libc, which has different but related APIs for
+buffered and unbuffered file handles (I<fopen> and I<open>, I<fread> and
+I<read> functions, etc). The buffered output is so often preferred, that
+it made into a default. However certain areas require non-buffered output.
+For example, CGI programs often want to send output as soon as it is 
+available. To do so, they turn off buffering by
+
+  $| = 1
+
+where C<$|> is, quote C<perldoc perlvar>, "If set to nonzero, forces a flush
+right away and after every write or print on the currently selected output
+channel.". Alternatively, buffering can be managed using standard L<IO::Handle>
+module:
+
+   use IO::Handle;
+   $io = new IO::Handle;
+
+   # issue libc's fdopen() to asscociate $io with STDOUT
+   $io-> fdopen(fileno(STDOUT),"w");
+
+   # now printing to STDOUT is buffered, while printing to
+   # $io is not 
+   $io-> autoflush(0);
+
+   # 'b' appears before 'a'
+   print STDOUT "a";
+   print $io "b";
+
+This example is to demonstrate that using buffered and non-buffered
+output on the same resource can lead to strange effects, so it usually
+should be avoided.
+
+Perl functions, that are used mostly for basic input-output, deal with buffered
+I/O, however can be told not to buffer, or to change the buffer size.  These
+are C<open>, C<close>, C<read>, C<readline>, C<seek>, C<tell>, C<print>
+(instead of C<write>, which in Perl is not opposite to C<read>, but does
+formatted output, see "perldoc -f write"). There is also a set of lesser-known
+functions, that deal exclusively with non-buffered I/O, as close to libc as
+possible. Those are: C<sysopen>, C<sysread>, C<syswrite>, C<sysseek>,
+C<sysclose>.  It is mostly these functions that are used when implementing
+socket and pipe interactions. It's not impossible to use the buffered
+functions, by explcitly turning the buffering off, however it is usually not
+done, because these function provide greater control over data transmission,
+which is important when implementing such, often asynchronous, interactions.
+
+=head2 Synchronous and asynchronous I/O
 
 =head1 HYPE
 
