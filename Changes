@@ -117,3 +117,5 @@
 1.01  - 8 Jan 2008
 	rename read to readable, write to writable, readwrite to rwx, sleep to timeout.
 
+1.02  - 9 Jan 2008
+	fix "invalid handle" exceptions caused by bugs in SNMP code
