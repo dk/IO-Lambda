@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.13 2008/12/17 10:08:16 dk Exp $
+# $Id: DBI.pm,v 1.14 2009/01/10 14:29:30 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -91,7 +91,18 @@ sub disconnect { shift-> dbi_message( disconnect => 0,         @_) }
 sub call       { shift-> dbi_message( call       => wantarray, @_) }
 sub set_attr   { shift-> dbi_message( set_attr   => 0, @_) }
 sub get_attr   { shift-> dbi_message( get_attr   => wantarray, @_) }
-sub prepare    { croak "prepare() is unimplemented" }
+
+sub prepare
+{
+	my ( $self, $stmt) = @_;
+	lambda {
+		context $self-> dbi_message( prepare => 0, $stmt);
+	tail {
+		my ($error, $obj_id) = @_;
+		return $error if defined $error;
+		return IO::Lambda::DBI::Statement-> new($self, $obj_id);
+	}}
+}
 
 sub DESTROY {}
 
@@ -101,6 +112,33 @@ sub AUTOLOAD
 	my $method = $AUTOLOAD;
 	$method =~ s/^.*:://;
 	shift-> dbi_message( call => wantarray, $method, @_);
+}
+
+package IO::Lambda::DBI::Statement;
+
+sub new
+{
+	my ( $class, $owner, $obj_id) = @_;
+	return bless {
+		owner => $owner,
+		id    => $obj_id,
+	}, $class;
+}
+
+sub DESTROY {}
+
+sub AUTOLOAD
+{
+	use vars qw($AUTOLOAD);
+	my $method = $AUTOLOAD;
+	$method =~ s/^.*:://;
+	my $self = shift;
+
+	return $self-> {owner}-> dbi_message( 
+		execute => wantarray, 
+		$method, $self-> {id},
+		@_
+	);
 }
 
 package IO::Lambda::Message::DBI;
@@ -117,6 +155,7 @@ sub connect
 	die "already connected\n" if $self-> {dbh};
 	$self-> {dbh} = DBI-> connect(@_);
 	return $DBI::errstr unless $self-> {dbh};
+	$self-> {prepared} = {};
 	return undef;
 }
 
@@ -152,6 +191,28 @@ sub get_attr
 	die "not connected\n" unless $self-> {dbh};
 	return @{$self->{dbh}}{@keys};
 
+}
+
+sub prepare
+{
+	my ( $self, $stmt) = @_;
+	die "not connected\n" unless $self-> {dbh};
+	
+	my $s = $self-> {dbh}-> prepare($stmt);
+	return $self-> {dbh}-> errstr unless $s;
+
+	$self-> {prepared}-> {"$s"} = $s;
+	return "$s";
+}
+
+sub execute
+{
+	my ( $self, $method, $stmt, @p) = @_;
+	
+	die "not connected\n" unless $self-> {dbh};
+	die "no such prepared statement\n" unless $self-> {prepared}->{$stmt};
+
+	return $self-> {prepared}-> {$stmt}-> $method(@p);
 }
 
 1;
@@ -241,6 +302,12 @@ Sets attributes on a DBI handle.
 
 Retrieves values for attribute keys from a DBI handle.
 
+=item prepare($statement)
+
+Returns a new prepared statement object or an error string.
+All method calls on this object return lambda that also
+wait until remote methods are executed.
+
 =back
 
 =head1 IO::Lambda::Message::DBI
@@ -250,7 +317,7 @@ blocking, server side that does the actual calls to the DBI.
 
 =head1 BUGS
 
-C<DBI::prepare> is unimplemented.
+C<DBI::prepare> is not tested.
 
 =head1 SEE ALSO
 
