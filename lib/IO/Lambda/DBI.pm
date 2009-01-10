@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.14 2009/01/10 14:29:30 dk Exp $
+# $Id: DBI.pm,v 1.15 2009/01/10 23:05:01 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -98,9 +98,9 @@ sub prepare
 	lambda {
 		context $self-> dbi_message( prepare => 0, $stmt);
 	tail {
-		my ($error, $obj_id) = @_;
-		return $error if defined $error;
-		return IO::Lambda::DBI::Statement-> new($self, $obj_id);
+		my $ok = shift;
+		return 0, $_[0] unless $ok;
+		return 1, IO::Lambda::DBI::Statement-> new($self, $_[0]);
 	}}
 }
 
@@ -154,7 +154,7 @@ sub connect
 	my $self = shift;
 	die "already connected\n" if $self-> {dbh};
 	$self-> {dbh} = DBI-> connect(@_);
-	return $DBI::errstr unless $self-> {dbh};
+	die $DBI::errstr, "\n" unless $self-> {dbh};
 	$self-> {prepared} = {};
 	return undef;
 }
@@ -199,7 +199,7 @@ sub prepare
 	die "not connected\n" unless $self-> {dbh};
 	
 	my $s = $self-> {dbh}-> prepare($stmt);
-	return $self-> {dbh}-> errstr unless $s;
+	die $self-> {dbh}-> errstr unless $s;
 
 	$self-> {prepared}-> {"$s"} = $s;
 	return "$s";
@@ -210,9 +210,10 @@ sub execute
 	my ( $self, $method, $stmt, @p) = @_;
 	
 	die "not connected\n" unless $self-> {dbh};
-	die "no such prepared statement\n" unless $self-> {prepared}->{$stmt};
-
-	return $self-> {prepared}-> {$stmt}-> $method(@p);
+	my $p = $self-> {prepared}-> {$stmt};
+	die "no such prepared statement\n" unless $p;
+	delete $self-> {prepared}-> {$stmt} if $method eq 'finish';
+	return $p-> $method(@p);
 }
 
 1;
