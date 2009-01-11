@@ -57,3 +57,4 @@ eg/bench/tcp-lambda.pl
 eg/bench/tcp-poe.pl
 eg/bench/tcp-raw.pl
 eg/bench/2.4GHz-x86-64.tcp.benchmark
+eg/bench/1.2GHz-win32.tcpbenchmark
