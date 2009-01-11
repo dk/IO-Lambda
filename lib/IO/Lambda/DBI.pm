@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.15 2009/01/10 23:05:01 dk Exp $
+# $Id: DBI.pm,v 1.16 2009/01/11 08:44:01 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -79,11 +79,31 @@ sub dbi_message
 {
 	my ( $self, $method, $wantarray) = ( shift, shift, shift );
 	$wantarray ||= 0;
-	my ( $msg, $error) = $self-> encode([ $method, $wantarray, @_]);
+
+	my $packet;
+	if ( exists $self-> {post}) {
+		$packet = [
+			'multicall',
+			$wantarray,
+			[ @{ $self-> {post} }, [ $method, @_ ]],
+		];
+		delete $self-> {post};
+	} else {
+		$packet = [ $method, $wantarray, @_];
+	}
+
+	my ( $msg, $error) = $self-> encode($packet);
 
 	return lambda { $error } if $error;
 	warn _d($self) . " > $method(@_)\n" if $DEBUG;
 	return $self-> new_message( $msg, $self-> {timeout} );
+}
+
+# add message that doesn't need to be awaited for
+sub dbi_post
+{
+	my $self = shift;
+	push @{ $self-> {post}}, [ @_ ];
 }
 
 sub connect    { shift-> dbi_message( connect    => 0,         @_) }
@@ -125,7 +145,9 @@ sub new
 	}, $class;
 }
 
-sub DESTROY {}
+sub DESTROY
+{
+}
 
 sub AUTOLOAD
 {
@@ -214,6 +236,23 @@ sub execute
 	die "no such prepared statement\n" unless $p;
 	delete $self-> {prepared}-> {$stmt} if $method eq 'finish';
 	return $p-> $method(@p);
+}
+
+sub multicall
+{
+	my ( $self, $post) = @_;
+
+	my @ret;
+	for ( @$post) {
+		my $method = shift @$_;
+		die "no such method: $method" unless $self-> can($method);
+		if ( wantarray) {
+			@ret    = $self-> $method(@$_);
+		} else {
+			$ret[0] = $self-> $method(@$_);
+		}
+	}
+	return wantarray ? @ret : $ret[0];
 }
 
 1;
