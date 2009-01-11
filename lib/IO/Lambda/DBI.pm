@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.17 2009/01/11 09:43:53 dk Exp $
+# $Id: DBI.pm,v 1.18 2009/01/11 09:49:36 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -80,6 +80,7 @@ sub begin_group
 	my $self = shift;
 	croak "Group already started" if exists $self-> {post};
 	$self-> {post} = [];
+	return ();
 }
 
 sub end_group
@@ -104,7 +105,7 @@ sub dbi_message
 	my $packet = [ $method, $wantarray, @_ ];
 	if ( $self-> {post}) {
 		push @{ $self->{post} }, $packet;
-		return;
+		return ();
 	}
 
 	my ( $msg, $error) = $self-> encode( $packet);
@@ -373,6 +374,19 @@ Note: each stored call registers whether it is called in array or scalar
 context. The results are returned accordingly in a list. so the caller
 is responsible for parsing the results if some or all calls were made
 in the array context.
+
+Example:
+    
+    context
+        $dbi-> begin_group,
+	$dbi-> selectrow_arrayref("select * from a"),
+	$dbi-> selectrow_arrayref("select * from b"),
+	$dbi-> end_group;
+    tail {
+    	return warn "error:$_[0]" unless shift;
+	my ( $a, $b) = @_;
+    }
+
 
 =back
 
