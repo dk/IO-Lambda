@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.16 2009/01/11 08:44:01 dk Exp $
+# $Id: DBI.pm,v 1.17 2009/01/11 09:43:53 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -75,41 +75,49 @@ sub outcoming
 	return ( 1, @$msg);
 }
 
+sub begin_group
+{
+	my $self = shift;
+	croak "Group already started" if exists $self-> {post};
+	$self-> {post} = [];
+}
+
+sub end_group
+{
+	my $self = shift;
+	my $p = delete $self-> {post};
+	croak "Group not started" unless $p;
+	return lambda {} unless @$p;
+
+	my ( $msg, $error) = $self-> encode([ 'multicall', 1, $p ]);
+
+	return lambda { $error } if $error;
+	warn _d($self) . " > end_group(@_)\n" if $DEBUG;
+
+	return $self-> new_message( $msg, $self-> {timeout} );
+}
+
 sub dbi_message
 {
 	my ( $self, $method, $wantarray) = ( shift, shift, shift );
-	$wantarray ||= 0;
 
-	my $packet;
-	if ( exists $self-> {post}) {
-		$packet = [
-			'multicall',
-			$wantarray,
-			[ @{ $self-> {post} }, [ $method, @_ ]],
-		];
-		delete $self-> {post};
-	} else {
-		$packet = [ $method, $wantarray, @_];
+	my $packet = [ $method, $wantarray, @_ ];
+	if ( $self-> {post}) {
+		push @{ $self->{post} }, $packet;
+		return;
 	}
 
-	my ( $msg, $error) = $self-> encode($packet);
+	my ( $msg, $error) = $self-> encode( $packet);
 
 	return lambda { $error } if $error;
 	warn _d($self) . " > $method(@_)\n" if $DEBUG;
 	return $self-> new_message( $msg, $self-> {timeout} );
 }
 
-# add message that doesn't need to be awaited for
-sub dbi_post
-{
-	my $self = shift;
-	push @{ $self-> {post}}, [ @_ ];
-}
-
 sub connect    { shift-> dbi_message( connect    => 0,         @_) }
 sub disconnect { shift-> dbi_message( disconnect => 0,         @_) }
 sub call       { shift-> dbi_message( call       => wantarray, @_) }
-sub set_attr   { shift-> dbi_message( set_attr   => 0, @_) }
+sub set_attr   { shift-> dbi_message( set_attr   => 0,         @_) }
 sub get_attr   { shift-> dbi_message( get_attr   => wantarray, @_) }
 
 sub prepare
@@ -245,11 +253,14 @@ sub multicall
 	my @ret;
 	for ( @$post) {
 		my $method = shift @$_;
+		my $want   = shift @$_;
 		die "no such method: $method" unless $self-> can($method);
-		if ( wantarray) {
-			@ret    = $self-> $method(@$_);
+		unless ( defined $want) {
+			$self-> $method(@$_);
+		} elsif ( $want) {
+			push @ret, $self-> $method(@$_);
 		} else {
-			$ret[0] = $self-> $method(@$_);
+			push @ret, scalar($self-> $method(@$_));
 		}
 	}
 	return wantarray ? @ret : $ret[0];
@@ -347,6 +358,21 @@ Retrieves values for attribute keys from a DBI handle.
 Returns a new prepared statement object or an error string.
 All method calls on this object return lambda that also
 wait until remote methods are executed.
+
+=item begin_group(), end_group()
+
+These two methods allow grouping of DBI calls. C<begin_group()>
+affects a C<IO::Lambda::DBI> object so that all calls to remoted
+methods are not stored in the queue (and, consequently, not executed
+one at a time). but are accumulated instead. C<end_group()> ends
+such buffering, sends the message incapsulating all stored calls,
+and returns a lambda that executes when all stored calls are finished
+and replied to. The lambda returns results to all accumulated calls.
+
+Note: each stored call registers whether it is called in array or scalar
+context. The results are returned accordingly in a list. so the caller
+is responsible for parsing the results if some or all calls were made
+in the array context.
 
 =back
 
