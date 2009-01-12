@@ -4,10 +4,13 @@ A gentle introduction to asynchronous programming
 
 =head1 Preface
 
-Input and output is much more than reading and writing. Opening and closing
-connections and files, reporting errors, memory mapping, various portability
-issues, these and other topics always accompany data transfer, in which
-applications, and therefore users, are mostly interested in. 
+Every program communicates with the world by inhaling and exhaling data in one
+or another way, and programs written in Perl are no exception. This article is
+about using Perl for managing input and output, or I/O. Despite the simple
+name, input and output is much more than reading and writing. Opening and
+closing connections and files, reporting errors, memory mapping, various
+portability issues, these and other topics always accompany data transfer, in
+which applications, and therefore users, are mostly interested in. 
 
 Perl, as a high-level language, takes pride in making simple reading
 and writing as much simple as possible. Consider the cryptic, but highly
@@ -31,110 +34,114 @@ where does C<readline> reads from, and how much exactly? Or, where does C<print>
 send data, and why doesn't it check whether it has succeeded or not?
 
 It is a blessing of Perl, that the programmer not only doesn't ask these
-questions, but is often unaware of them when using higher-level constructs
-like
+questions, but is often unaware of them when those higher-level constructs.  It
+is also somewhat a curse, that when such questions are asked, and needed to be
+answered, that can only be done after underlying concepts of file input and
+output are explained. This however requires that higher-level Perl constructs
+should be dissected and analyzed, so their powers and weaknesses could be
+understood more clear, rather than being viewed as unreadable black magic.
 
-    print while <>;
-
-It is also somewhat a curse, that if these questions are to be asked, and to be
-answered, it can only be done after underlying concepts of file input and
-output is explained. This, however, requires that such higher-level Perl
-constructs should be dissected and analyzed, so their powers and weaknesses
-could be understood more clear, rather than being viewed as unreadable black
-magic.
-
-This article tries to follow a similar pattern, it aims to explain modern uses
-of I/O, by starting from very basic and low-lever concepts, working through
-problems faced by these, explaining evolution of various metologies, their
-strong and weak points, and arrives to higher-level constructs that incorporate
-previous solution in an elegant manner. It is my strong belief that elegant
-concepts lead to elegant code, which is always a pleasure to work with. Quote
-Tao of Programming, 'A well-written program is its own heaven; a poorly-written
-program is its own hell.'. This, often unspoken rule, inspires many programmers
-to write highest quality code, even though there may be no one to appreciate
-it. Also with this rule in mind, I'd like to present my view on input-output,
-its problems, and ways to solve them.
+This article tries to follow a similar pattern as it aims to explain modern
+uses of I/O. The article starts from very basic and low-lever concepts, working
+through problems faced by these, explaining evolution of various metologies,
+their strong and weak points, and arrives to higher-level constructs that
+incorporate previous solution in an elegant manner. It is my strong belief that
+elegant concepts lead to elegant code, which is always a pleasure to work with.
+Quote Tao of Programming, 'A well-written program is its own heaven; a
+poorly-written program is its own hell.'. This, often unspoken rule, inspires
+many programmers to write highest quality code, even though there may be no one
+to appreciate it. Also with this rule in mind, I'd like to present my view on
+domain of input and output, its problems, and ways to solve them.
 
 =head1 Introduction to input/output
 
 =head2 Files and handles
 
 Perl I/O system is built mostly around I<libc> runtime library. All
-input/output notions are therefore inherited from C, and such terms are
+input/output notions are therefore inherited from C, and such terms as
 I<handle>, I<buffered I/O>, I<socket> etc are identical to the terms used in
 broader contexts, and are not dependent on the language. Standard input and
-output, sockets, file handles, - these entites are provided and handled by
-I<libc>, and Perl inherits their functionality, sometimes extending it,
-sometimes using system-specific additional functionality, but always treating
-them as I<libc> objects.
+output, sockets, file handles, these entites are provided and managed by
+I<libc>. Perl inherits basic functionality of these objects, often extends it,
+sometimes uses system-dependent additional functionality to enhance it,
+providing a portable interface to these objects, often more portable than
+the interface of I<libc> itself is.
 
 Perl was originally developed under Unix. One of the promintent Unix ideology
-features is the famous statement "everything as a file". By that, access to
-devices, hard disks, controllers, network sockets, pipes, disk files, to all
-spectrum of means for a process to interact with the world, boils down to using
-a small set of common operations, most often reading and writing, that can be
-applied to many types of files. This terminology might cause confusion, because
-nowadays the word "file" is usually attributed to disk files, whereas file here
-means a kernel resource, that a program can access by obtaining a file handle,
-and reading, writing, and doing file-specific operations through it.
+features is the famous statement "everything as a file". What ths means, is
+that access to devices, hard disks, controllers, network sockets, pipes, disk
+files, a large majority of possible ways for a process to interact with the
+world, boils down to a small set of common operations, most often reading and
+writing, that can be applied to files of various types. This phrase also might
+cause confusion, because nowadays the word "file" is usually attributed to disk
+files, whereas in this context it means a kernel resource, that a program can
+access by obtaining a handle to it, read from and write to, and perform other
+resource-specific operations.
 
-There are several standard ways for interacting with files, all provided by
-I<libc>. There are operations inherent to all types of files, such as opening and
-closing, operations that only make sense on sockets, such as sending and
-receiving datagrams, and operations that execute system- or file- specific
-commands, such as ejecting a CD-ROM, implemented through an C<ioctl> call.
+There are several standard ways to interact with files, too provided by
+I<libc>. There are different groups of operations. Some are inherent to all
+types of files, such as opening and closing. Others only make sense on sockets,
+for example sending and receiving datagrams. There are also operations that
+execute resource-specific commands, for example ejecting a CD-ROM on modern
+Unix systems can be done through a C<ioctl> call.
 
 Consider the simplest "Hello world" program:
 
     perl -le 'print q(Hello world!)'
 
-The program sends information to the standard output, a special file handle
-each program is guaranteed to have after it has started. Standard output, along
-with standard input and standard error, is a handle usually connected to the
-controlling terminal, or to a pipe if the command is redirected:
+The program sends information to the standard output, a special resource each
+program is guaranteed to have after it has started. Standard output, along with
+standard input and standard error, is usually, but not necessarily, is
+connected with the controlling terminal. It takes a shell redirection to send
+the output to a file, while the program itself doesn't mark the difference:
     
     perl -le 'print q(Hello world!)' > out.txt
 
-It only makes sense to write to the standard output, and read from standard
-input.  That is because the former is opened only for writing, and the latter
-only for reading.  However, many types of files can usually be opened for both
-operations. 
+It is only possible to write to the standard output, and read from standard
+input. However, many types of files can usually be opened for both operations. 
 
-File handles themselves, as provided by C<libs>, are unique positive integers.
-Even though this fact is rarely needed in Perl, because of power of the I/O
+File handles, as provided by C<libs>, are unique positive integers.  Even
+though this fact is rarely exploited in Perl, because of the power of the I/O
 handles associated to scalars and globs such as STDIN, Perl provides function
-C<fileno> that can extract that number. Also, by default, STDIN is tied to file
-handle 0, STDOUT to 1, and STDERR to 2. The following program closes STDOUT
-handle, and prints to the stream associated with it, by exploiting 
-this fact:
+C<fileno> that provides the file handle number for a given scalar or glob.  By
+default, STDIN is tied to file handle 0, STDOUT to 1, and STDERR to 2.  The
+following program closes the STDOUT handle, however continues to print to the standard
+output under another name:
 
+    # Issue dup() call on file handle #1
+    # dup() creates another file handle that refers to 
+    # the stream that is associated with the oroginal handle
+    # See "man dup" for details.
     open NEW_STDOUT, ">&=", 1;
+
     close STDOUT;
     print NEW_STDOUT "hello, world!\n";
 
-The underlying file concepts are not unique to Perl, or C, or any other
-language.  Therefore, when further down declarations such "Windows does not
-provide non-blocking pipes" should not be understood as if this is Perl's
-limitation. Therefore, Perl documentation often refers to the system
-documentation, and this is where portability issues become important.
+To summarize, the underlying concepts of a file are not unique to Perl, nor to
+C, nor to any other language, but are an essential part of POSIX standard.
+Therefore, when further down declarations such "Windows does not provide
+non-blocking pipes" should not be understood as if this is Perl's limitation.
+Perl documentation often refers to the system documentation, often where
+portability issues are important.
 
 =head2 Buffered and unbuffered I/O
 
-There are several layers on which buffering can affest input and output of file handles.
-If a program is being run from a shell prompt, it's input is usually line-buffered,
-which means that input shall be available to the program only after a newline character
-is entered. The following code
+There are several architectural layers where buffering may affect input and
+output. If a program is being run from a command prompt, and is getting input
+from the terminal, its input is normally line-buffered, which means that input
+is available to the program only after a newline character is entered.
+The following code
  
-    print $_ while <STDIN>;
+    print while <STDIN>;
 
-reads whatever input is provided to program's standard input, and prints it
-back to the standard output, line-by-line. However, if it is desired to print
-every character or keystroke as soon as these are entered, without waiting for
-the newline, such program won't work. The terminal must be first switched to
-the so-called "raw" mode.  This trick is used by so many programs, that
-standard libraries like I<libtermcap>, I<libcurses>, and the newer
-I<libncurses> emerged, to provide per-character input in a portable way.  Perl
-itself has no API dedicated to raw input. Additional modules L<Curses>,
+reads whatever input is provided to the standard input, and prints it back to
+the standard output, line by line. However, if it is desired to print every
+character or keystroke as soon as these are entered, without waiting for the
+newline, such program won't work. The terminal must be first switched to the
+so-called "raw" mode.  This trick is used by so many programs, that standard
+libraries like I<libtermcap>, I<libcurses>, and the newer I<libncurses>
+emerged, to provide per-character input in a portable way.  Perl itself has no
+API dedicated to raw input. Additional modules L<Curses>,
 L<Term::ReadLine::Gnu>, L<Term::ReadLine::Perl> deal with that quite
 effectively.
 
