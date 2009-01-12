@@ -1,6 +1,59 @@
 =head1 NAME
 
-A gentle introduction to asynchronous programming and IO::Lambda.
+A gentle introduction to asynchronous programming
+
+=head1 Preface
+
+Input and output is much more than reading and writing. Opening and closing
+connections and files, reporting errors, memory mapping, various portability
+issues, these and other topics always accompany data transfer, in which
+applications, and therefore users, are mostly interested in. 
+
+Perl, as a high-level language, takes pride in making simple reading
+and writing as much simple as possible. Consider the cryptic, but highly
+expressive construct
+
+    print while <>;
+
+which is, if expanded in full, is identical to
+
+    while (1) {
+        $_ = readline;
+        if ( not defined $_) {
+            # exit loop on EOF
+            last;
+        }
+        print $_;
+    }
+
+which is although more readable, but may cause still questions. For example,
+where does C<readline> reads from, and how much exactly? Or, where does C<print>
+send data, and why doesn't it check whether it has succeeded or not?
+
+It is a blessing of Perl, that the programmer not only doesn't ask these
+questions, but is often unaware of them when using higher-level constructs
+like
+
+    print while <>;
+
+It is also somewhat a curse, that if these questions are to be asked, and to be
+answered, it can only be done after underlying concepts of file input and
+output is explained. This, however, requires that such higher-level Perl
+constructs should be dissected and analyzed, so their powers and weaknesses
+could be understood more clear, rather than being viewed as unreadable black
+magic.
+
+This article tries to follow a similar pattern, it aims to explain modern uses
+of I/O, by starting from very basic and low-lever concepts, working through
+problems faced by these, explaining evolution of various metologies, their
+strong and weak points, and arrives to higher-level constructs that incorporate
+previous solution in an elegant manner. It is my strong belief that elegant
+concepts lead to elegant code, which is always a pleasure to work with. Quote
+Tao of Programming, 'A well-written program is its own heaven; a poorly-written
+program is its own hell.'. This, often unspoken rule, inspires many programmers
+to write highest quality code, even though there may be no one to appreciate
+it. Also with this rule in mind, I'd like to present my view on input-output,
+its problems, and ways to solve them.
 
 =head1 Introduction to input/output
 
@@ -281,6 +334,11 @@ To check for that, the socket must be queried directly:
 Finally, after jumping from all the hoops, the socket is connected.  Of course
 it is impractical to write programs in such low-level, explicit style. Wrapper
 libraries, which are discussed below, are best for these purposes.
+
+=head2 Reading and writing
+
+
+=head1 Wrapper modules: simple abstractions
 
 =head1 HYPE
 
