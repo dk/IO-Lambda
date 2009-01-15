@@ -120,3 +120,6 @@
 1.02  - 11 Jan 2008
 	fix "invalid handle" exceptions caused by bugs in SNMP code
 	implement DBI::prepare and DBI call grouping
+
+1.03  - 15 Jan 2008
+	add IO::Lambda::Mutex
