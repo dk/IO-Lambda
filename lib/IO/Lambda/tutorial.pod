@@ -138,15 +138,22 @@ reads whatever input is provided to the standard input, and prints it back to
 the standard output, line by line. However, if it is desired to print every
 character or keystroke as soon as these are entered, without waiting for the
 newline, such program won't work. The terminal must be first switched to the
-so-called "raw" mode.  This trick is used by so many programs, that standard
-libraries like I<libtermcap>, I<libcurses>, and the newer I<libncurses>
-emerged, to provide per-character input in a portable way.  Perl itself has no
-API dedicated to raw input. Additional modules L<Curses>,
-L<Term::ReadLine::Gnu>, L<Term::ReadLine::Perl> deal with that quite
-effectively.
+so-called "raw" mode. Perl provides no API for the raw input, however,
+additional modules L<Term::ReadKey> deals with it quite effectively.
+The following program switches the terminal into the raw mode, and prints
+keystrokes as soon as the user presses them:
+
+
+
+
+(Note: windows command prompt does not work that way. However, libraries
+know how to work with windows prompt, using native windows API).
+
+Input can also be buffered on I<libc> level. There are three modes
+
 
 While input buffering is traditionally associated with terminals, output
-buffering is implemented by I<libc>, which has different but related APIs for
+buffering is implemented by I<libc>. which has different but related APIs for
 buffered and unbuffered file handles (I<fopen> and I<open>, I<fread> and
 I<read> functions, etc). The buffered output is so often preferred, that
 it made into a default. However certain areas require non-buffered output.
