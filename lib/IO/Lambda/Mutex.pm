@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.1 2009/01/15 21:53:25 dk Exp $
+# $Id: Mutex.pm,v 1.2 2009/01/15 21:54:25 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 
@@ -127,8 +127,8 @@ that in turn will finish as soon as the caller can acquire the mutex.
         timeout { $mutex-> release }
     }-> start;
     
-    # create a new lambda that shall only wait for 0.5 seconds.
-    # it shall fail
+    # Create a new lambda that shall only wait for 0.5 seconds.
+    # It will surely fail.
     lambda {
         context $mutex-> waiter(0.5);
         tail {
