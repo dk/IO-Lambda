@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 99_pod_coverage.t,v 1.27 2008/11/16 21:15:04 dk Exp $
+# $Id: 99_pod_coverage.t,v 1.28 2009/01/15 21:53:26 dk Exp $
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ plan skip_all => 'Test::Pod::Coverage required for testing POD coverage'
      if $@;
 
 
-plan tests => 11;
+plan tests => 12;
 pod_coverage_ok( 'IO::Lambda' => { trustme => [
 	qr/^(add_\w+|\w+_handler|drive|start|cancel_\w+|remove_loop|\w+_frame|clear|callout)$/x
 ] });
@@ -40,4 +40,6 @@ pod_coverage_ok( 'IO::Lambda::Poll' => { trustme => [
 ] });
 pod_coverage_ok( 'IO::Lambda::Flock' => { trustme => [
 	qr/^(poll_flock)$/x
+] });
+pod_coverage_ok( 'IO::Lambda::Mutex' => { trustme => [
 ] });

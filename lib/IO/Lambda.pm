@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.146 2009/01/15 10:15:10 dk Exp $
+# $Id: Lambda.pm,v 1.147 2009/01/15 21:53:22 dk Exp $
 
 package IO::Lambda;
 
@@ -2561,6 +2561,10 @@ L<IO::Lambda::Poll> - generic polling wrapper
 =item *
 
 L<IO::Lambda::Flock> - flock(2) wrapper
+
+=item *
+
+L<IO::Lambda::Mutex> - wait for a shared resource
 
 =back
 
