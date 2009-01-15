@@ -1,4 +1,4 @@
-# $Id: tcp-raw.pl,v 1.2 2009/01/15 09:46:18 dk Exp $
+# $Id: tcp-raw.pl,v 1.3 2009/01/15 09:54:59 dk Exp $
 # An echo client-server benchmark
 use strict;
 use Time::HiRes qw(time);
@@ -28,8 +28,8 @@ sub sock
 		PeerPort  => $port,
 		Proto     => 'tcp',
 	);
+	die "connect() error: $!$^E\n" unless $x;
 	$x-> autoflush(1);
-	die "connect() error: $!\n" unless $x;
 	return $x;
 }
 
