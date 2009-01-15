@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.145 2009/01/09 12:08:41 dk Exp $
+# $Id: Lambda.pm,v 1.146 2009/01/15 10:15:10 dk Exp $
 
 package IO::Lambda;
 
@@ -1332,34 +1332,60 @@ The code below demonstrates execution of parallel HTTP requests
    {
       my $host = shift;
 
-      # create a socket, and issue a tcp connect
-      my $socket = IO::Socket::INET-> new( 
-         PeerAddr => $host, 
-         PeerPort => 80 
-      );
-
       # Simple HTTP functions by first sending request to the remote, and
-      # then waiting for the response:
+      # then waiting for the response. This sets up a new lambda object with 
+      # attached one of many closures that process sequentially
       return lambda {
 
+         # create a socket, and issue a tcp connect
+         my $socket = IO::Socket::INET-> new( 
+            PeerAddr => $host, 
+            PeerPort => 80 
+         );
+
          # Wait until socket become writable. Parameters to writable()
-	 # are passed using context().
+	 # are passed using context(). This association is remembered 
+	 # within the engine. 
          context $socket;
+
+         # writeable sets up a possible event to monitor, when 
+	 # $socket is writeable, execute the closure.
       writable {
-         # can write - send request
+         # The engine discovered we can write, so send the request
          print $socket "GET /index.html HTTP/1.0\r\n\r\n";
 
-         my $buf = ''; # collect whatever the remote returns
-	 # wait until socket becomes readable
+         # This variable needs to stay shared across
+	 # multiple invocations of our readable closure, so 
+	 # it needs to be outside that closure. Here, it collects
+         # whatever the remote returns
+         my $buf = ''; 
+
+	 # readable registers another event to monitor - 
+	 # that $socket is readable. Note that we do not 
+	 # need to set the context again because when we get 
+	 # here, the engine knows what context this command 
+	 # took place in, and assumes the same context. 
+	 # Also note that socket won't be awaited for writable events
+	 # anymore, and this code won't be executed for this $socket.
       readable {
+         # This closure is executed when we can read.
          
-	 # And read from the socket. sysread() returns number of
+	 # Read from the socket. sysread() returns number of
 	 # bytes read. Zero means EOF, and undef means error, so
-	 # we stop on these conditions
+	 # we stop on these conditions.
+         # If we return without registering a follow-up 
+	 # handler, this return will be processed as the 
+	 # end of this sequence of events for whoever is 
+	 # waiting on us.
          return $buf unless 
             sysread( $socket, $buf, 1024, length($buf));
 
-	 # otherwise, if sysread() returned a positive number, we read again
+         # We're not done so we need to do this again. 
+	 # Note that the engine knows that it just 
+	 # called this closure because $socket was 
+	 # readable, so it can infer that it is supposed 
+	 # to set up a callback that will call this 
+	 # closure when $socket is next readable.
          again;
       }}}
    }
@@ -1368,11 +1394,11 @@ The code below demonstrates execution of parallel HTTP requests
    print http('www.perl.com')-> wait;
 
    # Fire up a lambda that waits for two http requests in parallel.
-   # tails() wait for 
+   # tails() can wait for more than one lambda
    my @hosts = ('www.perl.com', 'www.google.com');
    lambda {
       context map { http($_) } @hosts;
-      # tails() asynchronously waits until all lambdas in teh context
+      # tails() asynchronously waits until all lambdas in the context
       # are finished.
       tails { print @_ }
    }-> wait;
@@ -2671,8 +2697,10 @@ I wish to thank those who helped me:
 
 David A. Golden for discussions about names, and his propositions to rename
 some terms into more appropriate, such as "read" to "readable", and "predicate"
-to "condition". He, Randall L. Schwartz, Brock Wilcox, and zby@perlmonks helped
-me to understand how the documentation for the module could be made better.
+to "condition". Ben Tilly for providing thorough comments to the code in the
+synopsis. Rocco Caputo for optimizing the POE benchmark script. Randall L.
+Schwartz, Brock Wilcox, and zby@perlmonks helped me to understand how the
+documentation for the module could be made better.
 
 All the good people on perlmonks.org and perl conferences, who invested their
 time into understanding the module.
