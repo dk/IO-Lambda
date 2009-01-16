@@ -364,6 +364,143 @@ functional languages, and brings back the simplicity of the declarative
 programming style, that is only available when one employs threads, coroutines,
 or co-processes.
 
+=head1 IDEAS
+
+Shared DBI connection pool
+
+Why the name? http://en.wikipedia.org/wiki/Lambda_calculus
+
+Explain context THOROUGHLY - get, set, how it is used outside conditions
+
+Explain the signatures THOROUGHLY! Especially where stack and context differs.
+With examples too.
+
+Exaplain naming convention, imperatives.
+
+Functional refs for the advanced: CPS, monads, currying
+
+Explain {{ style: [tilly]: 
+In that process I realized that if you indent normally, then after any complex
+sequence of events you are indented off of the right hand side! And what,
+exactly, does that indentation tell you? Basically that this happens before
+that happens before the other thing. Nesting of braces is carrying sequencing
+information, which we normally don't bother indenting at all.
+So once you get past the mechanics of what it is doing under the hood and try
+to think in terms of this library, what you really need to do is imagine that
+someone added a very small vaguely Lisp-like language to Perl, and that
+language is used to achieve the asynchronous magic. And once you think of it
+that way, the indentation makes perfect sense. You indent all of your Perl in a
+block by 4. Then outdent all of the commands in this second language by 2 (to
+indicate that they are this other language). Then let your closing braces pile
+up. In short at this point you're formatting the Perl bits like Perl, and the
+IO::Lambda bits like they were Lisp. (And once I figured that out, I understood
+as I never have before why Lisp people universally format their code that way.)
+
+Comment on examples, be explicit about return
+
+Stress on teh fact that event handler are one-shot
+
+Explain flow of a simple HTTP request
+
+1. lambda {X} has just been called. It returns an empty object, blessed hash of
+IO::Lambda with a single coderef X, which is not executed yet. This object has
+a method wait(), which is then called.
+
+2. wait() figures out that lambda (object, that is) hasn't been started yet. It
+switches the lambda into "started" state, and invokes callback X. Then it
+enters event loop sleep/select cycle, until the lambda state gets "finished":
+
+sub wait # simplified { my $lambda = shift; $lambda-> start if $lambda->
+is_passive; event_loop while not $lambda-> is_finished; return $lambda-> peek;
+}
+
+3. Coderef X creates a socket, calls a non-blocking TCP connect on it using
+IO::Socket::new, and passes that socket, along with a coderef Y to standard
+condition writable:
+
+context $socket; writable { Y }
+
+and then exits. The lambda state is unchanged by calling writable, however it
+adds the socket into the listening queue of the underlying event loop (select,
+AnyEvent, POE, whatever), and asks the loop to do something when that socket
+gets writable. Meanwhile, wait still processes the event loop.
+
+4. TCP syn-synack-ack succeeded, event loop says the socket is writable, and
+calls the lambda that waits for the socket. Lambda figures out that the socket
+waiting conditions should result in calling the coderef Y, which it immediately
+does.
+
+5. Coderef Y does two things: it prints to the socket, and registers another
+coderef Z, that will be called when the socket gets readable:
+
+syswrite $socket ....; readable { Z }
+
+Note, that these callbacks are one-shot only. The subscription to the writable
+events is not renewed, so the socket is not listened for write events anymore.
+
+6. Socket gets readable, Z gets executed. It reads some bytes, but wants more,
+so it re-subscribes on the same socket, with the same coderef Z, to be woken up
+when there are more data. This is done with calling again. The latter knows the
+last coderef used, and spares the programmer from calling readable with the
+same coderef.
+
+7. Socket gets readable, Z gets executed again. It reads zero bytes, figures
+it's an EOF, it says "return $buf". Before that, result of the last executed
+coderef was accumulated inside the lambda object. Now, $buf overwrites that and
+is stores its own $buf, which is then accessible through method peek.
+
+8. Lambda, having called coderef Z, finds out that it has no more
+subscriptions, so it switches itself to "finished" state.
+
+9. wait sees that the lambda is finished, it stops the cycle and and returns
+whatever was left on lambda, in our case $buf.
+
+
+xdg says:
+
+here are too many ways of doing things described too early and without context (no pun intended). For example:
+
+A lambda is initially called with some arguments passed from the outside. B<These
+arguments can be stored using the call method; wait and tail also issue call
+internally, thus replacing any previous data stored by call>. Inside the lambda
+these arguments are available as @_.
+The part in bold is extraneous and distracting, as it forces the reader to
+ponder the relationship between different ways of calling a lambda -- it
+exposes implementation details that are irrelevant to initial understanding.
+Moreover, I think you mean that the arguments are made available as @_ in the
+callback attached to the lambda object. "Inside the lambda" is a bit vague.
+
+A IO::Lambda object (a "lambda") is an FSM generator. The lambda() function
+takes an initialization callback and returns a lambda. When the lambda is
+executed, the FSM is created, the initialization callback is executed to
+dynamically register event handlers and associated callbacks and event
+processing begins.
+
+Lambdas are executed using method calls to the lambda, such as call(), wait(),
+etc. (as described elsewhere). (In what circumstances would I want to use one
+method or another?) Arguments to these execution methods are passed to the
+initialization callback in @_ for dynamic configuration.
+
+Within the initialization callback, special functions called "predicates"
+register a callback in response to specific events. The argument to a predicate
+function is the callback function itself. The context() function is used prior
+to calling a predicate to populate an argument stack for subsequent predicate
+calls. The argument stack must match the argument signature of the predicate.
+(E.g. the read() predicate requires a filehandle so context() must be called
+with a filehandle argument before read() is called.)
+
+Predicate callbacks may also call predicates, registering a new event handler
+during the processing of an event. If context() is not explictly called, the
+context that existed when the currently executing callback was registered is
+used.
+
+Some predicates may have side effects in addition to registering an event
+callback. For example, the tail() predicate executes a lambda (given in the
+context stack) and runs the callback provided when the lambda finishes running.
+
+
+xdg off
+
 =head1 AUTHOR
 
 Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
