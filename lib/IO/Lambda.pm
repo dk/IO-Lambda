@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.148 2009/01/15 21:55:25 dk Exp $
+# $Id: Lambda.pm,v 1.149 2009/01/16 16:32:37 dk Exp $
 
 package IO::Lambda;
 
@@ -389,7 +389,7 @@ sub lambda_handler
 	my $lambda = $rec-> [WATCH_LAMBDA];
 	die _d($self, 
 		'handler called but ', _obj($lambda),
-		' is not ready') unless $lambda-> {stopped};
+		' is not finished yet') unless $lambda-> {stopped};
 
 	my $arr = $EVENTS{"$lambda"};
 	@$arr = grep { $_ != $rec } @$arr;
@@ -414,8 +414,7 @@ sub lambda_handler
 	}
 }
 
-# Removes one event from queue; if that was the last event, triggers listening
-# lambdas
+# Removes one event from queue
 sub cancel_event
 {
 	my ( $self, $rec) = @_;
@@ -425,20 +424,23 @@ sub cancel_event
 	$LOOP-> remove_event($rec) if $LOOP;
 	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
 
-	delete $EVENTS{$rec->[WATCH_LAMBDA]} if ref($rec->[WATCH_LAMBDA]);
+	my $arr = $EVENTS{$rec->[WATCH_LAMBDA]};
+	if ( $arr) {
+		@$arr = grep { $_ != $rec } @$arr;
+		delete $EVENTS{$rec->[WATCH_LAMBDA]} unless @$arr;
+	}
 	@$rec = ();
 
 	return if @{$self->{in}};
-
 	# that was the last event
+
+	warn _d( $self, 'stopped') if $DEBUG_LAMBDA;
+	$self-> {stopped} = 1;
 	$_-> remove( $self) for @LOOPS;
-	my $arr = delete $EVENTS{$self};
-	return unless $arr;
-	$_-> [WATCH_OBJ]-> lambda_handler($_) for @$arr;
 }
 
 # Removes all events bound to the object, notifies the interested objects.
-# The object becomes stopped, so no new events will be allowed to register.
+# The object becomes stopped immediately, so no new events will be allowed to register.
 sub cancel_all_events
 {
 	my ( $self, %opt) = @_;
@@ -456,7 +458,11 @@ sub cancel_all_events
 	for my $rec ( @{$self->{in}}) {
 		if ( ref($rec->[WATCH_LAMBDA])) {
 			push @cancel, $rec->[WATCH_LAMBDA] if $cascade;
-			delete $EVENTS{$rec->[WATCH_LAMBDA]};
+			my $arr = $EVENTS{$rec->[WATCH_LAMBDA]};
+			if ( $arr) {
+				@$arr = grep { $_ != $rec } @$arr;
+				delete $EVENTS{$rec->[WATCH_LAMBDA]} unless @$arr;
+			}
 		}
 		@$rec = ();
 	}
@@ -958,13 +964,14 @@ sub any_tail(&)
 	my $timer;
 	
 	$timer = $THIS-> watch_timer( $deadline, sub {
+		local *__ANON__ = "IO::Lambda::any_tail::callback1";
 		$THIS     = shift;
-		$THIS-> cancel_event($_) for @watchers;
-		local *__ANON__ = "IO::Lambda::any_tail::callback";
 		@CONTEXT  = ($deadline, @lambdas);
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
-		$cb ? $cb-> (@ret) : @ret;
+		@ret = $cb-> (@ret) if $cb;
+		$THIS-> cancel_event($_) for @watchers;
+		return @ret;
 	}) if defined $deadline;
 
 	my $watcher;
@@ -972,14 +979,14 @@ sub any_tail(&)
 		push @ret, shift;
 		return if $n--;
 		
+		local *__ANON__ = "IO::Lambda::any_tail::callback2";
 		$THIS = shift;
-		$THIS-> cancel_event( $timer) if $timer;
-
-		local *__ANON__ = "IO::Lambda::any_tail::callback";
 		@CONTEXT  = ($deadline, @lambdas);
 		$METHOD   = \&any_tail;
 		$CALLBACK = $cb;
-		$cb ? $cb-> (@ret) : @ret;
+		@ret = $cb-> (@ret) if $cb;
+		$THIS-> cancel_event( $timer) if $timer;
+		return @ret;
 	};
 
 	@watchers = map {
