@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: http-redirect.pl,v 1.7 2008/05/06 20:41:33 dk Exp $
+# $Id: http-redirect.pl,v 1.8 2009/01/16 16:30:10 dk Exp $
 
 use strict;
 use HTTP::Request;
@@ -22,10 +22,10 @@ sub http_request
 	lambda {
 		return "socket error:$@" unless $socket;
 		context $socket;
-	write  {
+	writable  {
 		print $socket $req-> as_string or return "error:$!";
 		my $buf = '';
-	read   {
+	readable  {
 		my $n = sysread( $socket, $buf, 1024, length($buf));
 		return "error:$!" unless defined $n;
 		return HTTP::Response-> parse($buf) unless $n;
