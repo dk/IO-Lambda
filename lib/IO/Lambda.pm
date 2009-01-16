@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.149 2009/01/16 16:32:37 dk Exp $
+# $Id: Lambda.pm,v 1.150 2009/01/16 17:07:09 dk Exp $
 
 package IO::Lambda;
 
@@ -619,7 +619,7 @@ sub wait
 		$self-> call(@_);
 		$self-> start;
 	}
-	do {} while yield and not $self->{stopped};
+	yield while not $self-> {stopped};
 	return $self-> peek;
 }
 
