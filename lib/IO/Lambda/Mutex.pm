@@ -1,7 +1,10 @@
-# $Id: Mutex.pm,v 1.3 2009/01/16 15:05:56 dk Exp $
+# $Id: Mutex.pm,v 1.4 2009/01/16 17:08:23 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
+@ISA = qw(Exporter);
+@EXPORT_OK = qw(mutex);
+%EXPORT_TAGS = ( all => \@EXPORT_OK);
 
 use strict;
 use IO::Lambda qw(:all);
@@ -103,6 +106,13 @@ sub DESTROY
 	}
 }
 
+sub mutex(&)
+{
+	my ( $self, $timeout) = context;
+	$self-> waiter($timeout)-> condition(shift, \&mutex, 'mutex')
+}
+
+
 1;
 
 =pod
@@ -121,11 +131,9 @@ that in turn will finish as soon as the caller can acquire the mutex.
 =head1 SYNOPSIS
 
     use IO::Lambda qw(:lambda);
-    use IO::Lambda::Mutex;
+    use IO::Lambda::Mutex qw(mutex);
     
     my $mutex = IO::Lambda::Mutex-> new;
-    # new mutex is free, take it immediately
-    $mutex-> take;
     
     # wait for mutex that shall be available immediately
     my $waiter = $mutex-> waiter;
@@ -133,10 +141,11 @@ that in turn will finish as soon as the caller can acquire the mutex.
     die "error:$error" if $error;
     
     # create and start a lambda that sleep 2 seconds and then releases the mutex
-    lambda {
+    my $sleeper = lambda {
         context 2;
         timeout { $mutex-> release }
-    }-> start;
+    };
+    $sleeper-> start;
     
     # Create a new lambda that shall only wait for 0.5 seconds.
     # It will surely fail.
@@ -148,6 +157,18 @@ that in turn will finish as soon as the caller can acquire the mutex.
             # $error is expected to be 'timeout'
         }
     }-> wait;
+
+    # Again, wait for the same mutex but using different syntax.
+    # This time should be ok.
+    lambda {
+        context $mutex, 3;
+	mutex {
+            my $error = shift;
+            print $error ? "error:$error\n" : "ok\n";
+            # expected to be 'ok'
+	}
+    }->wait;
+    
 
 =head1 API
 
@@ -189,6 +210,10 @@ the mutex was acquired successfully, or the error string.
 If C<$timeout> is defined, and by the time it is expired the mutex
 could not be obtained, the lambda is removed from the queue, and
 returned error value is 'timeout'.
+
+=item mutex($mutex, $timeout = undef) -> error
+
+Condition wrapper over C<waiter>.
 
 =back
 
