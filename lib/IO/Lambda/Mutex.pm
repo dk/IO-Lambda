@@ -1,6 +1,7 @@
-# $Id: Mutex.pm,v 1.2 2009/01/15 21:54:25 dk Exp $
+# $Id: Mutex.pm,v 1.3 2009/01/16 15:05:56 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
+$DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
 
 use strict;
 use IO::Lambda qw(:all);
@@ -20,6 +21,7 @@ sub is_free  { not $_[0]-> {taken} }
 sub take
 {
 	my $self = shift;
+	warn "$self is taken\n" if $DEBUG and not $self->{taken};
 	return $self-> {taken} ? 0 : ($self-> {taken} = 1);
 }
 
@@ -29,7 +31,7 @@ sub waiter
 
 	# mutex is free, can take now
 	unless ( $self-> {taken}) {
-		$self-> {taken} = 1;
+		$self-> take;
 		return lambda { undef };
 	}
 
@@ -42,7 +44,12 @@ sub waiter
 		$waiter = lambda {
 			context $timeout, $l;
 		any_tail {
-			return undef if $_[0]; # acquired the mutex!
+			if ($_[0]) { # acquired the mutex!
+				warn "$self acquired for $l\n" if $DEBUG;
+				return undef;
+			}
+				
+			warn "$self timeout for $l\n" if $DEBUG;
 			
 			# remove the lambda from queue
 			my $found;
@@ -55,6 +62,8 @@ sub waiter
 			if ( defined $found) {
 				my ( $lambda, $bind) = splice( @$q, $found, 2);
 				$lambda-> resolve($bind);
+			} else {
+				warn "$self failed to remove $l from queue\n" if $DEBUG;
 			}
 
 			return 'timeout';
@@ -70,6 +79,7 @@ sub release
 	return unless $self-> {taken};
 
 	unless (@{$self-> {queue}}) {
+		warn "$self is free\n" if $DEBUG;
 		$self-> {taken} = 0;
 		return;
 	}
@@ -77,6 +87,7 @@ sub release
 	my $lambda = shift @{$self-> {queue}};
 	my $bind   = shift @{$self-> {queue}};
 	$lambda-> callout(undef, undef);
+	warn "$self gives ownership to $lambda\n" if $DEBUG;
 	$lambda-> resolve($bind);
 }
 
