@@ -123,3 +123,7 @@
 
 1.03  - 15 Jan 2008
 	add IO::Lambda::Mutex
+
+1.04  - 16 Jan 2008
+	critical fixes in core (bugs in cancel_event, any_tail, and wait)
+	add mutex(&) condition
