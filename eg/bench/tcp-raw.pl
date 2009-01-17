@@ -1,5 +1,7 @@
-# $Id: tcp-raw.pl,v 1.3 2009/01/15 09:54:59 dk Exp $
+# $Id: tcp-raw.pl,v 1.4 2009/01/17 11:26:53 dk Exp $
 # An echo client-server benchmark
+#
+# Raw socket operations using POE, thanks to Rocco Caputo
 use strict;
 use Time::HiRes qw(time);
 use IO::Handle;

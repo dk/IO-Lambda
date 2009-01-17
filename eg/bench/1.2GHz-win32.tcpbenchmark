@@ -1,10 +1,14 @@
 "Lambda using select"
-6.615 sec 6.791 sec 6.745 sec
+7.468 sec 7.498 sec
+"Lambda using select, optimized"
+5.273 sec 5.271 sec
 "Lambda using AnyEvent"
-7.250 sec 7.453 sec 7.427 sec
+8.175 sec 8.177 sec
 "Raw sockets using select"
-4.266 sec 4.281 sec 4.250 sec
-"POE using select"
-13.615 sec 13.722 sec 13.603 sec
+4.859 sec 4.890 sec
+"POE using select, components"
+12.306 sec 12.298 sec
+"POE using select, raw sockets"
+6.233 sec 6.267 sec
 "POE using select, optimized"
-6.940 sec 6.934 sec 6.902 sec
+7.510 sec 7.449 sec
