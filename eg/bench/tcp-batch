@@ -3,7 +3,7 @@
 echo "Lambda using select"
 time perl tcp-lambda.pl
 echo "Lambda using select, optimized"
-time perl tcp-lambda-optimized
+time perl tcp-lambda-optimized.pl
 echo "Lambda using AnyEvent"
 time perl tcp-lambda.pl --anyevent
 echo "Raw sockets using select"

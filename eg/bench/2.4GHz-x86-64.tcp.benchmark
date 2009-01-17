@@ -1,30 +1,42 @@
-Lambda using select                Lambda using select             Lambda using select
-0.681 sec                          0.688 sec                       0.829 sec
-                                                                   
-real	0m0.724s                   real	0m0.742s                   real	0m0.917s
-user	0m0.672s                   user	0m0.696s                   user	0m0.688s
-sys	0m0.052s                   sys	0m0.036s                   sys	0m0.080s
-Lambda using AnyEvent              Lambda using AnyEvent           Lambda using AnyEvent
-0.686 sec                          0.672 sec                       0.721 sec
-                                                                   
-real	0m0.734s                   real	0m0.719s                   real	0m0.769s
-user	0m0.668s                   user	0m0.668s                   user	0m0.676s
-sys	0m0.060s                   sys	0m0.032s                   sys	0m0.048s
-Raw sockets using select           Raw sockets using select        Raw sockets using select
-0.126 sec                          0.124 sec                       0.126 sec
-                                                                   
-real	0m0.154s                   real	0m0.151s                   real	0m0.154s
-user	0m0.112s                   user	0m0.104s                   user	0m0.140s
-sys	0m0.044s                   sys	0m0.048s                   sys	0m0.016s
-POE using select                   POE using select                POE using select
-1.544 sec                          1.470 sec                       1.512 sec
-                                                                   
-real	0m1.629s                   real	0m1.554s                   real	0m1.599s
-user	0m1.520s                   user	0m1.408s                   user	0m1.484s
-sys	0m0.084s                   sys	0m0.136s                   sys	0m0.088s
-POE using select, optimized        POE using select, optimized     POE using select, optimized
-0.724 sec                          0.732 sec                       0.749 sec
-                                                                   
-real	0m0.802s                   real	0m0.810s                   real	0m0.832s
-user	0m0.724s                   user	0m0.708s                   user	0m0.696s
-sys	0m0.068s                   sys	0m0.096s                   sys	0m0.068s
+Lambda using select                    Lambda using select                Lambda using select
+0.655 sec                              0.660 sec                          0.675 sec
+                                                                          
+real	0m0.697s                       real	0m0.701s                  real	0m0.717s
+user	0m0.636s                       user	0m0.632s                  user	0m0.656s
+sys	0m0.064s                       sys	0m0.064s                  sys	0m0.048s
+Lambda using select, optimized         Lambda using select, optimized     Lambda using select, optimized
+0.217 sec                              0.219 sec                          0.226 sec
+                                                                          
+real	0m0.257s                       real	0m0.259s                  real	0m0.271s
+user	0m0.204s                       user	0m0.204s                  user	0m0.232s
+sys	0m0.052s                       sys	0m0.056s                  sys	0m0.028s
+Lambda using AnyEvent                  Lambda using AnyEvent              Lambda using AnyEvent
+0.648 sec                              0.648 sec                          0.656 sec
+                                                                          
+real	0m0.694s                       real	0m0.694s                  real	0m0.703s
+user	0m0.628s                       user	0m0.628s                  user	0m0.616s
+sys	0m0.064s                       sys	0m0.064s                  sys	0m0.084s
+Raw sockets using select               Raw sockets using select           Raw sockets using select
+0.122 sec                              0.122 sec                          0.123 sec
+                                                                          
+real	0m0.149s                       real	0m0.149s                  real	0m0.150s
+user	0m0.104s                       user	0m0.088s                  user	0m0.104s
+sys	0m0.048s                       sys	0m0.064s                  sys	0m0.048s
+POE using select, components           POE using select, components       POE using select, components
+1.185 sec                              1.163 sec                          1.167 sec
+                                                                          
+real	0m1.272s                       real	0m1.249s                  real	0m1.253s
+user	0m1.172s                       user	0m1.180s                  user	0m1.180s
+sys	0m0.096s                       sys	0m0.064s                  sys	0m0.072s
+POE using select, raw sockets          POE using select, raw sockets      POE using select, raw sockets
+0.382 sec                              0.377 sec                          0.375 sec
+                                                                          
+real	0m0.450s                       real	0m0.445s                  real	0m0.444s
+user	0m0.396s                       user	0m0.388s                  user	0m0.372s
+sys	0m0.052s                       sys	0m0.056s                  sys	0m0.068s
+POE using select, optimized            POE using select, optimized        POE using select, optimized
+0.694 sec                              0.686 sec                          0.687 sec
+                                                                          
+real	0m0.770s                       real	0m0.761s                  real	0m0.763s
+user	0m0.724s                       user	0m0.704s                  user	0m0.692s
+sys	0m0.048s                       sys	0m0.056s                  sys	0m0.068s
