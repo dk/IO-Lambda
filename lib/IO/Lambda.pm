@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.151 2009/01/16 17:10:42 dk Exp $
+# $Id: Lambda.pm,v 1.152 2009/01/18 19:25:13 dk Exp $
 
 package IO::Lambda;
 
@@ -1074,7 +1074,7 @@ sub par
 	lambda {
 		my @q = @_;
 		my @ret;
-		$max = @q if $max < 0 or $max > @q;
+		$max = @q if $max < 1 or $max > @q;
 		context map {
 			lambda {
 				return unless @q;
