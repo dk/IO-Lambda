@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.44 2009/01/08 15:23:26 dk Exp $
+# $Id: HTTP.pm,v 1.45 2009/01/18 21:20:03 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -436,8 +436,6 @@ sub http_read_chunked
 	pos( $self-> {buf} ) = $offset;
 	context @ctx = $self-> http_read( qr/\G[^\r\n]+\r?\n/i);
 	state size => tail {
-		# save this lambda frame
-		@frame = restartable;
 		# got error
 		my $line = shift;
 		return undef, shift unless defined $line;
@@ -451,11 +449,17 @@ sub http_read_chunked
 		my $size = hex $line;
 		warn "reading chunk $size bytes\n" if $DEBUG;
 		return 1 unless $size;
+		
+		# save this lambda frame
+		@frame = restartable;
 
 	# read the chunk itself
 	context $self-> http_read( $size);
 	state chunk => tail {
-		return undef, shift unless shift;
+		unless ( shift ) {
+			undef @frame; # break circular reference
+			return undef, shift;
+		}
 		$offset += $size + 2; # 2 for CRLF
 		pos( $self-> {buf} ) = $offset;
 		warn "chunk $size bytes ok\n" if $DEBUG;
