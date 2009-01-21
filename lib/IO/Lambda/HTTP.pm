@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.45 2009/01/18 21:20:03 dk Exp $
+# $Id: HTTP.pm,v 1.46 2009/01/21 10:40:19 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -326,15 +326,19 @@ sub handle_request
 {
 	my ( $self, $req) = @_;
 
-	# fixup path
-	if (( $req-> protocol || '') =~ /http\/1.\d/i) {
-		my $u = $req-> uri;
-		$req-> uri( $u-> path);
-	}
-
 	lambda {
 		$self-> {buf} = '';
+
+		# fixup path - otherwise LWP generates request as GET http://hostname/uri HTTP/1.1
+		# which not all servers understand
+		my $uri;
+		if (( $req-> protocol || '') =~ /http\/1.\d/i) {
+			$uri = $req-> uri;
+			$req-> uri( $uri-> path);
+		}
 		context $self-> handle_request_in_buffer( $req);
+		$req-> uri($uri) if defined $uri;
+
 		if ( $DEBUG) {
 			warn "request sent\n";
 			warn $req-> as_string . "\n" if $DEBUG > 1;
