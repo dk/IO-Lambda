@@ -55,8 +55,12 @@ eg/dbi.pl
 eg/thread.pl
 eg/fork.pl
 eg/bench/tcp-batch
+eg/bench/tcp-batch.bat
 eg/bench/tcp-lambda.pl
-eg/bench/tcp-poe.pl
+eg/bench/tcp-lambda-optimized.pl
+eg/bench/tcp-poe-raw.pl
+eg/bench/tcp-poe-optimized.pl
+eg/bench/tcp-poe-components.pl
 eg/bench/tcp-raw.pl
 eg/bench/2.4GHz-x86-64.tcp.benchmark
 eg/bench/1.2GHz-win32.tcpbenchmark
