@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.18 2009/01/11 09:49:36 dk Exp $
+# $Id: DBI.pm,v 1.19 2009/01/27 17:55:45 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -394,10 +394,6 @@ Example:
 
 Descendant of C<IO::Lambda::Message::Simple>. Implements
 blocking, server side that does the actual calls to the DBI.
-
-=head1 BUGS
-
-C<DBI::prepare> is not tested.
 
 =head1 SEE ALSO
 
