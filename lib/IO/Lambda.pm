@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.154 2009/01/21 12:57:41 dk Exp $
+# $Id: Lambda.pm,v 1.155 2009/01/27 17:55:21 dk Exp $
 
 package IO::Lambda;
 
@@ -443,7 +443,7 @@ sub cancel_event
 # The object becomes stopped immediately, so no new events will be allowed to register.
 sub cancel_all_events
 {
-	my ( $self, %opt) = @_;
+	my $self = shift;
 
 	$self-> {stopped} = 1;
 
@@ -453,11 +453,8 @@ sub cancel_all_events
 	$_-> remove($self) for @LOOPS;
 	my $arr = delete $EVENTS{$self};
 
-	my $cascade = $opt{cascade};
-	my (%called, @cancel);
 	for my $rec ( @{$self->{in}}) {
 		if ( ref($rec->[WATCH_LAMBDA])) {
-			push @cancel, $rec->[WATCH_LAMBDA] if $cascade;
 			my $arr = $EVENTS{$rec->[WATCH_LAMBDA]};
 			if ( $arr) {
 				@$arr = grep { $_ != $rec } @$arr;
@@ -468,21 +465,6 @@ sub cancel_all_events
 	}
 
 	@{$self-> {in}} = (); 
-
-	for ( @cancel) {
-		next if $called{"$_"};
-		$called{"$_"}++;
-		$_-> cancel_all_events(%opt);
-	}
-
-	return unless $arr;
-
-	for my $rec ( @$arr) {
-		next unless my $watcher = $rec-> [WATCH_OBJ];
-		# global destruction in action! this should be $self, but isn't
-		next unless ref($rec-> [WATCH_LAMBDA]); 
-		$watcher-> lambda_handler( $rec);
-	}
 }
 
 sub autorestart
