@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.4 2009/01/16 17:08:23 dk Exp $
+# $Id: Mutex.pm,v 1.5 2009/01/29 16:29:13 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -28,6 +28,25 @@ sub take
 	return $self-> {taken} ? 0 : ($self-> {taken} = 1);
 }
 
+# remove the lambda from queue
+sub remove
+{
+	my ( $self, $lambda) = @_;
+	my $found;
+	my $q = $self-> {queue};
+	for ( my $i = 0; $i < @$q; $i ++) {
+		next if $q->[$i] != $lambda;
+		$found = $i;
+		last;
+	}
+	if ( defined $found) {
+		splice( @$q, $found, 1);
+		$self-> release unless @$q; 
+	} else {
+		warn "$self failed to remove $lambda from queue\n" if $DEBUG;
+	}
+}
+
 sub waiter
 {
 	my ( $self, $timeout) = @_;
@@ -40,38 +59,20 @@ sub waiter
 
 	# mutex is not free, wait for it
 	my $waiter = IO::Lambda-> new;
-	push @{$self-> {queue}}, $waiter, $waiter-> bind;
+	my $bind   = $waiter-> bind( sub {
+		my $w = shift;
+		# lambda was terminated, relinquish waiting and kill timeout
+		$self-> remove($w);
+		$w-> cancel_event($timeout) if defined $timeout;
+		return @_; # propagate error
+	});
+	push @{$self-> {queue}}, $waiter;
 
-	if ( defined $timeout) {
-		my $l = $waiter;
-		$waiter = lambda {
-			context $timeout, $l;
-		any_tail {
-			if ($_[0]) { # acquired the mutex!
-				warn "$self acquired for $l\n" if $DEBUG;
-				return undef;
-			}
-				
-			warn "$self timeout for $l\n" if $DEBUG;
-			
-			# remove the lambda from queue
-			my $found;
-			my $q = $self-> {queue};
-			for ( my $i = 0; $i < @$q; $i += 2) {
-				next if $q->[$i] != $l;
-				$found = $i;
-				last;
-			}
-			if ( defined $found) {
-				my ( $lambda, $bind) = splice( @$q, $found, 2);
-				$lambda-> resolve($bind);
-			} else {
-				warn "$self failed to remove $l from queue\n" if $DEBUG;
-			}
-
-			return 'timeout';
-		}};
-	}
+	$timeout = $waiter-> watch_timer( $timeout, sub {
+		$self-> remove($waiter);
+		$waiter-> resolve($bind);
+		return 'timeout';
+	}) if defined $timeout;
 
 	return $waiter;
 }
@@ -88,23 +89,12 @@ sub release
 	}
 
 	my $lambda = shift @{$self-> {queue}};
-	my $bind   = shift @{$self-> {queue}};
-	$lambda-> callout(undef, undef);
+
 	warn "$self gives ownership to $lambda\n" if $DEBUG;
-	$lambda-> resolve($bind);
+	$lambda-> terminate(undef);
 }
 
-sub DESTROY
-{
-	my $self = shift;
-	my $q = $self-> {queue};
-	while ( @$q) {
-		my $lambda = shift @$q;
-		my $bind   = shift @$q;
-		$lambda-> callout(undef, 'dead');
-		$lambda-> resolve($bind);
-	}
-}
+sub DESTROY { $_-> terminate('dead') for @{shift-> {queue}} }
 
 sub mutex(&)
 {
@@ -210,6 +200,12 @@ the mutex was acquired successfully, or the error string.
 If C<$timeout> is defined, and by the time it is expired the mutex
 could not be obtained, the lambda is removed from the queue, and
 returned error value is 'timeout'.
+
+=item remove($lambda)
+
+Removes the lambda created previously by waiter() from internal queue.  Note
+that after that operation the lambda will never finish by itself, therefore
+this call must be either appended or replaced with C<< $lambda-> terminate >>.
 
 =item mutex($mutex, $timeout = undef) -> error
 

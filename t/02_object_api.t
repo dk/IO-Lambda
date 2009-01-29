@@ -1,10 +1,10 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.9 2008/10/28 13:06:13 dk Exp $
+# $Id: 02_object_api.t,v 1.10 2009/01/29 16:29:15 dk Exp $
 
 use strict;
 use warnings;
 use Time::HiRes qw(time);
-use Test::More tests => 26;
+use Test::More tests => 27;
 use IO::Lambda qw(:all);
 
 alarm(10);
@@ -63,6 +63,13 @@ $m-> watch_timer( time, sub { 'time' });
 $l-> watch_lambda( $m, sub { @x = @_ });
 $l-> wait;
 ok(( 2 == @x and $x[1] eq 'time'), 'propagate timer');
+
+@x = ();
+$l-> reset;
+$l-> watch_timer( time + 2, sub { push @x, 't' }, sub { push @x, 'c' }); 
+$l-> terminate;
+$l-> wait;
+ok(( 1 == @x and $x[0] eq 'c'), 'catch');
 
 # file
 SKIP: {

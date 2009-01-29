@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.155 2009/01/27 17:55:21 dk Exp $
+# $Id: Lambda.pm,v 1.156 2009/01/29 16:29:12 dk Exp $
 
 package IO::Lambda;
 
@@ -17,7 +17,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
 	$DEBUG_IO $DEBUG_LAMBDA %DEBUG
 );
-$VERSION     = '1.05';
+$VERSION     = '1.06';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -28,7 +28,7 @@ $VERSION     = '1.05';
 	sysreader syswriter getline readbuf writebuf
 );
 @EXPORT_LAMBDA = qw(
-	this context lambda again state restartable
+	this context lambda again state restartable catch
 	io readable writable rwx timeout tail tails tailo any_tail
 );
 @EXPORT_FUNC = qw(
@@ -75,12 +75,14 @@ use constant IO_WRITE        => 2;
 use constant IO_EXCEPTION    => 1;
 	
 use constant WATCH_OBJ       => 0;
-use constant WATCH_DEADLINE  => 1;
-use constant WATCH_LAMBDA    => 1;
-use constant WATCH_CALLBACK  => 2;
+use constant WATCH_CANCEL    => 1;
+
+use constant WATCH_DEADLINE  => 2;
+use constant WATCH_LAMBDA    => 2;
+use constant WATCH_CALLBACK  => 3;
 	
-use constant WATCH_IO_HANDLE => 3;
-use constant WATCH_IO_FLAGS  => 4;
+use constant WATCH_IO_HANDLE => 4;
+use constant WATCH_IO_FLAGS  => 5;
 
 sub new
 {
@@ -154,7 +156,7 @@ sub _msg
 # register an IO event
 sub watch_io
 {
-	my ( $self, $flags, $handle, $deadline, $callback) = @_;
+	my ( $self, $flags, $handle, $deadline, $callback, $cancel) = @_;
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
@@ -163,6 +165,7 @@ sub watch_io
 	
 	my $rec = [
 		$self,
+		$cancel,
 		$deadline,
 		$callback,
 		$handle,
@@ -181,7 +184,7 @@ sub watch_io
 # register a timeout
 sub watch_timer
 {
-	my ( $self, $deadline, $callback) = @_;
+	my ( $self, $deadline, $callback, $cancel) = @_;
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "$self: time is undefined" unless defined $deadline;
@@ -189,6 +192,7 @@ sub watch_timer
 	$deadline += time if $deadline < 1_000_000_000;
 	my $rec = [
 		$self,
+		$cancel,
 		$deadline,
 		$callback,
 	];
@@ -205,7 +209,7 @@ sub watch_timer
 # register a callback when another lambda exits
 sub watch_lambda
 {
-	my ( $self, $lambda, $callback) = @_;
+	my ( $self, $lambda, $callback, $cancel) = @_;
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "bad lambda" unless $lambda and $lambda->isa('IO::Lambda');
@@ -217,6 +221,7 @@ sub watch_lambda
 
 	my $rec = [
 		$self,
+		$cancel,
 		$lambda,
 		$callback,
 	];
@@ -357,7 +362,6 @@ sub io_handler
 		if $nn == @$in or $self != $rec->[WATCH_OBJ];
 
 	_d_in if $DEBUG_IO;
-
 	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
 		$self, 
 		(($#$rec == WATCH_IO_FLAGS) ? $rec-> [WATCH_IO_FLAGS] : ()),
@@ -421,6 +425,9 @@ sub cancel_event
 
 	return unless @{$self-> {in}};
 
+	@{$self->{last}} = $rec-> [WATCH_CANCEL]->($self, @{$self->{last}})
+		if $rec-> [WATCH_CANCEL];
+
 	$LOOP-> remove_event($rec) if $LOOP;
 	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
 
@@ -448,10 +455,13 @@ sub cancel_all_events
 	$self-> {stopped} = 1;
 
 	return unless @{$self-> {in}};
+	
+	@{$self->{last}} = $_-> [WATCH_CANCEL]->($self, @{$self->{last}})
+		for grep { $_-> [WATCH_CANCEL] } 
+		reverse @{$self-> {in}};
 
 	$LOOP-> remove( $self) if $LOOP;
 	$_-> remove($self) for @LOOPS;
-	my $arr = delete $EVENTS{$self};
 
 	for my $rec ( @{$self->{in}}) {
 		if ( ref($rec->[WATCH_LAMBDA])) {
@@ -527,8 +537,8 @@ sub terminate
 {
 	my ( $self, @error) = @_;
 
-	$self-> cancel_all_events;
 	$self-> {last} = \@error;
+	$self-> cancel_all_events;
 	warn $self-> _msg('terminate') if $DEBUG_LAMBDA;
 }
 
@@ -689,6 +699,23 @@ sub set_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
 sub get_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
 sub swap_frame  { my @f = get_frame; set_frame(@_); @f }
 sub clear       { set_frame() }
+
+# exceptions
+sub catch(&$)
+{
+	my ( $cb, $event) = @_;
+	my $who = (caller(1))[3];
+	my @ctx = @CONTEXT;
+	$event->[WATCH_CANCEL] = $cb ? sub {
+		local *__ANON__ = "$who\:\:catch";
+		$THIS     = shift;
+		@CONTEXT  = @ctx;
+		$METHOD   = undef;
+		$CALLBACK = undef;
+		$cb-> (@_);
+	} : undef;
+	return $event;
+}
 	
 END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
 
@@ -697,7 +724,6 @@ sub state($)
 	my $this = ($_[0] && ref($_[0])) ? shift(@_) : this;
 	@_ ? $this-> {state} = $_[0] : return $this-> {state};
 }
-
 
 #
 # Conditions:
@@ -2009,6 +2035,19 @@ Example: convert existing C<getline> constructor into a condition:
    context $fh, $buf, $deadline;
    gl { ... }
 
+=item catch $coderef, $event
+
+Registers $coderef on $event, that is called when $event is aborted
+via either C<cancel_event>, C<cancel_all_event>, or C<terminate>:
+
+   my $resource = acquire;
+   context lambda { .. $resource .. };
+   catch {
+      $resource-> free;
+   } tail {
+      $resource-> free;
+   }
+
 =back
 
 =head2 Stream IO
@@ -2281,7 +2320,7 @@ third-party asynchronous event libraries with the lambda interface.
 Creates new C<IO::Lambda> object in the passive state. C<$start>
 will be called once, after the lambda gets active.
 
-=item watch_io($flags, $handle, $deadline, $callback)
+=item watch_io($flags, $handle, $deadline, $callback, $cancel)
 
 Registers an IO event listener that calls C<$callback> either after
 C<$handle> satisfies condition of C<$flags> ( a combination of IO_READ,
@@ -2294,11 +2333,15 @@ other callbacks, are passed the result of the last called callback attached to
 the same lambda. The result of this callback will then be stored and passed on
 to the next callback in the same fashion.
 
-=item watch_timer($deadline, $callback)
+If the event is cancelled with C<cancel_event>, then C<$cancel> callback
+is executed. The result of this callback will be stored and passed on,
+in the same manner as results and parameters to C<$callback>.
+
+=item watch_timer($deadline, $callback, $cancel)
 
 Registers a timer listener that calls C<$callback> after C<$deadline> time.
 
-=item watch_lambda($lambda, $callback)
+=item watch_lambda($lambda, $callback, $cancel)
 
 Registers a listener that calls C<$callback> after C<$lambda>, a C<IO::Lambda>
 object is finished. If C<$lambda> is in passive state, it is started first.
@@ -2391,7 +2434,7 @@ organizing event loops without C<wait/run> calls.
 Enters the event loop and doesn't exit until there are no registered events.
 Can be also called as package method.
 
-=item bind @args
+=item bind $cancel, @args
 
 Creates an event record that contains the lambda and C<@args>, and returns it.
 The lambda won't finish until this event is returned with C<resolve>.
@@ -2685,7 +2728,7 @@ C<IO::Lambda> works best.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (c) 2008 capmon ApS. All rights reserved.
+This work is partially sponsored by capmon ApS.
 
 This library is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
@@ -2696,13 +2739,15 @@ Dmitry Karasik, E<lt>dmitry@karasik.eu.orgE<gt>.
 
 I wish to thank those who helped me:
 
+Ben Tilly for providing thorough comments to the code in the synopsis, bringing
+up various important issues, valuable discussions, for his patience and
+dedicated collaboration.
+
 David A. Golden for discussions about names, and his propositions to rename
 some terms into more appropriate, such as "read" to "readable", and "predicate"
-to "condition". Ben Tilly for providing thorough comments to the code in the
-synopsis, bringing up various issues, and for valuable discussions. Rocco
-Caputo for optimizing the POE benchmark script. Randall L.  Schwartz, Brock
-Wilcox, and zby@perlmonks helped me to understand how the documentation for the
-module could be made better.
+to "condition". Rocco Caputo for optimizing the POE benchmark script. Randall
+L. Schwartz, Brock Wilcox, and zby@perlmonks helped me to understand how the
+documentation for the module could be made better.
 
 All the good people on perlmonks.org and perl conferences, who invested their
 time into understanding the module.
