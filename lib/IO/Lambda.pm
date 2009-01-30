@@ -808,14 +808,14 @@ sub add_watch
 	)
 }
 
-# rxw($flags,$handle,$deadline)
-sub rxw(&)
+# rwx($flags,$handle,$deadline)
+sub rwx(&)
 {
-	return $THIS-> override_handler('rxw', \&rxw, shift)
-		if $THIS-> {override}->{rxw};
+	return $THIS-> override_handler('rwx', \&rwx, shift)
+		if $THIS-> {override}->{rwx};
 
 	$THIS-> add_watch( 
-		_subname(rxw => shift), \&rxw,
+		_subname(rwx => shift), \&rwx,
 		@CONTEXT[0,1,2,0,1,2]
 	)
 }
@@ -1964,7 +1964,7 @@ that means that it will never be called with FALSE.
 
 Exactly same as C<readable>, but executes when C<$filehandle> becomes writable.
 
-=item rxw($flags, $filehandle, $deadline = undef)
+=item rwx($flags, $filehandle, $deadline = undef)
 
 Executes either when C<$filehandle> satisfies any of the condition in C<$flags>,
 or after C<$deadline>. C<$flags> is a combination of three integer constants,
