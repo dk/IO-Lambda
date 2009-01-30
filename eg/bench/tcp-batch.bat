@@ -5,6 +5,8 @@ echo "Lambda using select, optimized"
 perl tcp-lambda-optimized.pl
 echo "Lambda using AnyEvent"
 perl tcp-lambda.pl --anyevent
+echo "Lambda using AnyEvent, optimized"
+perl tcp-lambda-optimized.pl --anyevent
 echo "Raw sockets using select"
 perl tcp-raw.pl
 echo "POE using select, components"

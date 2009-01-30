@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.156 2009/01/29 16:29:12 dk Exp $
+# $Id: Lambda.pm,v 1.157 2009/01/30 07:09:09 dk Exp $
 
 package IO::Lambda;
 
@@ -2637,11 +2637,15 @@ A single-process TCP client and server; server echoes back everything is sent by
 the client. 500 connections sequentially created, instructed to send a single
 line to the server, and destroyed.
 
-                        2.4GHz x86-64 linux 1.2GHz win32
-  Lambda using select       0.694 sec        6.364 sec
-  Lambda using AnyEvent     0.684 sec        7.031 sec
-  Raw sockets using select  0.145 sec        4.141 sec
-  POE using select          5.349 sec       14.887 sec
+                         2.4GHz x86-64 linux 1.2GHz win32
+  Lambda/select              0.697            7.468
+  Lambda/select, optimized   0.257            5.273
+  Lambda/AnyEvent            0.648            8.175
+  Lambda/AnyEvent, optimized                  7.087
+  Raw sockets using select   0.149            4.859
+  POE/select, components     1.185           12.306
+  POE/select, raw sockets    0.382            6.233
+  POE/select, optimized      0.770            7.510
 
 See benchmarking code in F<eg/bench>.
 
