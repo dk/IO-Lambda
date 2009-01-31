@@ -1,6 +1,6 @@
 package IO::Lambda;
 
-use Carp;
+use Carp qw(croak);
 use strict;
 use warnings;
 use Exporter;
@@ -12,15 +12,15 @@ use vars qw(
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS	@EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM
 	@EXPORT_DEV @EXPORT_MISC @EXPORT_FUNC
-	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN
+	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN $SIGTHROW
 	$DEBUG_IO $DEBUG_LAMBDA $DEBUG_CALLER %DEBUG
 );
-$VERSION     = '1.07';
+$VERSION     = '1.08';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
 	WATCH_OBJ WATCH_DEADLINE WATCH_LAMBDA WATCH_CALLBACK
-	WATCH_IO_HANDLE WATCH_IO_FLAGS
+	WATCH_IO_HANDLE WATCH_IO_FLAGS WATCH_CALLER WATCH_CANCEL
 );
 @EXPORT_STREAM = qw(
 	sysreader syswriter getline readbuf writebuf
@@ -33,7 +33,7 @@ $VERSION     = '1.07';
 	seq par mapcar filter fold curry 
 );
 @EXPORT_MISC    = qw(
-	set_frame get_frame swap_frame
+	set_frame get_frame swap_frame sigthrow
 );
 @EXPORT_DEV    = qw(
 	_subname _o _t
@@ -667,7 +667,15 @@ sub lambda(&)
 		local $METHOD   = \&_lambda_restart;
 		$cb ? $cb-> (@_) : @_;
 	});
-	$l-> {caller} = join(':', (caller)[1,2]) if $DEBUG_CALLER;
+	if ( $DEBUG_CALLER) {
+		if ( $DEBUG_CALLER > 1) {
+			$l-> {caller} = Carp::longmess;
+			chomp $l-> {caller};
+			$l-> {caller} =~ s/^ at //;
+		} else {
+			$l-> {caller} = join(':', (caller)[1,2]);
+		}
+	}
 	$l;
 }
 
@@ -701,6 +709,14 @@ sub get_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
 sub swap_frame  { my @f = get_frame; set_frame(@_); @f }
 sub clear       { set_frame() }
 
+END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
+
+sub state($)
+{
+	my $this = ($_[0] && ref($_[0])) ? shift(@_) : this;
+	@_ ? $this-> {state} = $_[0] : return $this-> {state};
+}
+
 # exceptions and backtracing
 sub catch(&$)
 {
@@ -715,75 +731,45 @@ sub catch(&$)
 		$CALLBACK = undef;
 		$cb-> (@_);
 	} : undef;
+
+	# if throw() happened before we even get here
+	$event->[WATCH_CALLBACK] = $event->[WATCH_CANCEL]
+		if $event->[WATCH_CALLBACK] == \&_throw;
+	
 	return $event;
 }
 
-sub callers      { grep { $_[0] == $_-> [WATCH_LAMBDA] } map { @$_ } values %EVENTS }
-sub callers_tree { map  { [ $_, callers_tree( $_->[WATCH_OBJ] ) ] } shift-> callers }
-sub callers_tracks
+sub _throw
 {
-	my @tracks = shift-> callers_tree;
-	my (@finished, @current, @stack);
-	while (@stack or @tracks) {
-#		warn "next round: t=@tracks\n";
-		if ( @tracks) {
-			my $p = shift @tracks;
-			push @stack, [ @current ], [ @tracks ]
-				if @tracks;
-#			warn "pushcurr t=$p -> ev=$p->[0]:l=$p->[0]->[WATCH_OBJ]\n";
-			push @current, shift @$p;
-			@tracks = @$p;
-		} else {
-			push @finished, [ @current ] if @current;
-#			warn "b done: ev=@current\n";
-			@tracks  = @{ pop @stack };
-			@current = @{ pop @stack };
-		}
-	}
-	push @finished, [ @current ] if @current;
-#	warn "b really done: ev=@current\n";
-	return @finished;
+	my $self = shift;
+	warn _d( $self, 'throw') if $DEBUG_LAMBDA;
+	$self-> throw(@_);
 }
+
+sub throw
+{
+	my ( $self, @error) = @_;
+	my @c = $self-> callers;
+	$_-> [WATCH_CALLBACK] = $_->[WATCH_CANCEL] || \&_throw for @c;
+	$self-> terminate(@error);
+	$SIGTHROW->($self, @error) if $SIGTHROW and not @c;
+	return @error;
+}
+
+sub sigthrow
+{
+	shift if not(ref $_[0]) or ref($_[0]) ne 'CODE';
+	$SIGTHROW = $_[0] if @_;
+	return $SIGTHROW;
+}
+
+sub callees      { @{ $EVENTS{ "$_[0]" } || [] } }
+sub callers      { grep { $_[0] == $_-> [WATCH_LAMBDA] } map { @$_ } values %EVENTS }
 
 sub backtrace
 {
-	my $self = $_[0];
-	my $out = '';
-	my $ch  = 1;
-	for (( $self-> backtrace_events(chains => 1)) x 2) {
-		if ( $DEBUG_CALLER) {
-			$out .= "#$ch/1: lambda(". _o($self) . ')';
-			$out .= " created at $self->{caller}" if $self->{caller};
-			$out .= " awaited by\n";
-		} else {
-			$out .= "#$ch: lambda(". _o($self) . ') ';
-		}
-		my $depth = 1;
-		for ( @$_ ) {
-			$depth++;
-			$out .= "\t #$ch/$depth: " if $DEBUG_CALLER;
-			$out .= 'lambda(' . _o($_->[WATCH_OBJ]) . ')';
-			$out .= " created at $_->[WATCH_OBJ]->{caller}"
-				if $_->[WATCH_OBJ]->{caller};
-			if ( defined $_-> [WATCH_CALLER]) {
-				$out .= " awaited";
-				$out .= $_->[WATCH_CALLER];
-			} else {
-				$out .= " ";
-			}
-		}
-		$out .= "\n";
-		$ch++;
-	}
-	return $out;
-}
-	
-END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
-
-sub state($)
-{
-	my $this = ($_[0] && ref($_[0])) ? shift(@_) : this;
-	@_ ? $this-> {state} = $_[0] : return $this-> {state};
+	require IO::Lambda::Backtrace;
+	IO::Lambda::Backtrace-> new($_[0], Carp::shortmess);
 }
 
 #
@@ -2610,14 +2596,46 @@ is therefore better to be written as
       ...
    }}
 
+=back
+
+=head2 Exceptions and backtrace
+
+In addition to the normal call stack as reported by the C<caller> builtin,
+it can be useful also to access execution information of the thread of
+events, when a lambda waits for another, which in turn waits for another,
+etc. The following functions deal with backtrace information and
+exceptions, that propagate through thread of events.
+
+=over
+
+=item throw(@error)
+
+Terminates the current lambda, then propagates C<@error> to the immediate
+caller lambdas. They will have a chance to catch the exception with C<catch>
+later, and re-throw by calling C<throw> again. The default action is to
+propagate the exception further.
+
+When there are no caller lambdas, a C<sigthrow> callback is called ( analog:
+die outside eval calls $SIG{__DIE__} ).
+
+=item sigthrow($callback :: ($lambda, @error))
+
+Retrieves and sets a callback that is invoked when C<throw> is called
+on lambda that no lambdas wait for. By default, is empty. When invoked,
+is passed the lambda, and parameters passed to C<throw>.
+
 =item callers
 
 Returns event records that watch for the lambda.
 
+=item callees
+
+Returns event records that corresponds to the lambdas this lambda watches.
+
 =item backtrace
 
-Returns a string representation of thread of events that leads to the current
-lambda. To increase verbosity, add debug flag "caller".
+Returns a C<IO::Lambda::Backtrace> object that represents thread of events
+which leads to the current lambda. See L<IO::Lambda::Backtrace> for more.
 
 =back
 
@@ -2626,6 +2644,10 @@ lambda. To increase verbosity, add debug flag "caller".
 =head2 Included modules
 
 =over
+
+=item *
+
+L<IO::Lambda::Backtrace> - debug chains of events
 
 =item *
 
@@ -2708,8 +2730,8 @@ where one object waits for another, lambda being cancelled, finished, etc.
 =item caller
 
 Increase verbosity of I<lambda> by storing information about which line
-invoked object creation and subscription. Especially valuable for the
-C<backtrace> function.
+invoked object creation and subscription. See L<IO::Lambda::Backtrace>
+for more.
 
 =item die 
 

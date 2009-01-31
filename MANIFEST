@@ -22,6 +22,7 @@ lib/IO/Lambda/DBI.pm
 lib/IO/Lambda/Fork.pm
 lib/IO/Lambda/Flock.pm
 lib/IO/Lambda/Mutex.pm
+lib/IO/Lambda/Backtrace.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t
@@ -42,6 +43,7 @@ t/17_flock.t
 t/18_poll.t
 t/19_functional.t
 t/20_mutex.t
+t/21_exceptions.t
 t/98_pod.t
 t/99_pod_coverage.t
 eg/sequential.pl
