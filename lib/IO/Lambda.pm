@@ -2749,9 +2749,11 @@ Sets loop module, one of: Select, AnyEvent, Prima.
 Keys recognized for the other modules:
 I<select,dbi,http,https,signal,message,thread,fork,poll,flock>.
 
-=head2 Mailing list
+=head2 Online information
 
-I<io-lambda-general at lists.sourceforge.net>, thanks to sourceforge.
+Project homepage: L<http://iolambda.karasik.eu.org/>
+
+Mailing list: I<io-lambda-general at lists.sourceforge.net>, thanks to sourceforge.
 Subscribe by visiting L<https://lists.sourceforge.net/lists/listinfo/io-lambda-general>.
 
 =head2 Benchmarks
