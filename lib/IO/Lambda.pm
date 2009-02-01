@@ -1763,9 +1763,12 @@ dynamically.
 The new event listeners can be created either by explicitly calling condition,
 or by restarting the last condition with the C<again> call. For example, code
 
-     readable { int(rand 2) ? print 1 : again }
+     readable { 
+        print 1;
+	again if int rand(2)
+     }
 
-will print indeterminable number of ones.
+prints indeterminable number of ones.
 
 =head2 Contexts
 
@@ -2873,7 +2876,7 @@ dedicated collaboration.
 
 David A. Golden for discussions about names, and his propositions to rename
 some terms into more appropriate, such as "read" to "readable", and "predicate"
-to "condition". Rocco Caputo for optimizing the POE benchmark script. Randall
+to "condition". Rocco Caputo for optimizing the POE benchmark script. Randal
 L. Schwartz, Brock Wilcox, and zby@perlmonks helped me to understand how the
 documentation for the module could be made better.
 
