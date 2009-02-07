@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 21_exceptions.t,v 1.1 2009/01/31 11:34:59 dk Exp $
+# $Id: 21_exceptions.t,v 1.2 2009/02/07 17:47:49 dk Exp $
 
 alarm(10);
 
