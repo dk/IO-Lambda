@@ -1,5 +1,5 @@
 package IO::Lambda::Backtrace;
-# $Id: Backtrace.pm,v 1.1 2009/01/31 11:34:57 dk Exp $
+# $Id: Backtrace.pm,v 1.2 2009/02/13 21:19:40 dk Exp $
 use strict;
 use warnings;
 use IO::Lambda qw(:constants :dev);
