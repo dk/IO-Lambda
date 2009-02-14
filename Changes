@@ -141,3 +141,6 @@
 1.08  - 31 Jan 2008
 	implement exceptions with throw/catch
 	enhance backtracing and move it out to IO::Lambda::Backtrace
+
+1.09  - 14 Feb 2008
+	implement finally() for exceptions
