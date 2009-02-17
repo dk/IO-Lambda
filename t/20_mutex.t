@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 20_mutex.t,v 1.2 2009/01/29 16:29:15 dk Exp $
+# $Id: 20_mutex.t,v 1.3 2009/02/17 08:36:16 dk Exp $
 
 alarm(10);
 
@@ -63,5 +63,6 @@ ok( $mutex-> is_free, 'deadlock prevention 1');
 $mutex-> take;
 $waiter = $mutex-> waiter;
 $mutex-> remove($waiter);
+$waiter-> terminate;
 ok( $mutex-> is_free, 'deadlock prevention 2');
 

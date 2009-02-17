@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.5 2009/01/29 16:29:13 dk Exp $
+# $Id: Mutex.pm,v 1.6 2009/02/17 08:36:16 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -7,6 +7,7 @@ $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
 %EXPORT_TAGS = ( all => \@EXPORT_OK);
 
 use strict;
+use warnings;
 use IO::Lambda qw(:all);
 
 sub new
@@ -203,9 +204,11 @@ returned error value is 'timeout'.
 
 =item remove($lambda)
 
+Internal function, do not use directly, use C<< $lambda-> terminate >>
+instead.
+
 Removes the lambda created previously by waiter() from internal queue.  Note
-that after that operation the lambda will never finish by itself, therefore
-this call must be either appended or replaced with C<< $lambda-> terminate >>.
+that after that operation the lambda will never finish by itself.
 
 =item mutex($mutex, $timeout = undef) -> error
 
