@@ -1,4 +1,4 @@
-# $Id: SNMP.pm,v 1.17 2009/01/09 12:07:19 dk Exp $
+# $Id: SNMP.pm,v 1.18 2009/04/07 13:31:53 dk Exp $
 package IO::Lambda::SNMP;
 use vars qw(
 	$DEBUG
@@ -105,9 +105,8 @@ sub reshuffle_fds
 		$IO::Lambda::LOOP-> watch( $ACTIVE_FDS{$new} = \@rec);
 	}
 
-	# timer
-	$timeout ||= 0; 
-	if ( $timeout) {
+	# timer - btw 0.0 is a valid timeout
+	if ( defined $timeout) {
 		my $deadline = time + $timeout;
 		if ( $TIMER_ACTIVE) {
 			if ( abs( $deadline - $TIMER[WATCH_DEADLINE]) > 0.001) {
