@@ -12,10 +12,10 @@ use vars qw(
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS	@EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM
 	@EXPORT_DEV @EXPORT_MISC @EXPORT_FUNC
-	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN $SIGTHROW
+	$THIS @CONTEXT $METHOD $CALLBACK $CANCEL $AGAIN $SIGTHROW
 	$DEBUG_IO $DEBUG_LAMBDA $DEBUG_CALLER %DEBUG
 );
-$VERSION     = '1.09';
+$VERSION     = '1.10';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -664,6 +664,7 @@ sub lambda(&)
 		local $THIS     = shift;
 		local @CONTEXT  = ();
 		local $CALLBACK = $cb;
+		local $CANCEL   = undef;
 		local $METHOD   = \&_lambda_restart;
 		$cb ? $cb-> (@_) : @_;
 	});
@@ -693,23 +694,23 @@ sub _subname
 # re-enter the latest (or other) frame
 sub again
 {
-	( $METHOD, $CALLBACK) = @_ if 2 == @_;
+	( $METHOD, $CALLBACK, $CANCEL) = @_ if 2 <= @_;
 	local $AGAIN = 1;
 	defined($METHOD) ? 
-		$METHOD-> ($CALLBACK) : 
+		$METHOD-> ($CALLBACK, $CANCEL) : 
 		croak "again() outside of a restartable call" 
 }
 
 # define context
 sub this        { @_ ? ($THIS, @CONTEXT)    = @_ : $THIS }
 sub context     { @_ ? (@CONTEXT)           = @_ : @CONTEXT }
-sub restartable { @_ ? ($METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
-sub set_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
-sub get_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
+sub restartable { @_ ? ($METHOD, $CALLBACK, $CANCEL) = @_ : ( $METHOD, $CALLBACK, $CANCEL) }
+sub set_frame   { ( $THIS, $METHOD, $CALLBACK, $CANCEL, @CONTEXT) = @_ }
+sub get_frame   { ( $THIS, $METHOD, $CALLBACK, $CANCEL, @CONTEXT) }
 sub swap_frame  { my @f = get_frame; set_frame(@_); @f }
 sub clear       { set_frame() }
 
-END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
+END { ( $THIS, $METHOD, $CALLBACK, $CANCEL, @CONTEXT) = (); }
 
 sub state($)
 {
@@ -794,7 +795,7 @@ sub backtrace
 # common wrapper for declaration of handle-watching user conditions
 sub add_watch
 {
-	my ($self, $cb, $method, $flags, $handle, $deadline, @ctx) = @_;
+	my ($self, $cb, $cancel, $method, $flags, $handle, $deadline, @ctx) = @_;
 	my $who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_io(
 		$flags, $handle, $deadline,
@@ -804,6 +805,7 @@ sub add_watch
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
+			$CANCEL   = $cancel;
 			$cb ? $cb-> (@_) : @_;
 		}
 	)
@@ -848,7 +850,7 @@ sub writable(&)
 # common wrapper for declaration of time-watching user conditions
 sub add_timer
 {
-	my ($self, $cb, $method, $deadline, @ctx) = @_;
+	my ($self, $cb, $cancel, $method, $deadline, @ctx) = @_;
 	my $who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_timer(
 		$deadline,
@@ -858,6 +860,7 @@ sub add_timer
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
+			$CANCEL   = $cancel;
 			$cb ? $cb-> (@_) : @_;
 		}
 	)
@@ -874,7 +877,7 @@ sub timeout(&)
 # common wrapper for declaration of single lambda-watching user conditions
 sub add_tail
 {
-	my ($self, $cb, $method, $lambda, @ctx) = @_;
+	my ($self, $cb, $cancel, $method, $lambda, @ctx) = @_;
 	my $who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_lambda(
 		$lambda,
@@ -884,6 +887,7 @@ sub add_tail
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
+			$CANCEL   = $cancel;
 			$cb-> (@_);
 		} : undef,
 	);
@@ -903,7 +907,7 @@ sub add_constant
 # handle default condition logic given a lambda
 sub condition
 {
-	my ( $self, $cb, $method, $name) = @_;
+	my ( $self, $cb, $cancel, $method, $name) = @_;
 
 	return $THIS-> override_handler($name, $method, $cb)
 		if defined($name) and $THIS-> {override}->{$name};
@@ -924,6 +928,7 @@ sub condition
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
+			$CANCEL   = $cancel;
 			$cb-> (@_);
 		} : undef
 	);
@@ -949,13 +954,14 @@ sub tail(&)
 # dummy sub for empty calls for tails() family
 sub _empty
 {
-	my ($name, $method, $cb) = @_;
+	my ($name, $method, $cb, $cancel) = @_;
 	my @ctx = context;
 	$THIS-> watch_lambda( IO::Lambda-> new, sub {
 		local *__ANON__ = "IO::Lambda::".$name."::callback";
 		@CONTEXT  = @ctx;
 		$METHOD   = $method;
 		$CALLBACK = $cb;
+		$CANCEL   = $cancel;
 		$cb-> ();
 	}) if $cb;
 }
@@ -2125,6 +2131,15 @@ event reference:
    my $event = tail { ... };
    catch   { ... }, $event;
 
+Warning: if event is restarted using C<again>, C<catch> callback will
+be lost! Since C<catch> was added at later stage, I don't know how to
+solve this problem yet. Currently I could only propose a lame workaround:
+
+   catch { ... }
+   tail {
+       catch { ... } again;
+   }
+
 =item finally $coderef, $event
 
 Registers $coderef on $event, that is called when $event is finished,
@@ -2147,6 +2162,9 @@ undesirable, use explicit event reference:
    my $event = tail { ... };
    catch   { ... }, $event;
    finally { ... }, $event;
+
+Warning: C<finally> doesn't survibve restartable calls as well as C<catch>
+See L<catch> for the explanation and a workaround.
 
 =back
 
