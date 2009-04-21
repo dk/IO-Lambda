@@ -1,4 +1,4 @@
-# $Id: Flock.pm,v 1.7 2009/01/08 15:23:26 dk Exp $
+# $Id: Flock.pm,v 1.8 2009/04/21 14:42:46 dk Exp $
 package IO::Lambda::Flock;
 use vars qw($DEBUG @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
@@ -76,6 +76,21 @@ The module provides file locking interface for the lambda style,
 implemented by using non-blocking, periodic polling of flock(2).
 
 =head1 SYNOPSIS
+
+    open LOCK, ">lock";
+    lambda {
+        # obtain the lock 
+        context \*LOCK, timeout => 10;
+        flock { die "can't obtain lock" unless shift }
+        
+        # while reading from handle
+        context $handle;
+        readable { ... }
+
+        # and showing status 
+        context 0.5;
+        timeout { print '.'; again }
+    };
 
 =head1 API
 
