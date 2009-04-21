@@ -1,4 +1,4 @@
-# $Id: AnyEvent.pm,v 1.8 2008/12/17 11:39:06 dk Exp $
+# $Id: AnyEvent.pm,v 1.9 2009/04/21 12:02:06 dk Exp $
 
 package IO::Lambda::Loop::AnyEvent;
 use strict;
@@ -162,10 +162,18 @@ loop. The module is not intended for direct use.
 
 Note that L<AnyEvent> is also a proxy event loop itself, and depending on the
 actual event loop module it uses, functionality of C<IO::Lambda> might be
-limited. Of the found deficiencies, all but C<Event> interfaces don't support
-C<IO_EXCEPTION>. Also, interface to C<Tk> fails to work when more than one
-listener to the same filehandle is registered. See L<AnyEvent> for more 
-specific description.
+limited. 
+
+Found problems:
+
+* All but C<Event> interfaces don't support C<IO_EXCEPTION>. 
+
+* Interface to C<Tk> fails to work when more than one listener to the same filehandle 
+is registered. 
+
+* C<EV> doesn't work with threads and disk files.
+
+See L<AnyEvent> for more specific description.
 
 =head1 SYNOPSIS
 
