@@ -1,3 +1,4 @@
+# $Id: Lambda.pm,v 1.166 2009/04/21 08:02:15 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -12,7 +13,7 @@ use vars qw(
 	$VERSION @ISA
 	@EXPORT_OK %EXPORT_TAGS	@EXPORT_CONSTANTS @EXPORT_LAMBDA @EXPORT_STREAM
 	@EXPORT_DEV @EXPORT_MISC @EXPORT_FUNC
-	$THIS @CONTEXT $METHOD $CALLBACK $CANCEL $AGAIN $SIGTHROW
+	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN $SIGTHROW
 	$DEBUG_IO $DEBUG_LAMBDA $DEBUG_CALLER %DEBUG
 );
 $VERSION     = '1.10';
@@ -664,7 +665,6 @@ sub lambda(&)
 		local $THIS     = shift;
 		local @CONTEXT  = ();
 		local $CALLBACK = $cb;
-		local $CANCEL   = undef;
 		local $METHOD   = \&_lambda_restart;
 		$cb ? $cb-> (@_) : @_;
 	});
@@ -694,23 +694,23 @@ sub _subname
 # re-enter the latest (or other) frame
 sub again
 {
-	( $METHOD, $CALLBACK, $CANCEL) = @_ if 2 <= @_;
+	( $METHOD, $CALLBACK) = @_ if 2 == @_;
 	local $AGAIN = 1;
 	defined($METHOD) ? 
-		$METHOD-> ($CALLBACK, $CANCEL) : 
+		$METHOD-> ($CALLBACK) : 
 		croak "again() outside of a restartable call" 
 }
 
 # define context
 sub this        { @_ ? ($THIS, @CONTEXT)    = @_ : $THIS }
 sub context     { @_ ? (@CONTEXT)           = @_ : @CONTEXT }
-sub restartable { @_ ? ($METHOD, $CALLBACK, $CANCEL) = @_ : ( $METHOD, $CALLBACK, $CANCEL) }
-sub set_frame   { ( $THIS, $METHOD, $CALLBACK, $CANCEL, @CONTEXT) = @_ }
-sub get_frame   { ( $THIS, $METHOD, $CALLBACK, $CANCEL, @CONTEXT) }
+sub restartable { @_ ? ($METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
+sub set_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
+sub get_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
 sub swap_frame  { my @f = get_frame; set_frame(@_); @f }
 sub clear       { set_frame() }
 
-END { ( $THIS, $METHOD, $CALLBACK, $CANCEL, @CONTEXT) = (); }
+END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
 
 sub state($)
 {
@@ -805,7 +805,6 @@ sub add_watch
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$CANCEL   = $cancel;
 			$cb ? $cb-> (@_) : @_;
 		}
 	)
@@ -860,7 +859,6 @@ sub add_timer
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$CANCEL   = $cancel;
 			$cb ? $cb-> (@_) : @_;
 		}
 	)
@@ -887,7 +885,6 @@ sub add_tail
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$CANCEL   = $cancel;
 			$cb-> (@_);
 		} : undef,
 	);
@@ -928,7 +925,6 @@ sub condition
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
-			$CANCEL   = $cancel;
 			$cb-> (@_);
 		} : undef
 	);
@@ -961,7 +957,6 @@ sub _empty
 		@CONTEXT  = @ctx;
 		$METHOD   = $method;
 		$CALLBACK = $cb;
-		$CANCEL   = $cancel;
 		$cb-> ();
 	}) if $cb;
 }
