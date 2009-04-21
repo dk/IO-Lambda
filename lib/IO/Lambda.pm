@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.166 2009/04/21 08:02:15 dk Exp $
+# $Id: Lambda.pm,v 1.167 2009/04/21 09:34:56 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -364,6 +364,7 @@ sub io_handler
 		if $nn == @$in or $self != $rec->[WATCH_OBJ];
 
 	_d_in if $DEBUG_IO;
+	local $self-> {cancel} = $rec-> [WATCH_CANCEL];
 	@{$self->{last}} = $rec-> [WATCH_CALLBACK]-> (
 		$self, 
 		(($#$rec == WATCH_IO_FLAGS) ? $rec-> [WATCH_IO_FLAGS] : ()),
@@ -403,6 +404,7 @@ sub lambda_handler
 
 	_d_in if $DEBUG_LAMBDA;
 				
+	local $self-> {cancel} = $rec-> [WATCH_CANCEL];
 	@{$self->{last}} = 
 		$rec-> [WATCH_CALLBACK] ? 
 			$rec-> [WATCH_CALLBACK]-> (
@@ -741,20 +743,6 @@ sub catch(&$)
 	return $event;
 }
 
-sub finally(&$)
-{
-	my ( $cb, $event) = @_;
-	croak "callback cannot be empty" unless $cb;
-	my ( $a, $b) = @$event[WATCH_CALLBACK,WATCH_CANCEL];
-	$event-> [WATCH_CALLBACK] = sub {
-		$cb->($_[0], $a ? $a->($_[0]) : ());
-	};
-	$event-> [WATCH_CANCEL] = sub {
-		$cb->($_[0], $b ? $b->($_[0]) : ());
-	};
-	return $event;
-}
-
 sub _throw
 {
 	my $self = shift;
@@ -795,7 +783,7 @@ sub backtrace
 # common wrapper for declaration of handle-watching user conditions
 sub add_watch
 {
-	my ($self, $cb, $cancel, $method, $flags, $handle, $deadline, @ctx) = @_;
+	my ($self, $cb, $method, $flags, $handle, $deadline, @ctx) = @_;
 	my $who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_io(
 		$flags, $handle, $deadline,
@@ -806,7 +794,8 @@ sub add_watch
 			$METHOD   = $method;
 			$CALLBACK = $cb;
 			$cb ? $cb-> (@_) : @_;
-		}
+		}, 
+		($AGAIN ? delete($self-> {cancel}) : undef),
 	)
 }
 
@@ -849,7 +838,7 @@ sub writable(&)
 # common wrapper for declaration of time-watching user conditions
 sub add_timer
 {
-	my ($self, $cb, $cancel, $method, $deadline, @ctx) = @_;
+	my ($self, $cb, $method, $deadline, @ctx) = @_;
 	my $who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_timer(
 		$deadline,
@@ -860,7 +849,8 @@ sub add_timer
 			$METHOD   = $method;
 			$CALLBACK = $cb;
 			$cb ? $cb-> (@_) : @_;
-		}
+		},
+		($AGAIN ? delete($self-> {cancel}) : undef),
 	)
 }
 
@@ -875,18 +865,19 @@ sub timeout(&)
 # common wrapper for declaration of single lambda-watching user conditions
 sub add_tail
 {
-	my ($self, $cb, $cancel, $method, $lambda, @ctx) = @_;
+	my ($self, $cb, $method, $lambda, @ctx) = @_;
 	my $who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_lambda(
 		$lambda,
-		$cb ? sub {
+		($cb ? sub {
 			local *__ANON__ = "$who\:\:callback" if $DEBUG_CALLER;
 			$THIS     = shift;
 			@CONTEXT  = @ctx;
 			$METHOD   = $method;
 			$CALLBACK = $cb;
 			$cb-> (@_);
-		} : undef,
+		} : undef),
+		($AGAIN ? delete($self-> {cancel}) : undef),
 	);
 }
 
@@ -904,7 +895,7 @@ sub add_constant
 # handle default condition logic given a lambda
 sub condition
 {
-	my ( $self, $cb, $cancel, $method, $name) = @_;
+	my ( $self, $cb, $method, $name) = @_;
 
 	return $THIS-> override_handler($name, $method, $cb)
 		if defined($name) and $THIS-> {override}->{$name};
@@ -950,7 +941,7 @@ sub tail(&)
 # dummy sub for empty calls for tails() family
 sub _empty
 {
-	my ($name, $method, $cb, $cancel) = @_;
+	my ($name, $method, $cb) = @_;
 	my @ctx = context;
 	$THIS-> watch_lambda( IO::Lambda-> new, sub {
 		local *__ANON__ = "IO::Lambda::".$name."::callback";
@@ -2125,41 +2116,6 @@ event reference:
 
    my $event = tail { ... };
    catch   { ... }, $event;
-
-Warning: if event is restarted using C<again>, C<catch> callback will
-be lost! Since C<catch> was added at later stage, I don't know how to
-solve this problem yet. Currently I could only propose a lame workaround:
-
-   catch { ... }
-   tail {
-       catch { ... } again;
-   }
-
-=item finally $coderef, $event
-
-Registers $coderef on $event, that is called when $event is finished,
-no matter whether normally or was aborted:
-
-   my $resource = acquire;
-   context lambda { .. $resource .. };
-   finally {
-      $resource-> free;
-   } catch {
-      print "cannot";
-   } tail {
-      print "can";
-   }
-
-C<finally> must be invoked after both C<catch> and the condition watched, but
-in the syntax above that means that C<finally> should lexically come first. If
-undesirable, use explicit event reference:
-
-   my $event = tail { ... };
-   catch   { ... }, $event;
-   finally { ... }, $event;
-
-Warning: C<finally> doesn't survibve restartable calls as well as C<catch>
-See L<catch> for the explanation and a workaround.
 
 =back
 

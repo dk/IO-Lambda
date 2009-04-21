@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 21_exceptions.t,v 1.3 2009/02/14 09:45:48 dk Exp $
+# $Id: 21_exceptions.t,v 1.4 2009/04/21 09:34:56 dk Exp $
 
 alarm(10);
 
@@ -8,7 +8,7 @@ use warnings;
 use Test::More;
 use IO::Lambda qw(:lambda);
 
-plan tests => 25;
+plan tests => 22;
 
 # just throw
 sub throw
@@ -47,26 +47,14 @@ sub caught
 	}
 }
 
-# bypass expection but do something
+# bypass expection but alter the result
 sub fin
 {
 	my $listen = shift;
 	lambda {
 		context $listen;
-		finally { shift; 'finally', @_ }
-		tail    { @_ }
-	}
-}
-
-# catch exception and do not propagate
-sub finc
-{
-	my $listen = shift;
-	lambda {
-		context $listen;
-		finally { shift; shift() . 'finally', @_ }
-		catch   { shift; 'caught+', @_ }
-		tail    { shift; 'passed+', @_ }
+		catch    { this-> throw('finally') }
+		tail     { 'finally' }
 	}
 }
 
@@ -75,16 +63,12 @@ ok( throw-> wait eq 'throw', 'throw');
 ok( bypass(lambda{})-> wait eq 'pass', 'pass');
 ok( bypass(throw)-> wait eq 'throw', 'bypass/1');
 ok( fin(throw)-> wait eq 'finally', 'finally');
-ok( finc(throw)-> wait eq 'caught+finally', 'catch+finally');
 ok( forks(throw)-> wait eq 'throw', 'bypass/*');
 ok( caught(throw)-> wait eq 'caught', 'catch');
 ok( caught(fin(throw))-> wait eq 'caught', 'finally bypasses ok');
-ok( caught(finc(throw))-> wait eq 'passed', 'catch+finally catches ok');
 ok( fin(caught(throw))-> wait eq 'finally', 'finally/catch');
-ok( finc(caught(throw))-> wait eq 'passed+finally', 'catch+finally/catch');
 ok( caught(bypass(throw))-> wait eq 'caught', 'catch/bypass');
 ok( fin(caught(bypass(throw)))-> wait eq 'finally', 'finally/catch/bypass');
-ok( finc(caught(bypass(throw)))-> wait eq 'passed+finally', 'catch+finally/catch/bypass');
 ok( caught(caught(throw))-> wait eq 'passed', 'catch/catch');
 
 # SIGTHROW
@@ -138,3 +122,20 @@ $x = bypass($x);
 $s = forks(bypass($x), bypass($x))-> wait;
 ok((2 == @$s and 4 == @{$s->[0]} and 4 == @{$s->[1]}), 'stack 2/4/4');
 
+# check that catch() is restartable
+my $ret = 0;
+$x = lambda {
+    context lambda {
+	context 0.01;
+	catch   { $ret |= 1 }
+	timeout { $ret |= 2; again };
+    };
+    catch { $ret |= 4 }
+    tail  { $ret |= 8 };
+};
+
+$x-> start;
+lambda { context 0.1; &timeout }-> wait;
+undef $x;
+IO::Lambda::clear;
+ok( $ret == 7, 'catch is restartable');
