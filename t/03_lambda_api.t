@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.15 2009/01/29 16:29:15 dk Exp $
+# $Id: 03_lambda_api.t,v 1.16 2009/06/02 11:36:01 dk Exp $
 
 use strict;
 use warnings;
@@ -89,6 +89,7 @@ ok( '13' eq this-> wait, 'any_tail');
 
 SKIP: {
 	skip "select(file) doesn't work on win32", 3 if $^O =~ /win32/i;
+	skip "select(file) doesn't work with AnyEvent", 3 if $IO::Lambda::LOOP =~ /AnyEvent/;
 	skip "cannot open $0:$!", 3 unless open FH, '<', $0;
 
 this lambda {

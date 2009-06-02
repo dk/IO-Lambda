@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 02_object_api.t,v 1.10 2009/01/29 16:29:15 dk Exp $
+# $Id: 02_object_api.t,v 1.11 2009/06/02 11:36:01 dk Exp $
 
 use strict;
 use warnings;
@@ -74,6 +74,7 @@ ok(( 1 == @x and $x[0] eq 'c'), 'catch');
 # file
 SKIP: {
 	skip "select(file) doesn't work on win32", 3 if $^O =~ /win32/i;
+	skip "select(file) doesn't work with AnyEvent", 3 if $IO::Lambda::LOOP =~ /AnyEvent/;
 	skip "cannot open $0:$!", 3 unless open FH, '<', $0;
 
 	$m-> reset;

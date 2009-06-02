@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.22 2009/01/08 15:23:26 dk Exp $
+# $Id: Thread.pm,v 1.23 2009/06/02 11:36:01 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -260,6 +260,9 @@ Errors like this
 are triggered when child threads weren't properly joined. Make sure
 your lambdas are finished properly. Use C<env IO_LAMBDA_DEBUG=thread>
 to find out the details.
+
+Also, AnyEvent doesn't work with threads, so this module most probably won't
+work too when AnyEvent is selected for IO::Lambda::Loop.
 
 =head1 SEE ALSO
 

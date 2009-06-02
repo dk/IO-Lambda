@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 15_thread.t,v 1.12 2009/01/21 12:59:38 dk Exp $
+# $Id: 15_thread.t,v 1.13 2009/06/02 11:36:01 dk Exp $
 
 use strict;
 use warnings;
@@ -12,6 +12,7 @@ use IO::Lambda qw(:lambda);
 use IO::Lambda::Thread qw(threaded);
 
 plan skip_all => $IO::Lambda::Thread::DISABLED if $IO::Lambda::Thread::DISABLED;
+plan skip_all => "Threads don't work with AnyEvent" if IO::Lambda::Loop-> new =~ /AnyEvent/;
 
 plan tests    => 6;
 
