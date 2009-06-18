@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.167 2009/04/21 09:34:56 dk Exp $
+# $Id: Lambda.pm,v 1.168 2009/06/18 09:18:55 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -2125,8 +2125,8 @@ The whole point of this module is to help building protocols or arbitrary
 complexity in a clear, consequent programming style. Consider how perl's
 low-level C<sysread> and C<syswrite> relate to its higher-level C<readline>,
 where the latter not only does the buffering, but also recognizes C<$/> as
-input record separator.  The section above described lower-level lambda I/
-condition, that are only useful for C<sysread> and C<syswrite>; this section
+input record separator.  The section above described lower-level lambda I/O
+conditions, that are only useful for C<sysread> and C<syswrite>. This section
 tells about higher-level lambdas that relate to these low-level ones, as the
 aforementioned C<readline> relates to C<sysread>.
 
@@ -2167,7 +2167,7 @@ request:
 
 C<getline> reads from C<$handle> to C<$buf>, and wakes up when a new line
 is there. However, what if we need, for example, HTTPS instead of HTTP, where
-reading from socket may involve some writing, and of course some waiting?
+reading from a socket may involve some writing, and of course some waiting?
 Then the first default parameter to getline has to be replaced. By default, 
 
    context getline, $handle, \$buf;
