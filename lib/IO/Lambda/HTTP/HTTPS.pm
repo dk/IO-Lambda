@@ -1,4 +1,4 @@
-# $Id: HTTPS.pm,v 1.12 2008/12/17 10:51:38 dk Exp $
+# $Id: HTTPS.pm,v 1.13 2009/07/02 11:32:15 dk Exp $
 package IO::Lambda::HTTP::HTTPS;
 
 use strict;
@@ -9,9 +9,11 @@ use IO::Lambda qw(:lambda :stream);
 
 our $DEBUG = $IO::Lambda::DEBUG{https};
 
+# check for SSL error condition, wait for read or write if necessary
+# return ioresult
 sub https_wrapper
 {
-	my $sock = shift;
+	my ($sock, $deadline) = @_;
 	tail {
 		my ( $bytes, $error) = @_;
 		warn 
@@ -19,18 +21,26 @@ sub https_wrapper
 			(defined($bytes) ? "$bytes bytes" : "error $error"),
 			"\n" if $DEBUG;
 		return $bytes if defined $bytes;
-		return $error if $error eq 'timeout';
-	
-		my $v = '';
-		vec( $v, fileno($sock), 1) = 1;
+		return undef, $error if $error eq 'timeout';
+
 		if ( $SSL_ERROR == SSL_WANT_READ) {
 			warn "SSL_WANT_READ on fh(", fileno($sock), ")\n" if $DEBUG;
-			select( $v, undef, undef, 0);
-			return again;
+			my @ctx = context;
+			context $sock, $deadline;
+			readable { 
+				return 'timeout' unless shift;
+				context @ctx;
+				https_wrapper($sock, $deadline)
+			}
 		} elsif ( $SSL_ERROR == SSL_WANT_WRITE) {
 			warn "SSL_WANT_WRITE on fh(", fileno($sock), ")\n" if $DEBUG;
-			select( undef, $v, undef, 0);
-			return again;
+			my @ctx = context;
+			context $sock, $deadline;
+			writable { 
+				return 'timeout' unless shift;
+				context @ctx;
+				https_wrapper($sock, $deadline)
+			}
 		} else {
 			warn 
 				"SSL retry on fh(", fileno($sock), ") = ",
@@ -41,6 +51,18 @@ sub https_wrapper
 	}
 }
 
+sub https_connect
+{
+	my ($sock, $deadline) = @_;
+	IO::Socket::SSL-> start_SSL( $sock, SSL_startHandshake => 0 );
+
+	lambda {
+		# emulate sysreader/syswriter to be able to 
+		# reuse https_wrapper
+		context lambda { $sock-> connect_SSL ? 1 : (undef, 'ssl') };
+		https_wrapper( $sock, $deadline );
+	}
+}
 
 sub https_writer
 {
@@ -49,27 +71,18 @@ sub https_writer
 
 	lambda {
 		my ( $sock, $req, $length, $offset, $deadline) = @_;
-
-		# upgrade the socket
-		unless ( $cached) {
-			warn "negotiating SSL on fileno(", fileno($sock), ")\n" if $DEBUG;
-			IO::Socket::SSL-> start_SSL( $sock, SSL_startHandshake => 0 );
-			# XXX Warning, this'll block because IO::Socket::SSL doesn't 
-			# work with non-blocking connects. And I don't really want to 
-			# rewrite the SSL handshake myself.
-			$sock-> blocking(1);
-			my $r = $sock-> connect_SSL;
-			$sock-> blocking(0);
-
-			return undef, "SSL connect error: " . ( defined($SSL_ERROR) ? $SSL_ERROR : $!)
-				unless $r;
-			$cached = 1;
-			warn "SSL enabled on fileno(", fileno($sock), ")\n" if $DEBUG;
+		if ( $cached ) {
+			context $writer, $sock, $req, $length, $offset, $deadline;
+			return https_wrapper($sock, $deadline);
 		}
+		context https_connect($sock, $deadline);
+	tail {
+		my ( $bytes, $error) = @_;
+		return @_ if defined $error;
 
 		context $writer, $sock, $req, $length, $offset, $deadline;
-		https_wrapper($sock);
-	}
+		https_wrapper($sock, $deadline);
+	}}
 }
 
 sub https_reader
@@ -78,7 +91,7 @@ sub https_reader
 	lambda {
 		my ( $sock, $buf, $length, $deadline) = @_;
 		context $reader, $sock, $buf, $length, $deadline;
-		https_wrapper($sock);
+		https_wrapper($sock, $deadline);
 	}
 }
 
