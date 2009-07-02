@@ -149,3 +149,7 @@
 	make catch() survive restartable calls; remove finally() as
         it gets too complex if it needs to be restartable
 	minor SNMP fixes
+
+1.11  - 2 Jul 2009
+	rewrite HTTPS stack to be fully non-blocking
+	adapt tests for AnyEvent
