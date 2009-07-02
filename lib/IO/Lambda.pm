@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.168 2009/06/18 09:18:55 dk Exp $
+# $Id: Lambda.pm,v 1.169 2009/07/02 11:30:15 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -921,23 +921,6 @@ sub condition
 	);
 }
 
-# tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
-sub tail(&)
-{
-	return $THIS-> override_handler('tail', \&tail, shift)
-		if $THIS-> {override}->{tail};
-	
-	my ( $lambda, @param) = context;
-	$lambda-> reset
-		if $lambda-> is_stopped and $lambda-> autorestart;
-	if ( @param) {
-		$lambda-> call( @param);
-	} else {
-		$lambda-> call unless $lambda-> is_active;
-	}
-	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
-}
-
 # dummy sub for empty calls for tails() family
 sub _empty
 {
@@ -951,6 +934,26 @@ sub _empty
 		$cb-> ();
 	}) if $cb;
 }
+
+# tail( $lambda, @param) -- initialize $lambda with @param, and wait for it
+sub tail(&)
+{
+	return $THIS-> override_handler('tail', \&tail, shift)
+		if $THIS-> {override}->{tail};
+	
+	my ( $lambda, @param) = context;
+	return _empty(tail => \&tail, shift) unless $lambda;
+
+	$lambda-> reset
+		if $lambda-> is_stopped and $lambda-> autorestart;
+	if ( @param) {
+		$lambda-> call( @param);
+	} else {
+		$lambda-> call unless $lambda-> is_active;
+	}
+	$THIS-> add_tail( _subname(tail => shift), \&tail, $lambda, $lambda, @param);
+}
+
 
 # tails(@lambdas) -- wait for all lambdas to finish
 sub tails(&)
