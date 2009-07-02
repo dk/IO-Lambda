@@ -1,9 +1,9 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.16 2009/06/02 11:36:01 dk Exp $
+# $Id: 03_lambda_api.t,v 1.17 2009/07/02 11:30:31 dk Exp $
 
 use strict;
 use warnings;
-use Test::More tests => 16;
+use Test::More tests => 17;
 use IO::Lambda qw(:lambda);
 
 alarm(10);
@@ -126,3 +126,9 @@ this lambda {
 this-> start;
 this-> terminate('C');
 ok('B' eq this-> wait, 'catch');
+
+this lambda {
+	context undef;
+	tail { return 5 };
+};
+ok( 5 == this-> wait, 'no tail');
