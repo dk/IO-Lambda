@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.47 2009/06/18 08:08:52 dk Exp $
+# $Id: HTTP.pm,v 1.48 2009/07/30 18:16:06 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -90,8 +90,13 @@ sub handle_redirect
 			$was_failed_auth = 0;
 			return 'too many redirects' 
 				if ++$was_redirected > $self-> {max_redirect};
-			
-			$req-> uri( $response-> header('Location'));
+
+			my $uri = URI-> new($response-> header('Location'));
+			$uri-> scheme( $req-> uri-> scheme)
+				unless defined $uri-> scheme;
+			$uri-> host( $req-> uri-> host)
+				unless defined $uri-> host;
+			$req-> uri($uri);
 			$req-> headers-> header( Host => $req-> uri-> host);
 
 			warn "redirect to " . $req-> uri . "\n" if $DEBUG;
@@ -453,18 +458,19 @@ sub http_read_chunked
 		my $size = hex $line;
 		warn "reading chunk $size bytes\n" if $DEBUG;
 		return 1 unless $size;
+		$size += 2; # CRLF
 		
 		# save this lambda frame
 		@frame = restartable;
 
 	# read the chunk itself
-	context $self-> http_read( $size);
+	context $self-> http_read( $offset + $size);
 	state chunk => tail {
 		unless ( shift ) {
 			undef @frame; # break circular reference
 			return undef, shift;
 		}
-		$offset += $size + 2; # 2 for CRLF
+		$offset += $size;
 		pos( $self-> {buf} ) = $offset;
 		warn "chunk $size bytes ok\n" if $DEBUG;
 		context @ctx;

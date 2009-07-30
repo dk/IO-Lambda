@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.170 2009/07/02 11:34:12 dk Exp $
+# $Id: Lambda.pm,v 1.171 2009/07/30 18:16:06 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -1230,7 +1230,8 @@ sub readbuf
 		return $match if $match;
 	
 		my ($maxbytes, $bufsize);
-		$maxbytes = $cond if defined($cond) and not ref($cond) and $cond > 0;
+		$maxbytes = $cond - length($$buf)
+			if defined($cond) and not ref($cond) and $cond > length($$buf);
 		$bufsize = defined($maxbytes) ? $maxbytes : 65536;
 		
 		my $savepos = pos($$buf); # useful when $cond is a regexp
@@ -2245,7 +2246,7 @@ The condition C<$cond> is a "smart match" of sorts, and can be one of:
 
 =item integer
 
-The lambda will succeed when exactly C<$cond> bytes are read from C<$fh>.
+The lambda will succeed when C<$buf> is exactly C<$cond> bytes long.
 
 =item regexp
 
