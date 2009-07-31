@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.48 2009/07/30 18:16:06 dk Exp $
+# $Id: HTTP.pm,v 1.49 2009/07/31 11:53:34 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -366,6 +366,7 @@ sub handle_request_in_buffer
 {
 	my ( $self, $req) = @_;
 
+	my $method = $req-> method;
 	lambda {
 		# send request
 		$req = $req-> as_string("\x0d\x0a");
@@ -408,6 +409,8 @@ sub handle_request_in_buffer
 		# Connection: close
 		my $c = lc( $headers-> header('Connection') || '');
 		$self-> {close_connection} = $c =~ /^close\s*$/i;
+
+		return 1 if $method eq 'HEAD';
 
 		return $self-> http_read_body( length $line, $headers);
 	}}}}}
