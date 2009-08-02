@@ -1,4 +1,4 @@
-# $Id: DNS.pm,v 1.9 2009/01/08 15:23:26 dk Exp $
+# $Id: DNS.pm,v 1.10 2009/08/02 21:24:40 dk Exp $
 package IO::Lambda::DNS;
 use vars qw($DEBUG $TIMEOUT $RETRIES @ISA);
 @ISA = qw(Exporter);
@@ -139,10 +139,10 @@ below), or an error string.
 
 In the simple case, accepts C<$HOSTNAME> string, and returns also a string, either
 an IP address or an error. To distinguish between these use C< /^\d/ > regexp,
-because it is guaranteed that no error message will begin with digit, and no IP
-address will begin with anything other than digit.
+because it is guaranteed that no error message will begin with a digit, and no IP
+address will begin with anything other than a digit.
 
-   dns (%OPTIONS, ($PACKET | $HOSTNAME, $TYPE)) :: () -> ($RESPONSE|$ERROR)
+   new (%OPTIONS, ($PACKET | $HOSTNAME, $TYPE)) :: () -> ($RESPONSE|$ERROR)
 
 In the complex case, accepts either C<Net::DNS::Packet> object, or C<$HOSTNAME>
 and C<$TYPE> strings, where the latter can be one of C<A>, C<MX>, etc DNS query
