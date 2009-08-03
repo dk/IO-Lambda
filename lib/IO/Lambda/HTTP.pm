@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.49 2009/07/31 11:53:34 dk Exp $
+# $Id: HTTP.pm,v 1.50 2009/08/03 07:25:36 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -61,6 +61,14 @@ sub new
 	return $self-> handle_redirect( $req);
 }
 
+# HTTP::Response features methods base() and request() that we need to set as well
+sub finalize_response
+{
+	my ( $self, $req, $response) = @_;
+	$response-> request($req);
+	return $response;
+}
+
 # reissue the request, if necessary, because of 30X or 401 errors
 sub handle_redirect
 {
@@ -117,9 +125,9 @@ sub handle_redirect
 
 				# start from beginning, from handle_connection;
 				this-> start; 
-			} : $response;
+			} : $self-> finalize_response($req, $response);
 		} else {
-			return $response;
+			return $self-> finalize_response($req, $response);
 		}
 	}};
 }
