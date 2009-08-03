@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.172 2009/08/03 07:27:13 dk Exp $
+# $Id: Lambda.pm,v 1.173 2009/08/03 15:58:16 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -435,10 +435,12 @@ sub cancel_event
 	$LOOP-> remove_event($rec) if $LOOP;
 	@{$self-> {in}} = grep { $_ != $rec } @{$self-> {in}};
 
-	my $arr = $EVENTS{$rec->[WATCH_LAMBDA]};
-	if ( $arr) {
-		@$arr = grep { $_ != $rec } @$arr;
-		delete $EVENTS{$rec->[WATCH_LAMBDA]} unless @$arr;
+	if ($rec->[WATCH_LAMBDA] and ref($rec->[WATCH_LAMBDA])) {
+		my $arr = $EVENTS{$rec->[WATCH_LAMBDA]};
+		if ( $arr) {
+			@$arr = grep { $_ != $rec } @$arr;
+			delete $EVENTS{$rec->[WATCH_LAMBDA]} unless @$arr;
+		}
 	}
 	@$rec = ();
 
