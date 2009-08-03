@@ -153,3 +153,6 @@
 1.11  - 2 Jul 2009
 	rewrite HTTPS stack to be fully non-blocking
 	adapt tests for AnyEvent
+
+1.12  - 3 Aug 2009
+	bugfixes in http stack
