@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.6 2009/02/17 08:36:16 dk Exp $
+# $Id: Mutex.pm,v 1.7 2009/08/05 14:11:44 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -131,7 +131,7 @@ that in turn will finish as soon as the caller can acquire the mutex.
     my $error = $waiter-> wait;
     die "error:$error" if $error;
     
-    # create and start a lambda that sleep 2 seconds and then releases the mutex
+    # create and start a lambda that sleeps 2 seconds and then releases the mutex
     my $sleeper = lambda {
         context 2;
         timeout { $mutex-> release }
@@ -139,7 +139,7 @@ that in turn will finish as soon as the caller can acquire the mutex.
     $sleeper-> start;
     
     # Create a new lambda that shall only wait for 0.5 seconds.
-    # It will surely fail.
+    # It will surely fail, since $sleeper is well, still sleeping
     lambda {
         context $mutex-> waiter(0.5);
         tail {
@@ -150,7 +150,8 @@ that in turn will finish as soon as the caller can acquire the mutex.
     }-> wait;
 
     # Again, wait for the same mutex but using different syntax.
-    # This time should be ok.
+    # This time should be ok - $sleeper will sleep for 1.5 seconds and
+    # then the mutex will be available.
     lambda {
         context $mutex, 3;
 	mutex {
