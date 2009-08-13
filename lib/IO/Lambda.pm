@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.173 2009/08/03 15:58:16 dk Exp $
+# $Id: Lambda.pm,v 1.174 2009/08/13 09:54:25 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -2343,6 +2343,10 @@ where C<$lambda> accepts three parameters, can be rewritten as
    $m = curry { $lambda, $a, $b };
    context $m, $c;
    tail { ... }
+
+Another example, tie C<readbuf> with a filehandle and buffer:
+
+   my $readbuf = curry { readbuf, $fh, \(my $buf = '') };
 
 =item seq() :: @a -> @b
 
