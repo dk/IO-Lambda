@@ -15,7 +15,7 @@ can be described like in the following scheme:
 
 
 	writable {
-		print $fh or die;
+		print $fh "GET /\r\n\r\n" or die;
 		readable {
 			sysread $fh or die;
 			read_again;
