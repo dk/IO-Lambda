@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.9 2008/12/17 10:37:37 dk Exp $
+# $Id: Fork.pm,v 1.10 2009/08/13 07:49:20 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -205,7 +205,7 @@ processes. That can be done either synchronously:
 
 or asynchronously, using C<waitpid> wrappers from C<IO::Lambda::Socket>:
 
-    use IO::Lambda::Socket qw(pid new_pid);
+    use IO::Lambda::Signal qw(pid new_pid);
     ...
     lambda { context $pid; &pid() }-> wait;
     # or
