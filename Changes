@@ -156,3 +156,6 @@
 
 1.12  - 3 Aug 2009
 	bugfixes in http stack
+
+1.13  - 18 Sep 2009
+	bugfixes in SNMP
