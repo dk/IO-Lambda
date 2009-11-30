@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 07_dns.t,v 1.4 2009/08/13 09:53:22 dk Exp $
+# $Id: 07_dns.t,v 1.5 2009/11/30 14:56:36 dk Exp $
 
 use strict;
 use warnings;
@@ -13,8 +13,8 @@ plan skip_all => "online tests disabled" unless -e 't/online.enabled';
 
 # test if net::dns is functional at all
 eval {
-	my $obj  = Net::DNS::Resolver-> new( 'www.google.com' );
-	my $sock = $obj-> bgsend();
+	my $obj  = Net::DNS::Resolver-> new();
+	my $sock = $obj-> bgsend('www.google.com');
 	my $time = time + 5;
 	while ( not $obj-> bgisready( $sock )) { die if time > $time };
 	my $packet = $obj-> bgread( $sock);
