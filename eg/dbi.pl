@@ -1,4 +1,4 @@
-#$Id: dbi.pl,v 1.11 2008/11/12 11:47:02 dk Exp $
+#$Id: dbi.pl,v 1.12 2009/11/30 14:28:19 dk Exp $
 use strict;
 use warnings;
 
@@ -73,8 +73,7 @@ if ( $mode eq 'thread') {
 	die $IO::Lambda::Thread::DISABLED if $IO::Lambda::Thread::DISABLED;
 
 	my ($thread, $socket) = new_thread( sub {
-		my $socket = shift;
-		IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
+		IO::Lambda::Message::DBI-> new( shift )-> run;
 	}, 1);
 	
 	my $dbi = IO::Lambda::DBI-> new( $socket, $socket, %dbopt);
@@ -85,8 +84,7 @@ if ( $mode eq 'thread') {
 
 } elsif ( $mode eq 'fork') {
 	my ( $pid, $socket) = new_process {
-		my $socket = shift;
-		IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
+		IO::Lambda::Message::DBI-> new( shift )-> run;
 	};
 	
 	my $dbi = IO::Lambda::DBI-> new( $socket, $socket, %dbopt);
@@ -117,7 +115,7 @@ if ( $mode eq 'thread') {
 		my $c = IO::Handle-> new;
 		die $! unless accept( $c, $s);
 		eval {
-			my $loop = IO::Lambda::Message::DBI-> new( $c, $c);
+			my $loop = IO::Lambda::Message::DBI-> new($c);
 			$loop-> run;
 			close($c);
 		};

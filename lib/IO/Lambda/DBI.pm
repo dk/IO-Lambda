@@ -1,4 +1,4 @@
-# $Id: DBI.pm,v 1.19 2009/01/27 17:55:45 dk Exp $
+# $Id: DBI.pm,v 1.20 2009/11/30 14:28:19 dk Exp $
 package IO::Lambda::DBI::Storable;
 
 use Storable qw(freeze thaw);
@@ -292,11 +292,10 @@ lambdas, that shall be subsequently called and awaited for completion.
 
     # use threads as a transport
     my ($thread, $socket) = new_thread( sub {
-        my $socket = shift;
-        IO::Lambda::Message::DBI-> new( $socket, $socket )-> run;
+        IO::Lambda::Message::DBI-> new( shift )-> run;
     }, 1);
 	
-    my $dbi = IO::Lambda::DBI-> new($socket, $socket);
+    my $dbi = IO::Lambda::DBI-> new($socket);
 
     # execute a query
     print lambda {
@@ -365,13 +364,13 @@ wait until remote methods are executed.
 These two methods allow grouping of DBI calls. C<begin_group()>
 affects a C<IO::Lambda::DBI> object so that all calls to remoted
 methods are not stored in the queue (and, consequently, not executed
-one at a time). but are accumulated instead. C<end_group()> ends
+one at a time), but are accumulated instead. C<end_group()> ends
 such buffering, sends the message incapsulating all stored calls,
 and returns a lambda that executes when all stored calls are finished
 and replied to. The lambda returns results to all accumulated calls.
 
 Note: each stored call registers whether it is called in array or scalar
-context. The results are returned accordingly in a list. so the caller
+context. The results are returned accordingly in a list, so the caller
 is responsible for parsing the results if some or all calls were made
 in the array context.
 

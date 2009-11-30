@@ -1,4 +1,4 @@
-# $Id: Message.pm,v 1.13 2009/01/08 15:23:26 dk Exp $
+# $Id: Message.pm,v 1.14 2009/11/30 14:28:19 dk Exp $
 
 use strict;
 use warnings;
@@ -25,7 +25,7 @@ sub new
 	$opt{async}  ||= 0;
 
 	croak "Invalid read handle" unless $r;
-	croak "Invalid write handle" unless $w;
+	$w = $r unless $w;
 
 	my $self = bless {
 		%opt,
@@ -281,6 +281,7 @@ sub _d { "simple_msg($_[0])" }
 sub new
 {
 	my ( $class, $r, $w) = @_;
+	$w = $r unless $w;
 	my $self = bless {
 		r => $r,
 		w => $w,
@@ -440,7 +441,8 @@ asynchronous messages to the queue, and wait for the response.
 =item new $class, $reader, $writer, %options
 
 Constructs a new object of C<IO::Lambda::Message> class, and attaches to
-C<$reader> and C<$writer> file handles ( which can be the same object ).
+C<$reader> and C<$writer> file handles ( which can be the same object, and in
+which case C<$writer> can be omitted, but only if C<%options> is empty too).
 Accepted options:
 
 =over
@@ -507,7 +509,7 @@ to the client. The methods have to be defined in a derived class.
 
 =over
 
-=item new $reader, $writer
+=item new $reader [$writer = $reader]
 
 Creates a new object that will communicate with clients using 
 given handles, in a blocking fashion.
