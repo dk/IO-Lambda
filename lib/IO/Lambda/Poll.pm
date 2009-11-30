@@ -1,4 +1,4 @@
-# $Id: Poll.pm,v 1.6 2008/12/17 11:04:46 dk Exp $
+# $Id: Poll.pm,v 1.7 2009/11/30 13:25:06 dk Exp $
 package IO::Lambda::Poll;
 use vars qw(
 	@ISA @EXPORT_OK %EXPORT_TAGS 
@@ -155,7 +155,8 @@ sub poll_cancel
 sub poll_handler
 {
 	my ( $expired, $cb, @opt) = @_;
-	return 1,1 if $cb->(@opt);
+	my @res = $cb->(@opt);
+	return 1,@res if $res[0];
 	return 1,0 if $expired;
 	return 0;
 }
@@ -208,14 +209,15 @@ provides a layer between them and the lambda framework.
 
 =over
 
-=item poller (polling_function :: (%opt -> boolean)) :: (%opt) -> boolean
+=item poller (polling_function :: (%opt -> @list))) :: (%opt) -> @list
 
-Accepts a code reference, that returns a boolean value, which indicates whether
-a single-shot polling succeeded or not. Returns a new lambda, that accepts C<'timeout'>,
-C<'deadline'>, and C<'frequency'> options ( see C<poll_event> below for the options
-description). The lambda returns 1 if polling succeeds within a given time
-span, or 0 otherwise.  The options passed to the lambda are also passed to the
-polling function.
+Accepts a code reference, that returns a list of results, where the first
+scalar is a boolean value that indicates whether a single-shot polling
+succeeded or not. Returns a new lambda, that accepts C<'timeout'>,
+C<'deadline'>, and C<'frequency'> options ( see C<poll_event> below for the
+options description).  The lambda returns C<@list> if polling
+succeeds within a given time span, or empty list otherwise.  The options passed to the
+lambda are also passed to the polling function. 
 
 =item poll_event $callback, $method, $poller, $deadline, $frequency, @param
 

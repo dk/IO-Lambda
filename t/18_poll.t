@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 18_poll.t,v 1.2 2009/01/08 15:23:27 dk Exp $
+# $Id: 18_poll.t,v 1.3 2009/11/30 13:25:06 dk Exp $
 use strict;
 use Test::More;
 use Fcntl qw(:flock);
@@ -8,7 +8,7 @@ use IO::Lambda::Poll qw(poller);
 
 alarm(10);
 
-plan tests => 6;
+plan tests => 7;
 
 my $ready = 0;
 sub sec { select(undef,undef,undef,0.1 * ( $_[0] || 1 )) }
@@ -53,4 +53,4 @@ this lambda {
 this-> wait;
 ok( $polled == 1, "poller not timed out");
 
-
+ok( '23' eq join('', poller { 2,3 }-> wait), "returns extra data");
