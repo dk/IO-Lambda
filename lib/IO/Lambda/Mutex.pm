@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.7 2009/08/05 14:11:44 dk Exp $
+# $Id: Mutex.pm,v 1.8 2009/12/01 23:01:52 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -61,7 +61,7 @@ sub waiter
 	# mutex is not free, wait for it
 	my $waiter = IO::Lambda-> new;
 	my $bind   = $waiter-> bind( sub {
-		my $w = shift;
+		my ($w,$rec) = (shift,shift);
 		# lambda was terminated, relinquish waiting and kill timeout
 		$self-> remove($w);
 		$w-> cancel_event($timeout) if defined $timeout;

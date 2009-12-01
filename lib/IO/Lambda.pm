@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.177 2009/12/01 11:25:02 dk Exp $
+# $Id: Lambda.pm,v 1.178 2009/12/01 23:01:52 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -27,7 +27,7 @@ $VERSION     = '1.13';
 	sysreader syswriter getline readbuf writebuf
 );
 @EXPORT_LAMBDA = qw(
-	this context lambda again state restartable catch finally
+	this context lambda again state restartable catch autocatch 
 	io readable writable rwx timeout tail tails tailo any_tail
 );
 @EXPORT_FUNC = qw(
@@ -462,9 +462,11 @@ sub cancel_all_events
 
 	return unless @{$self-> {in}};
 	
-	@{$self->{last}} = $_-> [WATCH_CANCEL]->($self, @{$self->{last}})
-		for grep { $_-> [WATCH_CANCEL] } 
-		reverse @{$self-> {in}};
+	for ( grep { $_-> [WATCH_CANCEL] } reverse @{$self-> {in}}) {
+		my $wc = $_-> [WATCH_CANCEL];
+		$_-> [WATCH_CANCEL] = undef;
+		@{$self->{last}} = $wc-> ($self, $_, @{$self->{last}})
+	}
 
 	$LOOP-> remove( $self) if $LOOP;
 	$_-> remove($self) for @LOOPS;
@@ -732,6 +734,8 @@ sub catch(&$)
 	$event->[WATCH_CANCEL] = $cb ? sub {
 		local *__ANON__ = "$who\:\:catch" if $DEBUG_CALLER;
 		$THIS     = shift;
+		local $THIS-> {cancelled_event} = shift;
+		local $THIS-> {cancelling} = 1;
 		@CONTEXT  = @ctx;
 		$METHOD   = undef;
 		$CALLBACK = undef;
@@ -740,10 +744,28 @@ sub catch(&$)
 
 	# if throw() happened before we even get here
 	$event->[WATCH_CALLBACK] = $event->[WATCH_CANCEL]
-		if $event->[WATCH_CALLBACK] == \&_throw;
+		if $event->[WATCH_CALLBACK] && $event->[WATCH_CALLBACK] == \&_throw;
 	
 	return $event;
 }
+
+sub call_again
+{
+	my $self = shift;
+	croak "called outside catch()" unless $self-> {cancelled_event};
+	my $cb = $self-> {cancelled_event}->[WATCH_CALLBACK];
+	$cb->($self, @_) if $cb;
+}
+
+sub autocatch($)
+{
+	catch {
+		this-> call_again;
+		this-> throw(@_);
+	} $_[0]
+}
+
+sub is_cancelling { $_[0]-> {cancelling} }
 
 sub _throw
 {
@@ -2103,26 +2125,6 @@ Example: convert existing C<getline> constructor into a condition:
    context $fh, $buf, $deadline;
    gl { ... }
 
-=item catch $coderef, $event
-
-Registers $coderef on $event, that is called when $event is aborted
-via either C<cancel_event>, C<cancel_all_event>, or C<terminate>:
-
-   my $resource = acquire;
-   context lambda { .. $resource .. };
-   catch {
-      $resource-> free;
-   } tail {
-      $resource-> free;
-   }
-
-C<catch> must be invoked after a condition, but in the syntax above that means
-that C<catch> should lexically come before it. If undesirable, use explicit
-event reference:
-
-   my $event = tail { ... };
-   catch   { ... }, $event;
-
 =back
 
 =head2 Stream IO
@@ -2517,6 +2519,9 @@ Can be also called as package method.
 
 Creates an event record that contains the lambda and C<@args>, and returns it.
 The lambda won't finish until this event is returned with C<resolve>.
+C<$cancel> is an optional callback that will be called when the event is
+cancelled; the callback is passed two parameters, the lambda and the cancelled
+event record.
 
 C<bind> can be called several times on a single lambda; each event requires
 individual C<resolve>.
@@ -2634,6 +2639,48 @@ etc. The following functions deal with backtrace information and
 exceptions, that propagate through thread of events.
 
 =over
+
+=item catch $coderef, $event
+
+Registers $coderef on $event, that is called when $event is aborted
+via either C<cancel_event>, C<cancel_all_event>, or C<terminate>:
+
+   my $resource = acquire;
+   context lambda { .. $resource .. };
+   catch {
+      $resource-> free;
+   } tail {
+      $resource-> free;
+   }
+
+C<catch> must be invoked after a condition, but in the syntax above that means
+that C<catch> should lexically come before it. If undesirable, use explicit
+event reference:
+
+   my $event = tail { ... };
+   catch   { ... }, $event;
+
+=item autocatch $event
+
+Prefixes a condition, so that it is called even if cancelled.
+However, immediately after the call the exception is rethrown.
+Can be used in the following fashion:
+
+    context lambda ...;
+    autocatch tail {
+        print "aborted\n" if this-> is_cancelling;
+        .. finalize ...
+    };
+
+=item is_cancelling
+
+Returns true if running withing a C<catch> block.
+
+=item call_again(@param)
+
+To be called only from within a C<catch> block. Calls the normal
+callback that would be called if the event wouldn't be cancelled.
+C<@param> is passed to teh callback.
 
 =item throw(@error)
 

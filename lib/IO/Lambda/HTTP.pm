@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.50 2009/08/03 07:25:36 dk Exp $
+# $Id: HTTP.pm,v 1.51 2009/12/01 23:01:52 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -314,7 +314,7 @@ sub handle_connection
 		$self-> {writer} = writebuf( $self-> {writer});
 
 		context $self-> handle_request( $req);
-	tail {
+	autocatch tail {
 		my $response = shift;
 		
 		# put back the connection, if possible
