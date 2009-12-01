@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 21_exceptions.t,v 1.4 2009/04/21 09:34:56 dk Exp $
+# $Id: 21_exceptions.t,v 1.5 2009/12/01 11:06:22 dk Exp $
 
 alarm(10);
 
@@ -79,6 +79,7 @@ ok( $sig, 'sigthrow on');
 
 $sig = 0;
 IO::Lambda-> sigthrow(undef);
+throw-> wait;
 ok( 0 == $sig, 'sigthrow off');
 
 IO::Lambda::sigthrow( sub { $sig++ });
@@ -87,6 +88,7 @@ ok( $sig, 'sigthrow on');
 
 $sig = 0;
 IO::Lambda::sigthrow(undef);
+throw-> wait;
 ok( 0 == $sig, 'sigthrow off');
 
 # stack

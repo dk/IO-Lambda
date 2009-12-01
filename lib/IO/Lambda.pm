@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.175 2009/09/18 09:38:47 dk Exp $
+# $Id: Lambda.pm,v 1.176 2009/12/01 11:06:22 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -764,7 +764,7 @@ sub throw
 
 sub sigthrow
 {
-	shift if not(ref $_[0]) or ref($_[0]) ne 'CODE';
+	shift if defined($_[0]) and (not(ref $_[0]) or ref($_[0]) ne 'CODE');
 	$SIGTHROW = $_[0] if @_;
 	return $SIGTHROW;
 }
