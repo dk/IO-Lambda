@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.19 2009/01/08 15:23:26 dk Exp $
+# $Id: Signal.pm,v 1.20 2009/12/01 19:44:44 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -344,6 +344,22 @@ L<IPC::Run> apparently manages to work on win32 B<and> be compatible with
 C<select>, by using modules from C<Win32::> namespace. I don't think that
 dragging C<IPC::Run> as a dependency is a good idea, but if you need that, send
 me a working example so I can at least include it here.
+
+For all practical reasons, a more-or-less working analog of C<new_process> on win32
+would be the following:
+
+    use IO::Lambda::Thread qw(:all);
+
+    sub new_process_win32
+    {
+        lambda {
+	    my @cmd = @_;
+	    context threaded { `@cmd`, $?, $^E };
+	    &tail();
+        }
+    }
+
+It is not implement in the module because of bug #70974 in perl.
 
 =head1 SEE ALSO
 
