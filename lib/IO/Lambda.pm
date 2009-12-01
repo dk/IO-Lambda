@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.176 2009/12/01 11:06:22 dk Exp $
+# $Id: Lambda.pm,v 1.177 2009/12/01 11:25:02 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -712,7 +712,7 @@ sub restartable { @_ ? ($METHOD, $CALLBACK) = @_ : ( $METHOD, $CALLBACK) }
 sub set_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = @_ }
 sub get_frame   { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) }
 sub swap_frame  { my @f = get_frame; set_frame(@_); @f }
-sub clear       { set_frame() }
+sub clear       { set_frame(); undef $AGAIN; }
 
 END { ( $THIS, $METHOD, $CALLBACK, @CONTEXT) = (); }
 
