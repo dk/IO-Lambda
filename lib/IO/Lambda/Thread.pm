@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.23 2009/06/02 11:36:01 dk Exp $
+# $Id: Thread.pm,v 1.24 2009/12/04 22:11:31 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -25,6 +25,7 @@ sub thread_init
 
 	$SIG{KILL} = sub { threads-> exit(0) };
 	$SIG{PIPE} = 'IGNORE';
+	eval "END { IO::Lambda::__end(); };";
 	warn "thread(", threads->tid, ") started\n" if $DEBUG;
 
 	my @ret;
@@ -232,6 +233,10 @@ with C<threaded>.
 
 =head1 BUGS
 
+=over
+
+=item Unbalanced string table refcount
+
 Threading in Perl is fragile, so errors like the following:
 
    Unbalanced string table refcount: (1) for "GEN1" during global
@@ -250,6 +255,8 @@ and
 
 inexplicably hush these errors.
 
+=item Perl exited with active threads
+
 Errors like this
 
   Perl exited with active threads:
@@ -261,8 +268,22 @@ are triggered when child threads weren't properly joined. Make sure
 your lambdas are finished properly. Use C<env IO_LAMBDA_DEBUG=thread>
 to find out the details.
 
-Also, AnyEvent doesn't work with threads, so this module most probably won't
+=item Scalars leaked: 1
+
+This is a known bug, f.ex. L<http://rt.perl.org/rt3//Public/Bug/Display.html?id=70974>
+suggests adding the C<@_ = ();> construct at random places as a workaround.
+
+=item panic: del_backref during global destruction
+
+This is a known bug, L<http://rt.perl.org/rt3/Ticket/Display.html?id=70748> .
+I observed in on win32 only. No workaround is known however.
+
+=item AnyEvent
+
+AnyEvent doesn't work with threads, so this module most probably won't
 work too when AnyEvent is selected for IO::Lambda::Loop.
+
+=back
 
 =head1 SEE ALSO
 

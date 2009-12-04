@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 14_spawn.t,v 1.1 2008/08/15 14:51:00 dk Exp $
+# $Id: 14_spawn.t,v 1.2 2009/12/04 22:11:31 dk Exp $
 
 use strict;
 use warnings;
@@ -7,8 +7,7 @@ use Test::More;
 use IO::Lambda qw(:lambda);
 use IO::Lambda::Signal qw(:all);
 
-plan skip_all => "Doesn't work on Win32" if $^O =~ /win32/i;
-plan tests    => 2;
+plan tests => 2;
 
 this lambda {
 	context "$^X -v";

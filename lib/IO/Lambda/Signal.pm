@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.20 2009/12/01 19:44:44 dk Exp $
+# $Id: Signal.pm,v 1.21 2009/12/04 22:11:31 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -224,10 +224,9 @@ sub new_pid
 	return $p;
 }
 
-sub new_process
-{ 
+sub new_process_posix
+{
 lambda {
-	my $cmd = @_;
 	my $h   = IO::Handle-> new;
 	my $pid = open( $h, '-|', @_);
 
@@ -253,6 +252,30 @@ tail {
 pid {
 	return ($buf, shift);
 }}}}
+
+sub new_process_win32
+{
+	lambda {
+		my @cmd = @_;
+		context IO::Lambda::Thread::threaded( sub {
+			my $k = `@cmd`;
+			return $? ? ( undef, $?, $! ) : ( $k, 0, undef );
+		});
+		&tail();
+	}
+}
+
+sub new_process;
+if ( $^O !~ /win32/i) {
+	*new_process = \&new_process_posix;
+} else {
+	require IO::Lambda::Thread;
+	unless ( $IO::Lambda::Thread::DISABLED) {
+		*new_process = \&new_process_win32;
+	} else {
+		*new_process = sub { lambda { undef, undef, $IO::Lambda::Thread::DISABLED } };
+	}
+}
 
 # condition
 sub signal (&) { new_signal (context)-> condition(shift, \&signal, 'signal') }
@@ -334,36 +357,16 @@ initialized with the process pid value.
 
 =back
 
-=head1 LIMITATIONS
+=head1 LIMITATION
 
-C<spawn> doesn't work on Win32, because pipes don't work with win32's select.
-They do (see L<Win32::Process>) work with win32-specific
-C<WaitforMultipleObjects>, which in turn IO::Lambda doesn't work with.
-
-L<IPC::Run> apparently manages to work on win32 B<and> be compatible with
-C<select>, by using modules from C<Win32::> namespace. I don't think that
-dragging C<IPC::Run> as a dependency is a good idea, but if you need that, send
-me a working example so I can at least include it here.
-
-For all practical reasons, a more-or-less working analog of C<new_process> on win32
-would be the following:
-
-    use IO::Lambda::Thread qw(:all);
-
-    sub new_process_win32
-    {
-        lambda {
-	    my @cmd = @_;
-	    context threaded { `@cmd`, $?, $^E };
-	    &tail();
-        }
-    }
-
-It is not implement in the module because of bug #70974 in perl.
+C<pid> and C<new_pid> don't work on win32 because win32 doesn't use
+SIGCHLD/waitpid.  Native implementation of C<spawn> and C<new_process> doesn't
+work for the same reason on win32 as well, therefore those were reimplemented
+using threads, and require a threaded perl.
 
 =head1 SEE ALSO
 
-L<IO::Lambda>, L<perlipc>, L<IPC::Open2>, L<IPC::Run>, L<Win32::Process>.
+L<IO::Lambda>, L<perlipc>, L<IPC::Open2>, L<IPC::Run>
 
 =head1 AUTHOR
 

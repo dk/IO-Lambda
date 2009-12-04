@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.179 2009/12/02 14:32:50 dk Exp $
+# $Id: Lambda.pm,v 1.180 2009/12/04 22:11:31 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -211,6 +211,7 @@ sub watch_timer
 sub watch_lambda
 {
 	my ( $self, $lambda, $callback, $cancel) = @_;
+	@_ = (); # perl bug http://rt.perl.org/rt3//Public/Bug/Display.html?id=70974
 
 	croak "can't register events on a stopped lambda" if $self-> {stopped};
 	croak "bad lambda" unless $lambda and $lambda->isa('IO::Lambda');
@@ -1386,7 +1387,9 @@ sub callout
 }
 
 sub add_loop     { push @LOOPS, shift }
-sub remove_loop  { @LOOPS = grep { $_ != $_[0] } @LOOPS }
+sub remove_loop  { @LOOPS = grep { defined and $_ != $_[0] } @LOOPS }
+
+sub __end        { clear(); undef %EVENTS; undef @LOOPS; } # for threads
 
 package IO::Lambda::Loop;
 use vars qw($DEFAULT);
