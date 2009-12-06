@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.21 2009/12/04 22:11:31 dk Exp $
+# $Id: Signal.pm,v 1.22 2009/12/06 16:08:16 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -274,6 +274,17 @@ if ( $^O !~ /win32/i) {
 		*new_process = \&new_process_win32;
 	} else {
 		*new_process = sub { lambda { undef, undef, $IO::Lambda::Thread::DISABLED } };
+	}
+}
+
+sub new_popen
+{
+	lambda {
+		my @cmd = @_;
+		context IO::Lambda::Thread::threaded( sub {
+			die shift;
+		});
+		&tail();
 	}
 }
 

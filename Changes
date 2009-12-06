@@ -162,3 +162,6 @@
 
 1.14  - 2 Dec 2009
 	extend catch/throw API
+
+1.15  - 6 Dec 2009
+	implement spawn() and new_process() using threads on win32
