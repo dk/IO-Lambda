@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 12_udp.t,v 1.2 2008/08/08 07:37:50 dk Exp $
+# $Id: 12_udp.t,v 1.3 2009/12/06 16:16:32 dk Exp $
 
 use strict;
 use warnings;
@@ -20,7 +20,7 @@ my $server = IO::Socket::INET-> new(
 	Blocking  => 0,
 	Proto     => 'udp',
 );
-ok( $server, "udp.connect($!)");
+ok( $server, "udp.connect($@)");
 
 my @results;
 my $serv = lambda {
