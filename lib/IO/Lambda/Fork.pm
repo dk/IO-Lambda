@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.10 2009/08/13 07:49:20 dk Exp $
+# $Id: Fork.pm,v 1.11 2009/12/19 17:55:24 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -167,7 +167,7 @@ L<IO::Lambda::Message> ).
 
     lambda {
         context 0.1, forked {
-	      select(undef,undef,undef,0.8);
+	      sleep(1);
 	      return "hello!";
 	};
         any_tail {
