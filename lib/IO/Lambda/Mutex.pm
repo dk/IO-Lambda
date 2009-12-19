@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.9 2009/12/19 17:42:41 dk Exp $
+# $Id: Mutex.pm,v 1.10 2009/12/19 17:47:41 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -188,8 +188,11 @@ is failed and false value is returned.
 
 =item release
 
-Releases the taken mutex. The next waiter lambda in the queue, if available,
-is made finished. If there are no waiters in the queue, the mutex is set free,
+Tries to releases the taken mutex. If there are lambdas waiting (see L<waiter>)
+in the queue, the first lambda will be terminated, and thus whoever waits for
+the lambda can be notified; it will be up to the code associated with the
+waiter lambda to call C<release> again. If there are no waiters in the queue,
+the mutex is set free.
 
 =item waiter($timeout = undef) :: () -> error
 
