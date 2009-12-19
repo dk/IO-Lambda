@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.8 2009/12/01 23:01:52 dk Exp $
+# $Id: Mutex.pm,v 1.9 2009/12/19 17:42:41 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -177,7 +177,7 @@ Opposite of L<is_taken>.
 
 =item is_taken
 
-Returns boolean flag whether the mutex is taken or not
+Returns boolean flag whether the mutex is taken or not.
 Opposite of L<is_free>.
 
 =item take
