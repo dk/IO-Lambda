@@ -1,4 +1,4 @@
-# $Id: Select.pm,v 1.17 2009/01/09 12:05:52 dk Exp $
+# $Id: Select.pm,v 1.18 2010/01/01 14:52:17 dk Exp $
 
 package IO::Lambda::Loop::Select;
 use strict;
@@ -262,8 +262,8 @@ Creates new instance of C<IO::Lambda::Loop::Select>.
 =item after $RECORD
 
 Stores the timeout record. The timeout record is an array, with the following
-layout: [ $OBJECT, $DEADLINE, $CALLBACK ]. Loop will invoke
-C<IO::Lambda::io_handler> on C<$OBJECT> after C<$DEADLINE> is expired.
+layout: [ $OBJECT, $DEADLINE, $CALLBACK ]. Loop invokes
+C<io_handler> method on C<$OBJECT> after C<$DEADLINE> is expired.
 
 =item empty
 
@@ -281,7 +281,7 @@ Removes a single event record.
 
 Stores the IO record. The IO record in an array, with the following 
 layout: [ $OBJECT, $DEADLINE, $CALLBACK, $HANDLE, $FLAGS ]. Loop
-invokes C<IO::Lambda::io_handler> on C<$OBJECT> either when C<$HANDLE>
+invokes C<io_handler> method on C<$OBJECT> either when C<$HANDLE>
 becomes readable/writable etc, depending on C<$FLAGS>, or after C<$DEADLINE>
 is expired. C<$DEADLINE> can be undef, meaning no timeout. C<$FLAGS> is 
 a combination of C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION> values.
@@ -289,7 +289,7 @@ a combination of C<IO_READ>, C<IO_WRITE>, and C<IO_EXCEPTION> values.
 =item yield
 
 Waits for at least one of the stored record to become active, dispatches
-events to C<IO::Lambda::io_handler> for the records that have, then removes
+events to C<io_handler> method for the records that are active, then removes
 these records. The invoker must resubmit new records in order continue receiving
 new events.
 
