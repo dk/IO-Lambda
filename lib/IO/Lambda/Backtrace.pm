@@ -1,5 +1,5 @@
 package IO::Lambda::Backtrace;
-# $Id: Backtrace.pm,v 1.2 2009/02/13 21:19:40 dk Exp $
+# $Id: Backtrace.pm,v 1.3 2010/01/01 14:49:02 dk Exp $
 use strict;
 use warnings;
 use IO::Lambda qw(:constants :dev);
@@ -103,12 +103,16 @@ additional perl stack trace is added.
 =head1 SYNOPSIS
 
   use IO::Lambda;
-  $IO::Lambda::DEBUG_CALLER++;
+  $IO::Lambda::DEBUG_CALLER = 1;
 
   lambda {
      ...
      warn this-> backtrace-> as_text;
   }
+
+or from command line
+
+   env IO_LAMBDA_DEBUG=caller=2 ./myscript
 
 =head1 API
 
