@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 09_signal.t,v 1.7 2008/12/12 07:40:53 dk Exp $
+# $Id: 09_signal.t,v 1.8 2010/01/17 22:52:22 dk Exp $
 
 use strict;
 use warnings;
@@ -25,7 +25,7 @@ ok( not(this-> wait), 'signal timed out');
 
 # alarm NOT expires
 SKIP: {
-	skip "SIGALRM doesn't break select() on win32", 1 if $^O =~ /win32/i;
+	skip "SIGALRM doesn't break select() on $^O", 1 if $^O =~ /win32|^gnu$/i;
 
 	# check for buggy alarm()
 	{
