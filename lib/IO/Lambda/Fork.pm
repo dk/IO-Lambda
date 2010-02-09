@@ -1,4 +1,4 @@
-# $Id: Fork.pm,v 1.11 2009/12/19 17:55:24 dk Exp $
+# $Id: Fork.pm,v 1.12 2010/02/09 08:40:41 dk Exp $
 
 package IO::Lambda::Fork;
 
@@ -165,6 +165,22 @@ L<IO::Lambda::Message> ).
     use IO::Lambda qw(:lambda);
     use IO::Lambda::Fork qw(forked);
 
+Blocking wait
+
+    lambda {
+        context forked {
+	    sleep(1);
+	    return "hello!";
+	};
+	tail {
+	    print shift, "\n"
+	}
+    }-> wait;
+
+    # hello!
+
+Non-blocking wait
+
     lambda {
         context 0.1, forked {
 	      sleep(1);
@@ -179,6 +195,14 @@ L<IO::Lambda::Message> ).
             }
         };
     }-> wait;
+
+    # not yet
+    # not yet
+    # not yet
+    # done: hello!
+
+(of course, since IO::Lambda is inherently non-blocking, the first example is of much more
+use, as many of such "blocking" lambdas can execute in parallel)
 
 =head1 API
 
