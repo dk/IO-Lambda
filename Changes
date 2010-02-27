@@ -165,3 +165,6 @@
 
 1.15  - 6 Dec 2009
 	implement spawn() and new_process() using threads on win32
+
+1.16  - 7 Feb 2010
+	bugfix in HTTP redirect code (Szymon Swierkosz)
