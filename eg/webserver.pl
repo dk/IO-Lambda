@@ -1,14 +1,14 @@
 #!/usr/bin/perl
-# $Id: webserver.pl,v 1.3 2008/12/17 12:58:55 dk Exp $
+# $Id: webserver.pl,v 1.4 2010/03/01 10:21:51 dk Exp $
 #
 =pod
 
 This example features a minimalistic web server, that can only maintain
-a counter in a http session. It uses presistent connections of HTTP/1.1,
-and keeps counter per connection. The session expires in $conn_timeout
+a counter in a http session. It uses persistent connections of HTTP/1.1,
+and keeps one counter per connection. The session expires in $conn_timeout
 automatically.
 
-Open two instances of a browser (not just two windows/tabs of the same, browsers are
+Open two browsers (not just two windows/tabs of the same, browsers are
 smart now and share connections) and see how each has its own counter.
 
 =cut

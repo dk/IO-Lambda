@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.182 2010/02/27 14:20:34 dk Exp $
+# $Id: Lambda.pm,v 1.183 2010/03/01 10:19:13 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -2677,13 +2677,13 @@ Can be used in the following fashion:
 
 =item is_cancelling
 
-Returns true if running withing a C<catch> block.
+Returns true if running within a C<catch> block.
 
 =item call_again(@param)
 
 To be called only from within a C<catch> block. Calls the normal
 callback that would be called if the event wouldn't be cancelled.
-C<@param> is passed to teh callback.
+C<@param> is passed to the callback.
 
 =item throw(@error)
 
