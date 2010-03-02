@@ -1,5 +1,5 @@
 #! /usr/bin/perl
-# $Id: 20_mutex.t,v 1.4 2010/03/02 23:18:40 dk Exp $
+# $Id: 20_mutex.t,v 1.5 2010/03/02 23:22:47 dk Exp $
 
 alarm(10);
 
@@ -66,13 +66,13 @@ $mutex-> remove($waiter);
 $waiter-> terminate;
 ok( $mutex-> is_free, 'deadlock prevention 2');
 
-$flag = 0;
+$flag = '';
 lambda {
 	context 
-		$mutex-> pipeline( lambda { $flag += 1 if $mutex-> is_taken } ),
-		$mutex-> pipeline( lambda { $flag += 2 if $mutex-> is_taken } ),
-		$mutex-> pipeline( lambda { $flag += 3 if $mutex-> is_taken } )
+		$mutex-> pipeline( lambda { $flag .= 1 if $mutex-> is_taken } ),
+		$mutex-> pipeline( lambda { $flag .= 2 if $mutex-> is_taken } ),
+		$mutex-> pipeline( lambda { $flag .= 3 if $mutex-> is_taken } )
 		;
 	&tails();
-}-> wait;
-ok( $flag == 6, 'pipeline');
+}-> wait(0);
+ok( $flag == 123, 'pipeline');

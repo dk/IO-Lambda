@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.11 2010/03/02 23:18:39 dk Exp $
+# $Id: Mutex.pm,v 1.12 2010/03/02 23:22:46 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -107,11 +107,13 @@ sub pipeline
 {
 	my ( $self, $lambda, $timeout) = @_;
 	lambda {
+		my @p = @_;
 		context $self-> waiter($timeout);
 	tail {
-		context $lambda;
+		context $lambda, @p;
 	autocatch tail {
-		$self-> release
+		$self-> release;
+		return @_;
 	}}}
 }
 
