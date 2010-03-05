@@ -54,19 +54,19 @@ sub next_timeout
 		$self-> {high} -= $delta;
 	}
 	$self-> {last} = $ts;
-	# warn "$ts: $self->{low}/$self->{high}\n";
+	warn "$ts: $self->{low}/$self->{high}\n" if $DEBUG;
 
 	if ( $self-> {low} < $self-> {high}) {
 		$self-> {low} += 1 / $self-> {rate};
-		# warn "case1\n";
+		warn "case1\n" if $DEBUG;
 		return 0;
 	} elsif ( $self-> {low} < $ts) {
 		$self-> {low}  = $ts + 1 / $self-> {rate};
 		$self-> {high} = $ts + ($self->{strict} ? 1 / $self-> {rate} : 1);
-		# warn "case2\n";
+		warn "case2\n" if $DEBUG;
 		return 0;
 	} else {
-		# warn "wait ", $self->{low}-$ts, "\n";
+		warn "wait ", $self->{low}-$ts, "\n" if $DEBUG;
 		return $self-> {low} - $ts;
 	}
 }
