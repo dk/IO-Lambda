@@ -23,6 +23,7 @@ lib/IO/Lambda/Fork.pm
 lib/IO/Lambda/Flock.pm
 lib/IO/Lambda/Mutex.pm
 lib/IO/Lambda/Backtrace.pm
+lib/IO/Lambda/Throttle.pm
 t/01_load.t
 t/02_object_api.t
 t/03_lambda_api.t
@@ -56,6 +57,7 @@ eg/webserver.pl
 eg/dbi.pl
 eg/thread.pl
 eg/fork.pl
+eg/throttle.pl
 eg/bench/tcp-batch
 eg/bench/tcp-batch.bat
 eg/bench/tcp-lambda.pl
