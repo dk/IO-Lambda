@@ -1,3 +1,4 @@
+# $Id: Throttle.pm,v 1.4 2010/03/12 22:10:11 dk Exp $
 package IO::Lambda::Throttle;
 use strict;
 use warnings;
@@ -215,6 +216,8 @@ accumulated in a list.
 =item throttle($rate,$strict)
 
 Condition version of C<< new($rate,$strict)-> ratelimit >>
+
+=back
 
 =head1 AUTHOR
 
