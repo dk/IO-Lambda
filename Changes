@@ -168,3 +168,6 @@
 
 1.16  - 7 Feb 2010
 	bugfix in HTTP redirect code (Szymon Swierkosz)
+
+1.17  - 12 Mar 2010
+	add Throttle module (rate-limiter)
