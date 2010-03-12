@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# $Id: webserver.pl,v 1.4 2010/03/01 10:21:51 dk Exp $
+# $Id: webserver.pl,v 1.5 2010/03/12 23:01:47 dk Exp $
 #
 =pod
 
@@ -52,6 +52,7 @@ my $serv = lambda {
 			warn "accept() error:$conn\n" unless ref($conn);
 			return;
 		}
+		$conn-> blocking(0);
 
 		# try to read request - GET only
 		my $buf     = '';
