@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.184 2010/03/12 22:11:57 dk Exp $
+# $Id: Lambda.pm,v 1.185 2010/03/24 21:11:52 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -16,7 +16,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN $SIGTHROW
 	$DEBUG_IO $DEBUG_LAMBDA $DEBUG_CALLER %DEBUG
 );
-$VERSION     = '1.17';
+$VERSION     = '1.18';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 

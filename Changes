@@ -171,3 +171,6 @@
 
 1.17  - 12 Mar 2010
 	add Throttle module (rate-limiter)
+
+1.18  - 24 Mar 2010
+	add POE loop backend
