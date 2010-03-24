@@ -13,6 +13,7 @@ lib/IO/Lambda/Socket.pm
 lib/IO/Lambda/Loop/Select.pm
 lib/IO/Lambda/Loop/Prima.pm
 lib/IO/Lambda/Loop/AnyEvent.pm
+lib/IO/Lambda/Loop/POE.pm
 lib/IO/Lambda/Poll.pm
 lib/IO/Lambda/HTTP/Authen/NTLM.pm
 lib/IO/Lambda/HTTP/Authen/Negotiate.pm
