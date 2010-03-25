@@ -1,4 +1,4 @@
-# $Id: Prima.pm,v 1.8 2008/12/17 11:39:06 dk Exp $
+# $Id: Prima.pm,v 1.9 2010/03/25 12:52:36 dk Exp $
 
 package IO::Lambda::Loop::Prima;
 use strict;
@@ -316,6 +316,8 @@ sub remove_event
 		delete $filenos{$_};
 	}
 }
+
+sub signal { $event++ }
 
 END { undef $timer };
 

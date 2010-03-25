@@ -1,4 +1,4 @@
-# $Id: Signal.pm,v 1.23 2009/12/19 17:29:22 dk Exp $
+# $Id: Signal.pm,v 1.24 2010/03/25 12:52:36 dk Exp $
 package IO::Lambda::Signal;
 use vars qw(@ISA %SIGDATA);
 @ISA = qw(Exporter);
@@ -71,6 +71,7 @@ sub signal_handler
 	return unless exists $SIGDATA{$id};
 	$SIGDATA{$id}-> {signal}++;
 	$SIGDATA{$id}-> {mutex}++;
+	$IO::Lambda::LOOP-> signal($id) if $IO::Lambda::LOOP-> can('signal');
 }
 
 sub watch_signal

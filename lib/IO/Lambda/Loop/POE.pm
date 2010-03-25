@@ -1,4 +1,4 @@
-# $Id: POE.pm,v 1.2 2010/03/24 21:10:40 dk Exp $
+# $Id: POE.pm,v 1.3 2010/03/25 12:52:36 dk Exp $
 
 package IO::Lambda::Loop::POE;
 use strict;
@@ -326,6 +326,8 @@ sub yield
 	return if $nonblocking;
 	$POE::Kernel::poe_kernel-> run_one_timeslice while $event == 0;
 }
+
+sub signal { $event++ }
 
 1;
 
