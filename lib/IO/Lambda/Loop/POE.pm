@@ -1,4 +1,4 @@
-# $Id: POE.pm,v 1.5 2010/03/26 19:24:41 dk Exp $
+# $Id: POE.pm,v 1.6 2010/03/26 20:35:03 dk Exp $
 
 package IO::Lambda::Loop::POE;
 use strict;
@@ -371,25 +371,13 @@ limited.
   use IO::Lambda::Loop::POE; # explicitly select the event loop module
   use IO::Lambda;
 
+or
+
+  setenv IO_LAMBDA_DEBUG=loop=POE
+
 =head1 BUGS
 
-=over
-
-=item *
-
-Signals are unsupported yet.
-
-=item *
-
-Use of uninitialized value $sid in delete at POE/Resource/SIDs.pm line 73.
-
-Some unknown behavior causes POE to garbage-collect sessions twice.
-
-=item *
-
-Threads and forks seems not playing nicely together with POE.
-
-=back
+Threads and forks seem to be not playing nicely together with POE.
 
 =head1 SEE ALSO
 
