@@ -1,18 +1,20 @@
-# $Id: POE.pm,v 1.3 2010/03/25 12:52:36 dk Exp $
+# $Id: POE.pm,v 1.4 2010/03/26 18:01:54 dk Exp $
 
 package IO::Lambda::Loop::POE;
 use strict;
 use warnings;
 use POE;
-use IO::Lambda qw(:constants);
+use IO::Lambda qw(:constants :dev);
 use Time::HiRes qw(time);
 
 use vars qw(
 	@timers $deadline $alarm_id
-	$kr_active_session $kr_last_session 
+	$kernel $kr_active_session $kr_last_session 
 	$session $alarm_id 
-	%filenos $event $DEBUG @mask @modes
+	%filenos $event $DEBUG @mask @modes $global_destruction
 );
+
+END { $global_destruction = 1 } 
 
 $DEBUG = $IO::Lambda::DEBUG{poe} || 0;
 
@@ -24,10 +26,10 @@ $modes[POE::Kernel::MODE_WR()] = IO_WRITE;
 $modes[POE::Kernel::MODE_EX()] = IO_EXCEPTION;
 
 IO::Lambda::Loop::default('POE');
-$kr_active_session = $POE::Kernel::poe_kernel-> [POE::Kernel::KR_ACTIVE_SESSION()];
+$kr_active_session = $poe_kernel-> [POE::Kernel::KR_ACTIVE_SESSION()];
 
-# this shuts up warnings - we don't call run() anyway
-${$POE::Kernel::poe_kernel-> [POE::Kernel::KR_RUN()]} |= POE::Kernel::KR_RUN_CALLED();
+# this shuts up warnings - we don't rely on run() anyway
+${$poe_kernel-> [POE::Kernel::KR_RUN()]} |= POE::Kernel::KR_RUN_CALLED();
 
 sub new   { bless {} , shift }
 sub empty { ( @timers + scalar keys %filenos) ? 0 : 1 }
@@ -39,25 +41,29 @@ sub reset_session
 
 	if ( not @timers and not keys %filenos and not $expect_to_have_a_new_session ) {
 		if ( $session ) {
-			warn "session stop\n" if $DEBUG;
+			warn "session "._o($session)." abandoned\n" if $DEBUG;
 			undef $session;
 		}
 	} elsif ( not defined $session) {
-		warn "session start\n" if $DEBUG;
+
+		return if $global_destruction;
+		
 		$session = POE::Session-> create(
 			inline_states => {
 				_start  => sub {},
 				timeout => \&on_tick,
 				io      => \&on_io,
-				stop    => sub {
-					warn "POE session stop\n" if $DEBUG;
-					require Data::Dumper;
-					die "session stopped, but we have some unhandled data:\n",
-						Data::Dumper(\@timers, \%filenos)
-						if @timers or keys %filenos;
+				_stop    => sub {
+					warn "session "._o($_[SESSION])." stopped\n" if $DEBUG;
+					if (not $session and (@timers or keys %filenos)) {
+						require Data::Dumper;
+						die "session stopped, but we have some unhandled data:\n",
+						       Data::Dumper->Dump(\@timers, \%filenos)
+					}
 				},
 			}
 		);
+		warn "session "._o($session). " started\n" if $DEBUG;
 	}
 }
 
@@ -80,11 +86,16 @@ sub reset_timer
 {
 	my $old = $deadline;
 
+	if ( $global_destruction) {
+		undef $alarm_id;
+		return;
+	}
+
 	$deadline = deadline();
 	unless ( defined $deadline) {
 		if (defined $alarm_id) {
 			warn "stop timer[$alarm_id]\n" if $DEBUG;
-			$POE::Kernel::poe_kernel-> alarm_remove($alarm_id);
+			$poe_kernel-> alarm_remove($alarm_id);
 			undef $alarm_id;
 		}
 		return;
@@ -93,14 +104,12 @@ sub reset_timer
 	return if defined $old and $old == $deadline;
 
 	if ( defined $old and defined $alarm_id) {
-		my $ok = $POE::Kernel::poe_kernel-> alarm_adjust($alarm_id, $deadline - $old);
+		my $ok = $poe_kernel-> alarm_adjust($alarm_id, $deadline - $old);
 		warn "alarm_adjust($alarm_id, ", $deadline-$old, "):$!" unless $ok;
-		#$POE::Kernel::poe_kernel-> alarm_remove($alarm_id);
-		#$alarm_id = $POE::Kernel::poe_kernel-> alarm_set(timeout => $deadline);
 		warn "reset timer[$alarm_id] $old -> $deadline\n" if $DEBUG;
 	} else {
 		warn "something wrong, existing alarm ID with no old timeout" if defined $alarm_id;
-		$alarm_id = $POE::Kernel::poe_kernel-> alarm_set(timeout => $deadline);
+		$alarm_id = $poe_kernel-> alarm_set(timeout => $deadline);
 		warn "alarm_set($deadline):$!" unless defined $alarm_id;
 		warn "start timer[$alarm_id] $deadline\n" if $DEBUG;
 	}
@@ -108,6 +117,8 @@ sub reset_timer
 
 sub reset_mask
 {
+	return if $global_destruction;
+
 	my $f = shift;
 
 	my $mask = 0;
@@ -120,10 +131,10 @@ sub reset_mask
 		my $meth = $mask[$_];
 		if ( $mask & $_ ) {
 			next if $f-> {mask} & $_;
-			$POE::Kernel::poe_kernel-> $meth( $f-> {handle}, 'io', $f);
+			$poe_kernel-> $meth( $f-> {handle}, 'io', $f);
 			warn "$meth charged for ", fileno($f-> {handle}), "\n" if $DEBUG;
 		} elsif ( $f-> {mask} & $_) {
-			$POE::Kernel::poe_kernel-> $meth( $f-> {handle} );
+			$poe_kernel-> $meth( $f-> {handle} );
 			warn "$meth cleared for ", fileno($f-> {handle}), "\n" if $DEBUG;
 		}
 	}
@@ -322,9 +333,13 @@ sub yield
 	warn "yield\n" if $DEBUG;
 	my ( $self, $nonblocking ) = @_;
 	local $event = 0;
-	$POE::Kernel::poe_kernel-> run_one_timeslice;
+	$poe_kernel-> run_one_timeslice;
+	# that ssession should be the kernel itself
+	$poe_kernel-> run if $poe_kernel-> _data_ses_count == 1;
+	
 	return if $nonblocking;
-	$POE::Kernel::poe_kernel-> run_one_timeslice while $event == 0;
+	$poe_kernel-> run_one_timeslice while $event == 0;
+	$poe_kernel-> run if $poe_kernel-> _data_ses_count == 1;
 }
 
 sub signal { $event++ }
