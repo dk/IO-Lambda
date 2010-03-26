@@ -1,4 +1,4 @@
-# $Id: Socket.pm,v 1.11 2009/01/08 15:23:26 dk Exp $
+# $Id: Socket.pm,v 1.12 2010/03/26 20:45:45 dk Exp $
 use strict;
 use warnings;
 
@@ -298,8 +298,6 @@ See also L<perlfunc/send>.
 =back
 
 =head1 LICENSE AND COPYRIGHT
-
-Copyright (c) 2008 capmon ApS. All rights reserved.
 
 This library is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
