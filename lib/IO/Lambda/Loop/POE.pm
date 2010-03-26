@@ -1,4 +1,4 @@
-# $Id: POE.pm,v 1.4 2010/03/26 18:01:54 dk Exp $
+# $Id: POE.pm,v 1.5 2010/03/26 19:24:41 dk Exp $
 
 package IO::Lambda::Loop::POE;
 use strict;
@@ -9,7 +9,7 @@ use Time::HiRes qw(time);
 
 use vars qw(
 	@timers $deadline $alarm_id
-	$kernel $kr_active_session $kr_last_session 
+	$kr_active_session $kr_last_session 
 	$session $alarm_id 
 	%filenos $event $DEBUG @mask @modes $global_destruction
 );
