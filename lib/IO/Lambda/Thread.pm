@@ -1,4 +1,4 @@
-# $Id: Thread.pm,v 1.24 2009/12/04 22:11:31 dk Exp $
+# $Id: Thread.pm,v 1.25 2010/03/27 19:51:24 dk Exp $
 package IO::Lambda::Thread;
 use base qw(IO::Lambda);
 use strict;
@@ -149,7 +149,7 @@ threads. The socket can be also used by the caller for its own needs, if necessa
 
     lambda {
         context 0.1, threaded {
-	      select(undef,undef,undef,0.8);
+	      sleep(1);
 	      return "hello!";
 	};
         any_tail {
