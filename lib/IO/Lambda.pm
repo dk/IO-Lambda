@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.185 2010/03/24 21:11:52 dk Exp $
+# $Id: Lambda.pm,v 1.186 2010/03/27 15:11:37 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -2816,7 +2816,7 @@ If set, fatal errors dump the stack trace.
 
 =item loop=MODULE
 
-Sets loop module, one of: Select, AnyEvent, Prima.
+Sets loop module, one of: Select, AnyEvent, Prima, POE.
 
 =back
 
