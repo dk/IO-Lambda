@@ -1,4 +1,4 @@
-# $Id: Mutex.pm,v 1.12 2010/03/02 23:22:46 dk Exp $
+# $Id: Mutex.pm,v 1.13 2010/03/27 19:56:34 dk Exp $
 package IO::Lambda::Mutex;
 use vars qw($DEBUG @ISA);
 $DEBUG = $IO::Lambda::DEBUG{mutex} || 0;
@@ -227,8 +227,8 @@ release.
 =item pipeline($lambda, $timeout = undef)
 
 Creates a new lambda, that wraps over C<$lambda> so that it is executed
-any after mutex had been obtained. Also, as soon as C<$lambda> is finished,
-the mutex is released, thus allowing others to use it.
+after mutex had been obtained. Also, as soon as C<$lambda> is finished,
+the mutex is released, thus allowing others to take it.
 
 =item remove($lambda)
 
