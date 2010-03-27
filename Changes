@@ -174,3 +174,6 @@
 
 1.18  - 24 Mar 2010
 	add POE loop backend
+
+1.19  - 27 Mar 2010
+	polish POE backend some more
