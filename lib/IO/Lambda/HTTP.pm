@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.55 2010/04/05 09:31:58 dk Exp $
+# $Id: HTTP.pm,v 1.56 2010/04/05 18:18:48 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -99,10 +99,9 @@ sub handle_redirect
 			return 'too many redirects' 
 				if ++$was_redirected > $self-> {max_redirect};
 
-			$req-> uri( URI-> new_abs(
-				$response-> header('Location'),
-				$req-> uri
-			));
+			my $location = $response-> header('Location');
+			return $response unless defined $location;
+			$req-> uri( URI-> new_abs( $location, $req-> uri));
 			$req-> headers-> header( Host => $req-> uri-> host);
 
 			warn "redirect to " . $req-> uri . "\n" if $DEBUG;
