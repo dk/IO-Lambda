@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.54 2010/02/27 04:25:08 dk Exp $
+# $Id: HTTP.pm,v 1.55 2010/04/05 09:31:58 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -130,7 +130,7 @@ sub handle_redirect
 	}};
 }
 
-# if request needs authentication, and we can do anything about it, create 
+# if request needs authentication, and we can do something about it, create 
 # a lambda that handles the authentication
 sub get_authenticator
 {
