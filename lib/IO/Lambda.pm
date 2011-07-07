@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.188 2010/04/06 10:56:02 dk Exp $
+# $Id: Lambda.pm,v 1.189 2011/07/07 17:17:55 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -809,7 +809,8 @@ sub backtrace
 sub add_watch
 {
 	my ($self, $cb, $method, $flags, $handle, $deadline, @ctx) = @_;
-	my $who = (caller(1))[3] if $DEBUG_CALLER;
+	my $who;
+	$who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_io(
 		$flags, $handle, $deadline,
 		sub {
@@ -864,7 +865,8 @@ sub writable(&)
 sub add_timer
 {
 	my ($self, $cb, $method, $deadline, @ctx) = @_;
-	my $who = (caller(1))[3] if $DEBUG_CALLER;
+	my $who;
+	$who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_timer(
 		$deadline,
 		sub {
@@ -891,7 +893,8 @@ sub timeout(&)
 sub add_tail
 {
 	my ($self, $cb, $method, $lambda, @ctx) = @_;
-	my $who = (caller(1))[3] if $DEBUG_CALLER;
+	my $who;
+	$who = (caller(1))[3] if $DEBUG_CALLER;
 	$self-> watch_lambda(
 		$lambda,
 		($cb ? sub {
