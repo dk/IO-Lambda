@@ -1,4 +1,4 @@
-# $Id: HTTP.pm,v 1.57 2012/01/12 18:23:30 dk Exp $
+# $Id: HTTP.pm,v 1.58 2012/01/12 19:39:26 dk Exp $
 package IO::Lambda::HTTP;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
 @ISA = qw(Exporter);
@@ -347,7 +347,10 @@ sub handle_request
 		my $save_uri;
 		if (!$self-> {proxy} && ( $req-> protocol || '') =~ /http\/1.\d/i) {
 			$save_uri = $req-> uri;
-			$req-> uri( $save_uri-> path);
+
+			my $fullpath = $save_uri-> path;
+			$fullpath = "/$fullpath" unless $fullpath =~ m[^/];
+			$req-> uri( $fullpath);
 		}
 		context $self-> handle_request_in_buffer( $req);
 
