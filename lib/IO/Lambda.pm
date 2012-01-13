@@ -1,4 +1,4 @@
-# $Id: Lambda.pm,v 1.190 2011/07/07 17:20:07 dk Exp $
+# $Id: Lambda.pm,v 1.191 2012/01/13 06:41:28 dk Exp $
 package IO::Lambda;
 
 use Carp qw(croak);
@@ -16,7 +16,7 @@ use vars qw(
 	$THIS @CONTEXT $METHOD $CALLBACK $AGAIN $SIGTHROW
 	$DEBUG_IO $DEBUG_LAMBDA $DEBUG_CALLER %DEBUG
 );
-$VERSION     = '1.21';
+$VERSION     = '1.22';
 @ISA         = qw(Exporter);
 @EXPORT_CONSTANTS = qw(
 	IO_READ IO_WRITE IO_EXCEPTION 
@@ -2135,7 +2135,7 @@ Example: convert existing C<getline> constructor into a condition:
 
 =head2 Stream IO
 
-The whole point of this module is to help building protocols or arbitrary
+The whole point of this module is to help building protocols of arbitrary
 complexity in a clear, consequent programming style. Consider how perl's
 low-level C<sysread> and C<syswrite> relate to its higher-level C<readline>,
 where the latter not only does the buffering, but also recognizes C<$/> as

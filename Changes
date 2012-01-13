@@ -183,3 +183,6 @@
 
 1.21  - 7 Jul 2011
 	fixes for perl 5.14
+
+1.22  - 13 Jan 2012
+	small http fixes
