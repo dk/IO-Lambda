@@ -1,4 +1,5 @@
-# $Id: dns.pl,v 1.3 2009/01/08 15:23:25 dk Exp $
+#!/usr/bin/perl
+# $Id: dns.pl,v 1.4 2012/01/14 10:33:30 dk Exp $
 use strict;
 use IO::Lambda::DNS qw(:all);
 use IO::Lambda qw(:lambda);

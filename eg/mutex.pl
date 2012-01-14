@@ -1,4 +1,5 @@
-# $Id: mutex.pl,v 1.1 2009/01/16 17:06:16 dk Exp $
+#!/usr/bin/perl
+# $Id: mutex.pl,v 1.2 2012/01/14 10:33:30 dk Exp $
 
 # Example of use of mutexes
 

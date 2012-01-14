@@ -1,4 +1,5 @@
-# $Id: fork.pl,v 1.1 2008/11/04 21:19:48 dk Exp $
+#!/usr/bin/perl
+# $Id: fork.pl,v 1.2 2012/01/14 10:33:30 dk Exp $
 use strict;
 use IO::Lambda qw(:lambda);
 use IO::Lambda::Fork qw(forked);

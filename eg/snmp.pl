@@ -1,4 +1,5 @@
-# $Id: snmp.pl,v 1.3 2008/02/01 10:49:15 dk Exp $
+#!/usr/bin/perl
+# $Id: snmp.pl,v 1.4 2012/01/14 10:33:30 dk Exp $
 use strict;
 use SNMP;
 use IO::Lambda::SNMP qw(:all);

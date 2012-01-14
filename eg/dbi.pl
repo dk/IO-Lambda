@@ -1,4 +1,5 @@
-#$Id: dbi.pl,v 1.12 2009/11/30 14:28:19 dk Exp $
+#!/usr/bin/perl
+#$Id: dbi.pl,v 1.13 2012/01/14 10:33:30 dk Exp $
 use strict;
 use warnings;
 
