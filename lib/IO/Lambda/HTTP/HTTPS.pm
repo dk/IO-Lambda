@@ -1,4 +1,4 @@
-# $Id: HTTPS.pm,v 1.13 2009/07/02 11:32:15 dk Exp $
+# $Id: HTTPS.pm,v 1.14 2012/03/13 03:23:24 dk Exp $
 package IO::Lambda::HTTP::HTTPS;
 
 use strict;
@@ -23,7 +23,7 @@ sub https_wrapper
 		return $bytes if defined $bytes;
 		return undef, $error if $error eq 'timeout';
 
-		if ( $SSL_ERROR == SSL_WANT_READ) {
+		if ( $error == SSL_WANT_READ) {
 			warn "SSL_WANT_READ on fh(", fileno($sock), ")\n" if $DEBUG;
 			my @ctx = context;
 			context $sock, $deadline;
@@ -32,7 +32,7 @@ sub https_wrapper
 				context @ctx;
 				https_wrapper($sock, $deadline)
 			}
-		} elsif ( $SSL_ERROR == SSL_WANT_WRITE) {
+		} elsif ( $error == SSL_WANT_WRITE) {
 			warn "SSL_WANT_WRITE on fh(", fileno($sock), ")\n" if $DEBUG;
 			my @ctx = context;
 			context $sock, $deadline;
@@ -59,7 +59,7 @@ sub https_connect
 	lambda {
 		# emulate sysreader/syswriter to be able to 
 		# reuse https_wrapper
-		context lambda { $sock-> connect_SSL ? 1 : (undef, 'ssl') };
+		context lambda { $sock-> connect_SSL ? 1 : (undef, $SSL_ERROR) };
 		https_wrapper( $sock, $deadline );
 	}
 }
