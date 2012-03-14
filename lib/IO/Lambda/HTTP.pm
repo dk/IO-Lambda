@@ -410,7 +410,7 @@ sub handle_request_in_buffer
 		# no headers? 
 		return $self-> http_tail
 			unless $line =~ /^HTTP\/[\.\d]+\s+\d{3}\s+/i;
-		
+
 		# got some headers
 		context $self-> http_read( qr/^.*?\r?\n\r?\n/s);
 	state body => tail {
@@ -443,11 +443,18 @@ sub http_read_body
 	my $te = lc( $headers-> header('Transfer-Encoding') || '');
 	return $self-> http_read_chunked($offset)
 		if $self-> {chunked} = $te =~ /^chunked\s*$/i;
-	
-	# just read as much as possible then
+
+	# just read as much as possible then -- however with considerations;
+	# we can't do that if server keeps connection open, otherwise we'll hang
+
+	# http/1.0 and less doesn't implement open connections
 	return $self-> http_tail if 
 		$headers-> protocol =~ /^HTTP\/(\d+\.\d+)/ and
 		$1 < 1.1;
+
+	# server wants to close the connection
+	return $self-> http_tail if
+		$self-> {close_connection};
 }
 
 # read sequence of TE chunks
