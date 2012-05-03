@@ -9,7 +9,7 @@ use Test::More;
 use IO::Lambda qw(:lambda);
 use IO::Lambda::Mutex;
 
-plan tests => 13;
+plan tests => 15;
 
 # basic stuff
 my $mutex = IO::Lambda::Mutex-> new;
@@ -42,16 +42,22 @@ my $sleeper = lambda {
 $sleeper-> start;
 $error = $waiter-> wait;
 ok( not(defined $error) && $flag == 1, 'unconditional wait ok');
-ok( $mutex-> is_taken, 'awaited mutex is taken');
+ok( $mutex-> is_free, 'awaited mutex is free');
 
 # wait for blocked mutex with a timeout
+$mutex-> take;
 $waiter = $mutex-> waiter(0.001);
 $flag = 0;
 $sleeper-> reset;
 $sleeper-> start;
 $error = $waiter-> wait;
-ok( defined($error) && $error eq 'timeout', 'conditional wait ok');
-ok( $mutex-> is_free, 'awaited mutex is free');
+ok( defined($error) && $error eq 'timeout', 'conditional wait ok - timeout');
+ok( $mutex-> is_taken, 'timeouted mutex is taken');
+
+$waiter = $mutex-> waiter(1);
+$error = $waiter-> wait;
+ok( not(defined $error), 'conditional wait ok - no timeout');
+ok( $mutex-> is_free, 'non-timeouted mutex is free');
 
 # deadlock prevention
 $mutex-> take;
@@ -69,9 +75,9 @@ ok( $mutex-> is_free, 'deadlock prevention 2');
 $flag = '';
 lambda {
 	context 
-		$mutex-> pipeline( lambda { $flag .= 1 if $mutex-> is_taken } ),
-		$mutex-> pipeline( lambda { $flag .= 2 if $mutex-> is_taken } ),
-		$mutex-> pipeline( lambda { $flag .= 3 if $mutex-> is_taken } )
+		$mutex-> pipeline( lambda { $flag .= 1 } ),
+		$mutex-> pipeline( lambda { $flag .= 2 } ),
+		$mutex-> pipeline( lambda { $flag .= 3 } )
 		;
 	&tails();
 }-> wait(0);

@@ -42,7 +42,6 @@ sub remove
 	}
 	if ( defined $found) {
 		splice( @$q, $found, 1);
-		$self-> release unless @$q; 
 	} else {
 		warn "$self failed to remove $lambda from queue\n" if $DEBUG;
 	}
@@ -65,6 +64,7 @@ sub waiter
 		# lambda was terminated, relinquish waiting and kill timeout
 		$self-> remove($w);
 		$w-> cancel_event($timeout) if defined $timeout;
+		$self-> release unless @{$self-> {queue}};
 		return @_; # propagate error
 	});
 	push @{$self-> {queue}}, $waiter;
@@ -218,11 +218,11 @@ the mutex was acquired successfully, or the error string.
 
 If C<$timeout> is defined, and by the time it is expired the mutex
 could not be obtained, the lambda is removed from the queue, and
-returned error value is 'timeout'.
+returned error value is 'timeout'. The mutex state is then unchanged.
 
-Note, that after C<waiter> succeeds, a C<release> call is needed
-should mutex be reused. See C<pipeline> method for automatic mutex
-release.
+If C<waiter> succeeds, a C<release> call is issued. Thus, if the next 
+waiter awaits for the mutex, it will be notified; otherwise the mutex
+becomes free.
 
 =item pipeline($lambda, $timeout = undef)
 
