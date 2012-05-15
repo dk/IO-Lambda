@@ -12,12 +12,23 @@ use IO::Lambda::HTTP;
 plan skip_all => "online tests disabled" unless -e 't/online.enabled';
 plan tests    => 2;
 
+my %opt;
+
+if ( defined ( my $p = $ENV{http_proxy} )) {
+	$p =~ s{^http://}{};
+	$p =~ s{[\.\-\w]*\@([\.\-w]*:)}{}; # user-pass
+	$p =~ s{/$}{};
+	my ( $host, $port ) = $p =~ /^([\.\-\w]+):?(\d*)$/;
+	$port ||= 80;
+	$opt{proxy} = [ $host, $port ];
+}
+
 sub http_lambda
 {
 	IO::Lambda::HTTP-> new(
 		HTTP::Request-> new( 
 			GET => "http://$_[0]/"
-		))
+		), %opt)
 }
 
 # single
