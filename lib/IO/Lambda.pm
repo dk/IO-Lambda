@@ -2741,7 +2741,7 @@ L<IO::Lambda::Socket> - lambda versions of C<connect>, C<accept> etc.
 
 L<IO::Lambda::HTTP> - implementation of HTTP and HTTPS protocols.  HTTPS
 requires L<IO::Socket::SSL>, NTLM/Negotiate authentication requires
-L<Authem::NTLM> modules (not marked as dependencies).
+L<Authen::NTLM> modules (not marked as dependencies).
 
 =item *
 
@@ -2860,16 +2860,15 @@ See benchmarking code in F<eg/bench>.
 =head2 Apologetics
 
 There are many async libraries readily available from CPAN. C<IO::Lambda> is
-yet another one. How is it different from the existing tools? Why using it?  To
+yet another one. How is it different from the existing tools? Why use it?  To
 answer these questions, I need to show the evolution of async libraries, to
 explain how they grew from simple tools to complex frameworks.
 
 First, all async libraries are based on OS-level syscalls, like C<select>,
 C<poll>, C<epoll>, C<kqueue>, and C<Win32::WaitForMultipleObjects>. The first
-layer of async libraries provides access to exactly these facilites: there are
-C<IO::Select>, C<IO::Epoll>, C<IO::Kqueue> etc. I won't go deepeer into
-describing pros and contras for programming on this level, this should be
-obvious.
+layer provides access to exactly these facilities: there are C<IO::Select>,
+C<IO::Epoll>, C<IO::Kqueue> etc. I won't go deeper into describing pros and
+cons for programming on this level, this should be obvious.
 
 Perl modules of the next abstraction layer are often characterised by
 portability and event loops. While the modules of the first layer are seldom
@@ -2878,7 +2877,7 @@ OS-independent, and use callbacks to ease the otherwise convoluted ways async
 I/O would be programmed. These modules mostly populate the "asynchronous
 input-output programming frameworks" niche in the perl world. The examples are
 many: C<IO::Events>, C<EV>, C<AnyEvent>, C<IO::NonBlocking>, C<IO::Multiplex>,
-to name the few. 
+to name a few. 
 
 Finally, there's the third layer of complexity, which, before C<IO::Lambda>,
 had a single representative: C<POE> (now, to the best of my knowledge,
@@ -2910,7 +2909,7 @@ Consider C<POE> code:
 	   },
    });
 
-and the correspodning C<IO::Lambda> code (I<state1> and I<state2> are I<conditions>,
+and the corresponding C<IO::Lambda> code (I<state1> and I<state2> are I<conditions>,
 they need to be declared separately):
 
     lambda {
