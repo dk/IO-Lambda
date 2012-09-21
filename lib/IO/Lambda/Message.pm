@@ -476,7 +476,11 @@ to no later than C<$deadline>, and returns a lambda that will be ready when the
 message is responded to. The lambda returns the response or the error.
 
 Upon communication error, all queued messages are discarded.  Timeout is regarded
-as a protocol error too, so use the C<$deadline> option with care.
+as a protocol error too, so use the C<$deadline> option with care. That means, as soon
+the deadline error is fired, communication is no longer possible; the remote will wait
+for its eventual response to be read by your program, which no longer listens. And if
+it tries to write to the socket again, the whole thing will deadlock. Consider using
+other means to wait for the message with a timeout.
 
 =item message ($message, $deadline = undef) :: () -> ($response, $error)
 
