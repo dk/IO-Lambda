@@ -42,8 +42,10 @@ sub remove
 	}
 	if ( defined $found) {
 		splice( @$q, $found, 1);
+		return 1;
 	} else {
 		warn "$self failed to remove $lambda from queue\n" if $DEBUG;
+		return 0;
 	}
 }
 
@@ -62,9 +64,11 @@ sub waiter
 	my $bind   = $waiter-> bind( sub {
 		my ($w,$rec) = (shift,shift);
 		# lambda was terminated, relinquish waiting and kill timeout
-		$self-> remove($w);
+		unless ($w->{__already_removed}) {
+			my $removed = $self->remove($w);
+			$self->release if !$removed && 0 == $self->{queue};
+		}
 		$w-> cancel_event($timeout) if defined $timeout;
-		$self-> release unless @{$self-> {queue}};
 		return @_; # propagate error
 	});
 	push @{$self-> {queue}}, $waiter;
@@ -92,6 +96,7 @@ sub release
 	my $lambda = shift @{$self-> {queue}};
 
 	warn "$self gives ownership to $lambda\n" if $DEBUG;
+	$lambda-> {__already_removed} = 1;
 	$lambda-> terminate(undef);
 }
 
@@ -174,7 +179,18 @@ that in turn will finish as soon as the caller can acquire the mutex.
             # expected to be 'ok'
 	}
     }->wait;
-    
+
+    # pipeline -  manage a queue of lambdas, stuff new ones to it, guarantees
+    # sequential execution:
+    lambda {
+        context 
+            $mutex-> pipeline( lambda { print 1 } ),
+            $mutex-> pipeline( lambda { print 2 } ),
+            $mutex-> pipeline( lambda { print 3 } )
+        ;
+        &tails();
+    }-> wait;
+    # prints 123 guaranteedly in that order, even if intermediate lambda speep etc
 
 =head1 API
 

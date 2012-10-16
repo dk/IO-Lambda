@@ -9,7 +9,7 @@ use Test::More;
 use IO::Lambda qw(:lambda);
 use IO::Lambda::Mutex;
 
-plan tests => 15;
+plan tests => 19;
 
 # basic stuff
 my $mutex = IO::Lambda::Mutex-> new;
@@ -42,7 +42,9 @@ my $sleeper = lambda {
 $sleeper-> start;
 $error = $waiter-> wait;
 ok( not(defined $error) && $flag == 1, 'unconditional wait ok');
-ok( $mutex-> is_free, 'awaited mutex is free');
+ok( $mutex-> is_taken, 'awaited mutex is taken');
+$mutex->release;
+ok( $mutex-> is_free, 'awaited mutex is 0-queued and free');
 
 # wait for blocked mutex with a timeout
 $mutex-> take;
@@ -57,7 +59,9 @@ ok( $mutex-> is_taken, 'timeouted mutex is taken');
 $waiter = $mutex-> waiter(1);
 $error = $waiter-> wait;
 ok( not(defined $error), 'conditional wait ok - no timeout');
-ok( $mutex-> is_free, 'non-timeouted mutex is free');
+ok( $mutex-> is_taken, 'non-timeouted mutex is taken');
+$mutex->release;
+ok( $mutex-> is_free, 'awaited mutex is 0-queued and free');
 
 # deadlock prevention
 $mutex-> take;
@@ -70,6 +74,8 @@ $mutex-> take;
 $waiter = $mutex-> waiter;
 $mutex-> remove($waiter);
 $waiter-> terminate;
+ok( $mutex-> is_taken, 'mutex is taken');
+$mutex->release;
 ok( $mutex-> is_free, 'deadlock prevention 2');
 
 $flag = '';
@@ -80,5 +86,21 @@ lambda {
 		$mutex-> pipeline( lambda { $flag .= 3 } )
 		;
 	&tails();
-}-> wait(0);
+}-> wait;
 ok( $flag == 123, 'pipeline');
+
+$flag = '';
+lambda {
+	context $mutex-> pipeline( lambda { 
+		$flag .= 1;
+		context 0.2;
+		timeout { };
+	});
+	tail {};
+	
+	context $mutex-> pipeline( lambda { 
+		$flag .= 2;
+	});
+	tail {};
+}-> wait;
+ok( $flag == 12, 'pipeline: trying to get in queue before another lambda');
