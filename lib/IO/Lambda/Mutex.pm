@@ -190,7 +190,7 @@ that in turn will finish as soon as the caller can acquire the mutex.
         ;
         &tails();
     }-> wait;
-    # prints 123 guaranteedly in that order, even if intermediate lambda speep etc
+    # prints 123 guaranteedly in that order, even if intermediate lambdas sleep etc
 
 =head1 API
 
