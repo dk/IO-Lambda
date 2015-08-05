@@ -153,6 +153,12 @@ sub signal_or_timeout_lambda
 	return $q;
 }
 
+sub new_process;
+# condition
+sub signal (&) { new_signal (context)-> condition(shift, \&signal, 'signal') }
+sub pid    (&) { new_pid    (context)-> condition(shift, \&pid,    'pid') }
+sub spawn  (&) { new_process-> call(context)-> condition(shift, \&spawn,  'spawn') }
+
 sub new_signal
 {
 	my ( $id, $deadline) = @_;
@@ -180,7 +186,7 @@ sub new_pid
 	}
 
 	# finished already
-	if ( waitpid( $pid, WNOHANG) > 0) {
+	if ( waitpid( $pid, WNOHANG) != 0) {
 		if ( defined $early_sigchld) {
 			if ( defined( $savesig)) {
 				$SIG{CHLD} = $savesig;
@@ -244,13 +250,17 @@ tail {
 		close $h;
 		return ($buf, $?, $error);
 	}
-	return ($buf, $?, $!) unless close $h;
-	# finished already
-	return ($buf, $?, $!) if waitpid($pid, WNOHANG) >= 0;
 
+	# finished already
+	if (waitpid($pid, WNOHANG) != 0) {
+		my ( $exitcode, $error) = ( $?, $! );
+		close $h;
+		return ($buf, $exitcode, $error);
+	}
 	# wait for it
 	context $pid;
 pid {
+	close $h;
 	return ($buf, shift);
 }}}}
 
@@ -266,7 +276,7 @@ sub new_process_win32
 	}
 }
 
-sub new_process;
+
 if ( $^O !~ /win32/i) {
 	*new_process = \&new_process_posix;
 } else {
@@ -277,11 +287,6 @@ if ( $^O !~ /win32/i) {
 		*new_process = sub { lambda { undef, undef, $IO::Lambda::Thread::DISABLED } };
 	}
 }
-
-# condition
-sub signal (&) { new_signal (context)-> condition(shift, \&signal, 'signal') }
-sub pid    (&) { new_pid    (context)-> condition(shift, \&pid,    'pid') }
-sub spawn  (&) { new_process-> call(context)-> condition(shift, \&spawn,  'spawn') }
 
 
 1;
