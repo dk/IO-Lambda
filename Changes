@@ -1,3 +1,6 @@
+1.24  - 5 Aug 2015
+        fixes in Signal::pid and Mutex
+
 1.23  - 18 Mar 2012
 	small http fixes
 
