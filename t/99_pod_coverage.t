@@ -29,9 +29,13 @@ pod_coverage_ok( 'IO::Lambda::Signal' => { trustme => [
 pod_coverage_ok( 'IO::Lambda::Message' => { trustme => [
         qr/(push|listen|coming|pull|receive|send)/, 
 ]});
-pod_coverage_ok( 'IO::Lambda::DBI' => { trustme => [
-        qr/dbi_message|outcoming|prepare/, 
-]});
+SKIP: {
+	eval "use DBI;";
+	skip("no DBI", 1) if $@;
+	pod_coverage_ok( 'IO::Lambda::DBI' => { trustme => [
+	        qr/dbi_message|outcoming|prepare/, 
+	]});
+}
 pod_coverage_ok( 'IO::Lambda::Thread'=> { trustme => [
         qr/thread_init/,
 ]});
