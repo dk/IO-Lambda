@@ -22,7 +22,6 @@ eval {
 };
 plan skip_all => "Net::DNS cannot resolve google.com in this environment" if $@;
 
-
 plan tests    => 3;
 
 # simple

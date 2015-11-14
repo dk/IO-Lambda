@@ -48,8 +48,21 @@ sub new
 	# proceed
 lambda {
 	my $obj  = Net::DNS::Resolver-> new( %opt);
-	my $sock = $obj-> bgsend( @ctx);
-	return "send error: " . $obj-> errorstring unless $sock;
+	my $bg_obj = $obj-> bgsend( @ctx);
+	return "send error: " . $obj-> errorstring unless $bg_obj;
+
+	my $sock;
+	if ( $Net::DNS::VERSION > 1.02 ) {
+		# this is a IO::Select object
+		my @handles = $bg_obj->handles;
+		if ( 1 != @handles ) {
+			warn "There's something wrong with Net::DNS version $Net::DNS::VERSION, please notify the author\n";
+			return "panic: Net::DNS returned not 1 socket\n";
+		}
+		$sock = $handles[0]->[0];
+	} else {
+		$sock = $bg_obj;
+	}
 
 	context $sock, $timeout;
 readable {
@@ -63,10 +76,11 @@ readable {
 		$! = $err;
 		return "socket error: $!";
 	}
-	return again unless $obj-> bgisready($sock);
+	return again unless $obj-> bgisready($bg_obj);
 
-	my $packet = $obj-> bgread( $sock);
+	my $packet = $obj-> bgread( $bg_obj);
 	undef $sock;
+	undef $bg_obj;
 	
 	return "recv error: " . $obj-> errorstring unless $packet;
 
