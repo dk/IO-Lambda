@@ -52,7 +52,7 @@ lambda {
 	return "send error: " . $obj-> errorstring unless $bg_obj;
 
 	my $sock;
-	if ( $Net::DNS::VERSION > 1.02 ) {
+	if ( $Net::DNS::VERSION == 1.03 ) {
 		# this is a IO::Select object
 		my @handles = $bg_obj->handles;
 		if ( 1 != @handles ) {
