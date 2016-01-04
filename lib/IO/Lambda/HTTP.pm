@@ -374,7 +374,7 @@ sub handle_request_in_buffer
 	if (!$self-> {proxy} && ( $req-> protocol || '') =~ /http\/1.\d/i) {
 		$save_uri = $req-> uri;
 
-		my $fullpath = $save_uri-> path;
+		my $fullpath = $save_uri-> path_query;
 		$fullpath = "/$fullpath" unless $fullpath =~ m[^/];
 		$req-> uri( $fullpath);
 	}
