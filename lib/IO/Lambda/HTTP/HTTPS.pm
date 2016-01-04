@@ -65,29 +65,51 @@ sub https_connect
 	}
 }
 
-sub https_syswriter (){ lambda
+sub https_syscall
 {
-	my ( $fh, $buf, $length, $offset, $deadline) = @_;
-
-	this-> watch_io( IO_WRITE, $fh, $deadline, _subname https_syswriter => sub {
-		return undef, 'timeout' unless $_[1];
-                local $SIG{PIPE} = 'IGNORE';
-		my $n = syswrite( $fh, $$buf, $length, $offset);
+	my ( $read, $fh, $buf, $length, $offset) = @_;
+	$$buf = '' unless defined $$buf;
+	local $SIG{PIPE} = 'IGNORE';
+	my $n = $read ? 
+		sysread( $fh, $$buf, $length, $offset) : 
+		syswrite( $fh, $$buf, $length, $offset);
+	unless ( defined $n ) {
 		my $err = $!;
-		$err = $SSL_ERROR if $err == EWOULDBLOCK || $err == EAGAIN;
-		if ( $DEBUG) {
-			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes out of $length" : "error $err"), "\n";
-			warn substr( $$buf, $offset, $n), "\n" if $DEBUG > 1 and ($n || 0) > 0;
-		}
-		return undef, $err unless defined $n;
-		return $n;
-	});
-}}
+		warn "fh(", fileno($fh), ") ", ( $read ? 'read' : 'write'), " error $err\n" if $DEBUG;
+		return undef, $err;
+	}
+	if ( $DEBUG ) {
+		warn "fh(", fileno($fh), ") ", ( $read ? 'read' : 'wrote'), "$n bytes\n";
+		warn substr( $$buf, length($$buf) - $n), "\n" if $DEBUG > 1 and $n > 0;
+	}
+	return $n;
+}
+
+sub https_syscall_watcher
+{
+	my $read = shift;
+	lambda {
+		my ( $fh, $buf, $length, $offset, $deadline) = @_;
+
+		($deadline, $offset) = ($offset, length($$buf) || 0) if $read;
+
+		my ( $n, $err ) = https_syscall( $read, $fh, $buf, $length, $offset );
+		return ($n, $err) if defined($n) || ($err != EAGAIN && $err != EWOULDBLOCK);
+
+		this-> watch_io( $read ? IO_READ : IO_WRITE, $fh, $deadline, _subname https_syscall_watcher => sub {
+			return undef, 'timeout' unless $_[1];
+			my ( $n, $err ) = https_syscall( $read, $fh, $buf, $length, $offset );
+			return $n if defined $n;
+			$err = $SSL_ERROR if $err == EWOULDBLOCK || $err == EAGAIN;
+			return undef, $err;
+		});
+	};
+}
 
 sub https_writer
 {
 	my $cached = shift;
-	my $writer = https_syswriter;
+	my $writer = https_syscall_watcher(0);
 
 	lambda {
 		my ( $sock, $req, $length, $offset, $deadline) = @_;
@@ -105,29 +127,9 @@ sub https_writer
 	}}
 }
 
-sub https_sysreader (){ lambda 
-{
-	my ( $fh, $buf, $length, $deadline) = @_;
-	$$buf = '' unless defined $$buf;
-
-	this-> watch_io( IO_READ, $fh, $deadline, _subname https_sysreader => sub {
-		return undef, 'timeout' unless $_[1];
-                local $SIG{PIPE} = 'IGNORE';
-		my $n = sysread( $fh, $$buf, $length, length($$buf));
-		my $err = $!;
-		$err = $SSL_ERROR if $err == EWOULDBLOCK || $err == EAGAIN;
-		if ( $DEBUG ) {
-			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $err"), "\n";
-			warn substr( $$buf, length($$buf) - $n), "\n" if $DEBUG > 1 and ($n || 0) > 0;
-		}
-		return undef, $err unless defined $n;
-		return $n;
-	})
-}}
-
 sub https_reader
 {
-	my $reader = https_sysreader;
+	my $reader = https_syscall_watcher(1);
 	lambda {
 		my ( $sock, $buf, $length, $deadline) = @_;
 		context $reader, $sock, $buf, $length, $deadline;
