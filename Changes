@@ -1,5 +1,8 @@
+1.26  - 4 Jan 2016
+        https bug fixes
+
 1.25  - 14 Nov 2015
-        works witg Net::DNS 1.03
+        works with Net::DNS 1.03
 
 1.24  - 5 Aug 2015
         fixes in Signal::pid and Mutex
