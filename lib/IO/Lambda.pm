@@ -1204,7 +1204,7 @@ sub sysreader (){ lambda
 		my $n = sysread( $fh, $$buf, $length, length($$buf));
 		if ( $DEBUG_IO) {
 			warn "fh(", fileno($fh), ") read ", ( defined($n) ? "$n bytes" : "error $!"), "\n";
-			warn substr( $$buf, length($$buf) - $n), "\n" if $DEBUG_IO > 1 and $n > 0;
+			warn substr( $$buf, length($$buf) - $n), "\n" if $DEBUG_IO > 1 and ($n || 0) > 0;
 		}
 		return undef, $! unless defined $n;
 		return $n;
@@ -1224,7 +1224,7 @@ sub syswriter (){ lambda
 		my $n = syswrite( $fh, $$buf, $length, $offset);
 		if ( $DEBUG_IO) {
 			warn "fh(", fileno($fh), ") wrote ", ( defined($n) ? "$n bytes out of $length" : "error $!"), "\n";
-			warn substr( $$buf, $offset, $n), "\n" if $DEBUG_IO > 1 and $n > 0;
+			warn substr( $$buf, $offset, $n), "\n" if $DEBUG_IO > 1 and ($n || 0) > 0;
 		}
 		return undef, $! unless defined $n;
 		return $n;
