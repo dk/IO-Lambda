@@ -103,7 +103,11 @@ sub after
 
 sub yield
 {
-	AnyEvent-> one_event;
+        my $model = $AnyEvent::MODEL;
+        {
+            no strict 'refs';
+            ($model . '::_poll')->();
+        }
 }
 
 sub remove
