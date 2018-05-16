@@ -103,11 +103,16 @@ sub after
 
 sub yield
 {
-        my $model = $AnyEvent::MODEL;
-        {
-            no strict 'refs';
-            ($model . '::_poll')->();
-        }
+	my ($self, $nonblocking) = @_;
+	if ( $AnyEvent::VERSION >= 6) {
+        	my $model = $AnyEvent::MODEL;
+        	{
+        	    no strict 'refs';
+        	    ($model . '::_poll')->();
+        	}
+	} else {
+		AnyEvent->one_event;
+	}
 }
 
 sub remove
