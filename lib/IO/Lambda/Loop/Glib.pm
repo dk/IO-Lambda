@@ -2,6 +2,7 @@ package IO::Lambda::Loop::Glib;
 use strict;
 use warnings;
 use Glib;
+use Glib::Object::Introspection;
 use IO::Lambda qw(:constants);
 use Time::HiRes qw(time);
 
@@ -93,7 +94,9 @@ sub after
 	my $time = $rec-> [WATCH_DEADLINE] - time;
 	$time = 0 if $time < 0;
 	push @records, $rec;
+	warn "after?\n";
 	push @$rec, Glib::Timeout->add($time * 1000, sub {
+	warn "after!\n";
 		my $nr = @records;
 		@records = grep { $_ != $rec } @records;
 		goto RETURN if $nr == @records;
@@ -112,8 +115,11 @@ sub after
 sub yield
 {
 	my ($self, $nonblocking) = @_;
-	return if $reentrant;
-	die "Synchoronous I/O is not supported for Glib";
+	Glib::Object::Introspection->invoke(
+        	'Gtk', undef, 'main_iteration_do',
+        	[!$nonblocking]
+	) unless $reentrant;
+	warn "yield!\n";
 }
 
 sub remove
@@ -176,8 +182,12 @@ loop. The module is not intended for direct use.
 
 =head1 LIMITATIONS
 
-Glib cannot be used in syncrohous I/O that requires yield() calls, so
-all code that involves C<wait> and friends cannot be used with this event loop.
+Synchronous I/O (wait() and friends) can so far only work with either Gtk2 og
+Gtk3 main loop initialized. Also, after the main loop gets stopped, this module
+won't work as well.
+
+Under Gtk2 it is not possible to run bare synchronous IO::Lambda I/O, without
+calling main_loop, while under Gtk3 it works okay.
 
 =head1 SEE ALSO
 
