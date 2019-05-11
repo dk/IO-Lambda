@@ -119,7 +119,6 @@ sub yield
         	'Gtk', undef, 'main_iteration_do',
         	[!$nonblocking]
 	) unless $reentrant;
-	warn "yield!\n";
 }
 
 sub remove
