@@ -94,9 +94,7 @@ sub after
 	my $time = $rec-> [WATCH_DEADLINE] - time;
 	$time = 0 if $time < 0;
 	push @records, $rec;
-	warn "after?\n";
 	push @$rec, Glib::Timeout->add($time * 1000, sub {
-	warn "after!\n";
 		my $nr = @records;
 		@records = grep { $_ != $rec } @records;
 		goto RETURN if $nr == @records;
