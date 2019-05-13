@@ -58,4 +58,9 @@ WriteMakefile(
 		# 'threads'         => 0,     # for IO::Lambda::Threads
 	},
 	clean         => { FILES => 't/online.enabled' },
+	META_MERGE    => {
+		resources => {
+			repository => 'https://github.com/dk/IO-Lambda'
+		},
+	},
 );
