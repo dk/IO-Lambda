@@ -41,6 +41,7 @@ WriteMakefile(
 	AUTHOR        => 'Dmitry Karasik <dmitry@karasik.eu.org>',
 	ABSTRACT_FROM => 'lib/IO/Lambda.pm',
 	VERSION_FROM  => 'lib/IO/Lambda.pm',
+	LICENSE       => 'perl',
 	PREREQ_PM     => {
 		'Net::DNS'          => 0,
 		'Storable'          => 0,
