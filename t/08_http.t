@@ -8,9 +8,9 @@ use Test::More;
 use HTTP::Request;
 use IO::Lambda qw(:all);
 use IO::Lambda::HTTP;
+use IO::Lambda::HTTP::Server;
 
 plan skip_all => "online tests disabled" unless -e 't/online.enabled';
-plan tests    => 2;
 
 my %opt;
 
@@ -40,3 +40,30 @@ lambda {
 	context map { http_lambda('www.google.com') } 1..3;
 	tails { ok(( 3 == grep { ref($_) } @_), 'parallel resolve') }
 }-> wait;
+
+# own
+my $port   = $ENV{TESTPORT} || 29876;
+my $num = 0;
+my $server = http_server {
+	$num++;
+	if ( $num == 1 ) {
+		return HTTP::Response->new(200, 'OK', ['Content-Type' => 'text/plain'], "case1");
+	} elsif ( $num == 2 ) {
+		return lambda { HTTP::Response->new(200, 'OK', ['Content-Type' => 'text/plain'], "case2"); };
+	} elsif ( $num == 3 ) {
+		return undef, "case3";
+	}
+} "localhost:$port";
+$server->start;
+
+my $resp = http_lambda("localhost:$port")->wait;
+is( $resp->code, "200", "httpd simple code");
+is( $resp->content, "case1", "httpd simple response");
+$resp = http_lambda("localhost:$port")->wait;
+is( $resp->code, "200", "httpd lambda code");
+is( $resp->content, "case2", "httpd lambda response");
+$resp = http_lambda("localhost:$port")->wait;
+is( $resp->code, "500", "httpd error code");
+is( $resp->content, "case3", "httpd error response");
+
+done_testing;
