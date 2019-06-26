@@ -12,11 +12,131 @@ use Exporter;
 use IO::Socket::INET;
 use HTTP::Request;
 use HTTP::Response;
-use IO::Lambda qw(:lambda :stream);
+use IO::Lambda qw(:lambda :stream get_frame set_frame);
 use IO::Lambda::Socket qw(accept);
 use Time::HiRes qw(time);
 
 my $CRLF = "\x0d\x0a";
+
+sub _close($$)
+{
+	warn "$_[1]\n" if $DEBUG;
+	close($_[0]);
+}
+
+sub _msg
+{
+	my ( $status, $msg, $close) = @_;
+	my $resp = "HTTP/1.1 $status${CRLF}Content-Length: ".length($msg)."$CRLF";
+	$resp .= "Connection: ".($close ? 'close' : 'keep-alive')."$CRLF";
+	$resp .= "Date: ". scalar(localtime).$CRLF;
+	$resp .= "Content-Type: text/plain$CRLF" if length($msg);
+	$resp .= $CRLF . $msg;
+	return $resp;
+}
+
+sub _bye
+{
+	my ( $conn, $opt, $close, $msg) = @_;
+	tail {
+		my $resp = _msg( $msg, '', $close);
+		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
+	tail {
+		close($conn) if $close;
+	}}
+}
+
+sub _bad_request
+{
+	my ( $conn, $opt, $close) = @_;
+	_bye($conn, $opt, $close, "400 Bad Request");
+}
+
+sub _timeout
+{
+	my ( $conn, $opt, $close) = @_;
+	_bye($conn, $opt, $close, "408 Timeout");
+}
+
+sub handle_connection
+{
+	my ($conn, $cb, $opt) = @_;
+	my $session_timeout = $opt->{timeout};
+	my %session;
+	lambda {
+		my $buf = '';
+		context readbuf, $conn, \$buf, qr/^.*?$CRLF$CRLF/s, $session_timeout;
+	tail {
+		my ( $match, $error) = @_;
+		return _timeout($conn, $opt) if defined($error) and $error eq 'timeout';
+		return _close $conn, $error unless defined $match;
+		warn length($buf), " bytes read\n" if $DEBUG > 1;
+
+		my $req = HTTP::Request-> parse( $match);
+		return _bad_request($conn, $opt, 1) unless $req;
+
+		my $proto = (( $req->protocol // '') =~ /^HTTP\/([\d\.]+)$/i) ? $1 : 1.0;
+		my $keep_alive =
+			$proto >= 1.1 &&
+			(lc( $req->header('Connection') // 'keep-alive') eq 'keep-alive');
+		my @frame = get_frame;
+		my $t;
+		if ( $keep_alive && defined( $t = $req->header('Keep-Alive')) && $t =~ /^\d+$/) {
+			$session_timeout = $t if
+				!defined($session_timeout) ||
+				($session_timeout <  1_000_000_000 && $session_timeout > $t) ||
+				($session_timeout >= 1_000_000_000 && (time - $session_timeout) > $t);
+		}
+
+		my $cl = length($match) + ($req->header('Content-Length') // 0);
+		context readbuf, $conn, \$buf, $cl, $session_timeout;
+	tail {
+		my ( undef, $error) = @_;
+		if (defined($error) and $error eq 'timeout') {
+			undef @frame;
+			return _timeout($conn, $opt);
+		}
+		undef(@frame), return _close $conn, $error if defined $error;
+
+		warn length($buf), " bytes read\n" if $DEBUG > 1;
+		unless ($req = HTTP::Request-> parse( $buf)) {
+			undef @frame;
+			return _bad_request($conn, $opt, !$keep_alive) unless $req;
+		}
+		substr( $buf, 0, $cl, '');
+
+		my $resp;
+		($resp, $error) = $cb->($req, \%session);
+		context UNIVERSAL::isa( $resp, 'IO::Lambda') ?
+			$resp : lambda { $resp, $error };
+	tail {
+		my $error;
+		($resp, $error) = @_;
+		if ( $error ) {
+			$resp = _msg("500 Server Error", $error, !$keep_alive);
+		} elsif ( UNIVERSAL::isa( $resp, 'HTTP::Response')) {
+			$resp = "HTTP/1.1 " . $resp->as_string($CRLF);
+		} else {
+			$resp = _msg("200 OK", $resp, !$keep_alive);
+		}
+		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
+	tail {
+		my ( undef, $error) = @_;
+		undef(@frame), return _close $conn, $error if defined $error;
+		warn length($resp), " bytes written\n" if $DEBUG > 1;
+
+		if ( $keep_alive ) {
+			set_frame(@frame);
+			undef @frame;
+			return again;
+		}
+		if ( !close($conn)) {
+			warn "error during response:$!\n" if $DEBUG;
+		}
+		undef @frame;
+	}}}}}
+}
+
 sub http_server(&$;)
 {
 	my ( $cb, $listen, %opt) = @_;
@@ -33,8 +153,8 @@ sub http_server(&$;)
 			ReusePort => 1,
 		);
 		unless ( $listen ) {
-			warn "$!\n";
-			return;
+			warn "$!\n" if $DEBUG;
+			return (undef, $!);
 		}
 	} else {
 		$port = $listen->sockport;
@@ -42,79 +162,22 @@ sub http_server(&$;)
 
 	return lambda {
 		context $listen;
-		accept {
-			my $conn = shift;
-			again;
+	accept {
+		my $conn = shift;
+		again;
 
-			unless ( ref($conn)) {
-				warn "accept() error:$conn\n" if $DEBUG;
-				return;
-			}
-			if ( $DEBUG ) {
-       				my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
-				warn "[$hostname] connect\n";
-			}
-			$conn-> blocking(0);
-
-			my $buf = '';
-			context readbuf, $conn, \$buf, qr/^.*?$CRLF$CRLF/s, $opt{timeout};
-		tail {
-			my ( $match, $error) = @_;
-			unless (defined $match) {
-				warn "$error\n" if $DEBUG;
-				close($conn);
-				return;
-			}
-			warn length($buf), " bytes read\n" if $DEBUG > 1;
-			my $req = HTTP::Request-> parse( $match);
-			unless ($req) {
-				warn "bad request\n" if $DEBUG;
-				close($conn);
-				return;
-			}
-
-			my $cl = length($match) + ($req->header('Content-Length') // 0);
-			context (($cl > length($buf)) ?
-				(readbuf, $conn, \$buf, $cl, $opt{conn_timeout}) :
-				lambda {});
-		tail {
-			my ( undef, $error) = @_;
-			if (defined $error) {
-				warn "bad request\n" if $DEBUG;
-				close($conn);
-				return;
-			}
-			warn length($buf), " bytes read\n" if $DEBUG > 1;
-			$req = HTTP::Request-> parse( $buf);
-			my $resp;
-			($resp, $error) = $cb->($req);
-			context UNIVERSAL::isa( $resp, 'IO::Lambda') ?
-				$resp : lambda { $resp, $error };
-		tail {
-			my $error;
-			($resp, $error) = @_;
-			if ( $error ) {
-				$resp = "HTTP/1.1 500 Server Error${CRLF}Content-Length: ".length($error) . "$CRLF$CRLF" . $error;
-			} elsif ( UNIVERSAL::isa( $resp, 'HTTP::Response')) {
-				$resp = "HTTP/1.1 " . $resp->as_string($CRLF);
-			} else {
-				$resp = "HTTP/1.1 200 OK${CRLF}Content-Length: ".length($resp) . "$CRLF$CRLF" . $resp;
-			}
-			context writebuf, $conn, \$resp, length($resp), 0, $opt{timeout};
-		tail {
-			my ( undef, $error) = @_;
-			if (defined $error) {
-				warn "error during response:$error\n" if $DEBUG;
-				close($conn);
-				return;
-			}
-			if ( !close($conn)) {
-				warn "error during response:$!\n" if $DEBUG;
-				return;
-			}
-			warn length($resp), " bytes written\n" if $DEBUG > 1;
-		}}}}}
-	};
+		unless ( ref($conn)) {
+			warn "accept() error:$conn\n" if $DEBUG;
+			return;
+		}
+		if ( $DEBUG ) {
+			my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
+			warn "[$hostname] connect\n";
+		}
+		$conn-> blocking(0);
+		context handle_connection($conn, $cb, \%opt);
+		&tail;
+	}};
 }
 
 1;
