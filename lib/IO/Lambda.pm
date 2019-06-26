@@ -1542,9 +1542,6 @@ intimidated by the module's ambitions, you can skip to L<Simple use> for a more
 gentle introduction. Those, who are interested how the module is different from
 the other I/O frameworks, please continue reading.
 
-Warning: API in version 1.01 has slightly changed. See L<IO::Lambda::Compat>
-for dealing with program written usign the older API.
-
 =head2 Simple use
 
 This section is for those who don't need all of the module's powerful
