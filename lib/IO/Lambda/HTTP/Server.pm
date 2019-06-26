@@ -42,7 +42,15 @@ sub _bye
 		my $resp = _msg( $msg, '', $close);
 		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
 	tail {
-		close($conn) if $close;
+		if ( $close ) {
+			if ( $DEBUG ) {
+				my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
+				warn "[$hostname] disconnect\n";
+			}
+			if ( !close($conn)) {
+				warn "close error:$!\n" if $DEBUG;
+			}
+		}
 	}}
 }
 
@@ -54,8 +62,8 @@ sub _bad_request
 
 sub _timeout
 {
-	my ( $conn, $opt, $close) = @_;
-	_bye($conn, $opt, $close, "408 Timeout");
+	my ( $conn, $opt) = @_;
+	_bye($conn, $opt, 1, "408 Timeout");
 }
 
 sub handle_connection
@@ -122,6 +130,10 @@ sub handle_connection
 			undef @frame;
 			return again;
 		}
+		if ( $DEBUG ) {
+			my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
+			warn "[$hostname] disconnect\n";
+		}
 		if ( !close($conn)) {
 			warn "error during response:$!\n" if $DEBUG;
 		}
@@ -129,7 +141,7 @@ sub handle_connection
 	}}}}}
 }
 
-sub http_server(&$;)
+sub http_server(&$;@)
 {
 	my ( $cb, $listen, %opt) = @_;
 
@@ -141,8 +153,6 @@ sub http_server(&$;)
 			LocalAddr => $listen,
 			LocalPort => $port,
 			Proto     => 'tcp',
-			ReuseAddr => 1,
-			ReusePort => 1,
 		);
 		unless ( $listen ) {
 			warn "$!\n" if $DEBUG;

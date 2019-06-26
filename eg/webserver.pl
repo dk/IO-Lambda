@@ -23,7 +23,7 @@ use IO::Lambda::HTTP::Server;
 my $port = 8080;
 $port = $ARGV[0] if $ARGV[0] && $ARGV[0] =~ /^\d+$/;
 
-my ($serv,$error) = http_server { handle( @_ ) } "localhost:$port";
+my ($serv,$error) = http_server { handle( @_ ) } "localhost:$port", timeout => 5;
 die "Cannot create webserver: $error\n" unless $serv;
 
 print <<BANNER;
