@@ -461,11 +461,9 @@ sub http_read_chunked
 {
 	my ( $self, $offset) = @_;
 
-	my ( @frame, @ctx);
-
 	# read chunk size
 	pos( $self-> {buf} ) = $offset;
-	context @ctx = $self-> http_read( qr/\G[^\r\n]+\r?\n/i);
+	context $self-> http_read( qr/\G[^\r\n]+\r?\n/i);
 	state size => tail {
 		my $line = shift;
 		return undef, shift unless defined $line; # got error
@@ -480,26 +478,20 @@ sub http_read_chunked
 		warn "reading chunk $size bytes\n" if $DEBUG;
 		return 1 unless $size;
 		$size += 2; # CRLF
-		
-		# save this lambda frame
-		@frame = restartable;
+
+		my $frame = restartable;
 
 	# read the chunk itself
 	context $self-> http_read( $offset + $size);
 	state chunk => tail {
-		unless ( shift ) {
-			undef @frame; # break circular reference
-			return undef, shift;
-		}
+		return undef, shift unless shift;
 
 		$offset += $size - 2;
 		substr( $self->{buf}, $offset, 2, '' ); # remove CRLF
 		pos( $self-> {buf} ) = $offset;
 		warn "chunk $size bytes ok\n" if $DEBUG;
 
-		context @ctx;
-		again( @frame);
-		undef @frame; # break circular reference
+		again($frame);
 	}};
 }
 

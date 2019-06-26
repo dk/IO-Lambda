@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 use Test::More tests => 17;
-use IO::Lambda qw(:lambda);
+use IO::Lambda qw(:lambda frame_context);
 
 alarm(10);
 
@@ -58,11 +58,10 @@ this lambda {
     context lambda { 1 };
     tail {
         return 3 if 3 == shift;
-    	my @frame = restartable;
+    	my $frame = restartable;
         context lambda { 2 };
 	tail {
-	   context lambda { 3 };
-	   again( @frame);
+	   again($frame, lambda { 3 });
 	}
     }
 };

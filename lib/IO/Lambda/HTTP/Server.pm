@@ -12,7 +12,7 @@ use Exporter;
 use IO::Socket::INET;
 use HTTP::Request;
 use HTTP::Response;
-use IO::Lambda qw(:lambda :stream get_frame set_frame);
+use IO::Lambda qw(:lambda :stream);
 use IO::Lambda::Socket qw(accept);
 use Time::HiRes qw(time);
 
@@ -86,23 +86,17 @@ sub handle_connection
 		my $keep_alive =
 			$proto >= 1.1 &&
 			(lc( $req->header('Connection') // 'keep-alive') eq 'keep-alive');
-		my @frame = get_frame;
+		my $frame = restartable;
 
 		my $cl = length($match) + ($req->header('Content-Length') // 0);
 		context readbuf, $conn, \$buf, $cl, $opt->{timeout};
 	tail {
 		my ( undef, $error) = @_;
-		if (defined($error) and $error eq 'timeout') {
-			undef @frame;
-			return _timeout($conn, $opt);
-		}
-		undef(@frame), return _close $conn, $error if defined $error;
+		return _timeout($conn, $opt) if defined($error) and $error eq 'timeout';
+		return _close $conn, $error if defined $error;
 
 		warn length($buf), " bytes read\n" if $DEBUG > 1;
-		unless ($req = HTTP::Request-> parse( $buf)) {
-			undef @frame;
-			return _bad_request($conn, $opt, !$keep_alive) unless $req;
-		}
+		return _bad_request($conn, $opt, !$keep_alive) unless $req = HTTP::Request-> parse( $buf);
 		substr( $buf, 0, $cl, '');
 
 		my $resp;
@@ -122,14 +116,10 @@ sub handle_connection
 		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
 	tail {
 		my ( undef, $error) = @_;
-		undef(@frame), return _close $conn, $error if defined $error;
+		return _close $conn, $error if defined $error;
 		warn length($resp), " bytes written\n" if $DEBUG > 1;
 
-		if ( $keep_alive ) {
-			set_frame(@frame);
-			undef @frame;
-			return again;
-		}
+		return again($frame) if $keep_alive;
 		if ( $DEBUG ) {
 			my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
 			warn "[$hostname] disconnect\n";
@@ -137,7 +127,6 @@ sub handle_connection
 		if ( !close($conn)) {
 			warn "error during response:$!\n" if $DEBUG;
 		}
-		undef @frame;
 	}}}}}
 }
 
@@ -153,6 +142,7 @@ sub http_server(&$;@)
 			LocalAddr => $listen,
 			LocalPort => $port,
 			Proto     => 'tcp',
+			ReuseAddr => 1,
 		);
 		unless ( $listen ) {
 			warn "$!\n" if $DEBUG;
