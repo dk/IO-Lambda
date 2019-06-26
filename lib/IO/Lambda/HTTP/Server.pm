@@ -61,11 +61,10 @@ sub _timeout
 sub handle_connection
 {
 	my ($conn, $cb, $opt) = @_;
-	my $session_timeout = $opt->{timeout};
 	my %session;
 	lambda {
 		my $buf = '';
-		context readbuf, $conn, \$buf, qr/^.*?$CRLF$CRLF/s, $session_timeout;
+		context readbuf, $conn, \$buf, qr/^.*?$CRLF$CRLF/s, $opt->{timeout};
 	tail {
 		my ( $match, $error) = @_;
 		return _timeout($conn, $opt) if defined($error) and $error eq 'timeout';
@@ -80,16 +79,9 @@ sub handle_connection
 			$proto >= 1.1 &&
 			(lc( $req->header('Connection') // 'keep-alive') eq 'keep-alive');
 		my @frame = get_frame;
-		my $t;
-		if ( $keep_alive && defined( $t = $req->header('Keep-Alive')) && $t =~ /^\d+$/) {
-			$session_timeout = $t if
-				!defined($session_timeout) ||
-				($session_timeout <  1_000_000_000 && $session_timeout > $t) ||
-				($session_timeout >= 1_000_000_000 && (time - $session_timeout) > $t);
-		}
 
 		my $cl = length($match) + ($req->header('Content-Length') // 0);
-		context readbuf, $conn, \$buf, $cl, $session_timeout;
+		context readbuf, $conn, \$buf, $cl, $opt->{timeout};
 	tail {
 		my ( undef, $error) = @_;
 		if (defined($error) and $error eq 'timeout') {
