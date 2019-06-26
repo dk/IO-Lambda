@@ -1,10 +1,9 @@
 #! /usr/bin/perl
-# $Id: 03_lambda_api.t,v 1.17 2009/07/02 11:30:31 dk Exp $
 
 use strict;
 use warnings;
 use Test::More tests => 17;
-use IO::Lambda qw(:lambda frame_context);
+use IO::Lambda qw(:lambda);
 
 alarm(10);
 
