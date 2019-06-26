@@ -7,7 +7,7 @@ use warnings;
 use Test::More;
 use HTTP::Request;
 use IO::Lambda qw(:all);
-use IO::Lambda::HTTP;
+use IO::Lambda::HTTP::Client;
 use IO::Lambda::HTTP::Server;
 use LWP::ConnCache;
 
@@ -26,7 +26,7 @@ if ( defined ( my $p = $ENV{http_proxy} )) {
 
 sub http_lambda
 {
-	IO::Lambda::HTTP-> new(
+	IO::Lambda::HTTP::Client-> new(
 		HTTP::Request-> new( 
 			GET => "http://$_[0]/"
 		), %opt)
@@ -72,11 +72,11 @@ $r = HTTP::Request-> new( GET => "http://localhost:$port/");
 
 $num = 0;
 my $conn_cache = LWP::ConnCache->new;
-$resp = IO::Lambda::HTTP->new($r, keep_alive => 1, conn_cache => $conn_cache)->wait;
+$resp = IO::Lambda::HTTP::Client->new($r, keep_alive => 1, conn_cache => $conn_cache)->wait;
 is( $resp->code, "200", "httpd keep_alive code");
 is( $resp->content, "case1", "httpd keep_alive response");
 is( scalar $conn_cache->get_connections(), 1, "1 active connection");
-$resp = IO::Lambda::HTTP->new($r, keep_alive => 1, conn_cache => $conn_cache)->wait;
+$resp = IO::Lambda::HTTP::Client->new($r, keep_alive => 1, conn_cache => $conn_cache)->wait;
 is( $resp->code, "200", "httpd keep_alive code");
 is( $resp->content, "case2", "httpd keep_alive response");
 
