@@ -108,7 +108,7 @@ sub handle_connection
 		substr( $buf, 0, $cl, '');
 
 		my $resp;
-		($resp, $error) = $cb->($req, \%session);
+		eval { ($resp, $error) = $cb->($req, \%session); };
 		context UNIVERSAL::isa( $resp, 'IO::Lambda') ?
 			$resp : lambda { $resp, $error };
 	tail {
