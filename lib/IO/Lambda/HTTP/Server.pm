@@ -1,7 +1,7 @@
 package IO::Lambda::HTTP::Server;
 use vars qw(@ISA @EXPORT_OK $DEBUG);
-@ISA = qw(Exporter);
 @EXPORT = qw(http_server);
+use base qw(Exporter IO::Lambda);
 
 our $DEBUG = $IO::Lambda::DEBUG{httpd} || 0;
 
@@ -37,16 +37,13 @@ sub _msg
 
 sub _bye
 {
-	my ( $conn, $opt, $close, $msg) = @_;
+	my ( $self, $conn, $close, $msg) = @_;
 	tail {
 		my $resp = _msg( $msg, '', $close);
-		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
+		context writebuf, $conn, \$resp, length($resp), 0, $self->{timeout};
 	tail {
 		if ( $close ) {
-			if ( $DEBUG ) {
-				my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
-				warn "[$hostname] disconnect\n";
-			}
+			warn "[$self->{sessions}->{$conn}->{remote}] disconnect\n" if $DEBUG;
 			if ( !close($conn)) {
 				warn "close error:$!\n" if $DEBUG;
 			}
@@ -56,47 +53,58 @@ sub _bye
 
 sub _bad_request
 {
-	my ( $conn, $opt, $close) = @_;
-	_bye($conn, $opt, $close, "400 Bad Request");
+	my ( $self, $conn, $close) = @_;
+	$self->_bye( $conn, $close, "400 Bad Request");
 }
 
 sub _timeout
 {
-	my ( $conn, $opt) = @_;
-	_bye($conn, $opt, 1, "408 Timeout");
+	my ( $self, $conn) = @_;
+	$self->_bye($conn, 1, "408 Timeout");
 }
 
 sub handle_connection
 {
-	my ($conn, $cb, $opt) = @_;
+	my ($self, $conn, $cb) = @_;
 	my %session;
+	my $session_data = $self->{sessions}->{"$conn"};
+	my $buf = '';
 	lambda {
-		my $buf = '';
-		context readbuf, $conn, \$buf, qr/^.*?$CRLF$CRLF/s, $opt->{timeout};
+		$session_data->{active} = 0;
+		context readbuf, $conn, \$buf, 1, $self->{timeout};
+	tail {
+		$session_data->{active} = 1;
+		context readbuf, $conn, \$buf, qr/^.*?\x{0D}?\x{0A}\x{0D}?\x{0A}/s, $self->{timeout};
 	tail {
 		my ( $match, $error) = @_;
-		return _timeout($conn, $opt) if defined($error) and $error eq 'timeout';
+		return $self->_timeout($conn) if defined($error) and $error eq 'timeout';
 		return _close $conn, $error unless defined $match;
 		warn length($buf), " bytes read\n" if $DEBUG > 1;
 
 		my $req = HTTP::Request-> parse( $match);
-		return _bad_request($conn, $opt, 1) unless $req;
+		return $self->_bad_request($conn, 1) unless $req;
 
 		my $proto = (( $req->protocol // '') =~ /^HTTP\/([\d\.]+)$/i) ? $1 : 1.0;
 		my $keep_alive =
 			$proto >= 1.1 &&
 			(lc( $req->header('Connection') // 'keep-alive') eq 'keep-alive');
-		my $frame = restartable;
+		$keep_alive = 0 if $self->{shutdown};
 
 		my $cl = length($match) + ($req->header('Content-Length') // 0);
-		context readbuf, $conn, \$buf, $cl, $opt->{timeout};
+		context readbuf, $conn, \$buf, $cl, $self->{timeout};
 	tail {
 		my ( undef, $error) = @_;
-		return _timeout($conn, $opt) if defined($error) and $error eq 'timeout';
+		return $self->_timeout($conn) if defined($error) and $error eq 'timeout';
 		return _close $conn, $error if defined $error;
 
 		warn length($buf), " bytes read\n" if $DEBUG > 1;
-		return _bad_request($conn, $opt, !$keep_alive) unless $req = HTTP::Request-> parse( $buf);
+		unless ($req = HTTP::Request-> parse( $buf)) {
+			return lambda {
+				context $self->_bad_request($conn, !$keep_alive);
+			tail {
+				this->start if $keep_alive && !($self->{shutdown} && !length($buf)); 
+			}};
+		}
 		substr( $buf, 0, $cl, '');
 
 		my $resp;
@@ -106,34 +114,33 @@ sub handle_connection
 	tail {
 		my $error;
 		($resp, $error) = @_;
+		$keep_alive = 0 if $self->{shutdown};
 		if ( $error ) {
 			$resp = _msg("500 Server Error", $error, !$keep_alive);
 		} elsif ( UNIVERSAL::isa( $resp, 'HTTP::Response')) {
+			$resp->header(Connection => ($keep_alive ? 'keep-alive' : 'close'));
 			$resp = "HTTP/1.1 " . $resp->as_string($CRLF);
 		} else {
 			$resp = _msg("200 OK", $resp // '', !$keep_alive);
 		}
-		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
+		context writebuf, $conn, \$resp, length($resp), 0, $self->{timeout};
 	tail {
 		my ( undef, $error) = @_;
 		return _close $conn, $error if defined $error;
 		warn length($resp), " bytes written\n" if $DEBUG > 1;
+		return this->start if $keep_alive && !($self->{shutdown} && !length($buf));
 
-		return again($frame) if $keep_alive;
-		if ( $DEBUG ) {
-			my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
-			warn "[$hostname] disconnect\n";
-		}
+		warn "[$session_data->{remote}] disconnect\n" if $DEBUG;
 		if ( !close($conn)) {
 			warn "error during response:$!\n" if $DEBUG;
 		}
-	}}}}}
+	}}}}}}
 }
 
 sub http_server(&$;@)
 {
 	my ( $cb, $listen, %opt) = @_;
-
+	
 	my $port = 80;
 	unless ( ref $listen ) {
 		($listen, $port) = ($1, $2) if $listen =~ /^(.*)\:(\d+)$/;
@@ -151,25 +158,58 @@ sub http_server(&$;@)
 	} else {
 		$port = $listen->sockport;
 	}
+	return __PACKAGE__->new(
+		socket   => $listen,
+		port     => $port,
+		callback => $cb,
+		%opt
+	);
+}
 
-	return lambda {
-		context $listen;
-	accept {
+sub new
+{
+	my ( $class, %opt ) = @_;
+
+	my $cb     = delete $opt{callback};
+
+	my $self;
+	$self = lambda {
+		context $self->{socket};
+	$self->{accept_event} = accept {
+		return if $self->{shutdown};
+
 		my $conn = shift;
-		again;
+		$self->{accept_event} = again;
 
 		unless ( ref($conn)) {
 			warn "accept() error:$conn\n" if $DEBUG;
 			return;
 		}
-		if ( $DEBUG ) {
-			my $hostname = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
-			warn "[$hostname] connect\n";
-		}
 		$conn-> blocking(0);
-		context handle_connection($conn, $cb, \%opt);
-		&tail;
-	}};
+		my $sess = $self->{sessions}->{"$conn"} = {
+			active  => 0,
+		};
+		$sess->{remote} = inet_ntoa((sockaddr_in(getsockname($conn)))[1]);
+		warn "[$sess->{remote}] connect\n" if $DEBUG;
+
+		$sess->{handler}  = handle_connection($self, $conn, $cb);
+		context $sess->{handler};
+	tail {
+		delete $self->{sessions}->{"$conn"};
+	}}};
+	bless $self, $class;
+	$self->{$_} = $opt{$_} for qw(socket port timeout);
+	$self->{sessions} = {};
+	$self->{shutdown} = 0;
+	return $self;
+}
+
+sub shutdown
+{
+	my $self = shift;
+	$self->{shutdown} = 1;
+	$self->cancel_event($self->{accept_event});
+	$_->{handler}->terminate for grep { !$_->{active}} values %{ $self->{sessions}};
 }
 
 1;
@@ -225,6 +265,11 @@ Options:
 Connection timeout or a deadline.
 
 =back
+
+=item shutdown
+
+Enter a graceful shutdown mode - stop accepting new connections, handle the
+running ones, and stop after all connections are served.
 
 =back
 

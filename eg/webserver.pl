@@ -53,6 +53,8 @@ sub handle
 		$session-> {counter}--;
 	} elsif ( $req-> uri eq '/rst') {
 		$session-> {counter} = 0;
+	} elsif ( $req-> uri eq '/stp') {
+		$serv->shutdown;
 	} else {
 		fail( 404, "Not found");
 	}
@@ -64,6 +66,7 @@ sub handle
 <a href="/inc">++</a><br>
 <a href="/dec">--</a><br>
 <a href="/rst">=0</a><br>
+<a href="/stp">exit</a><br>
 </body></html>
 
 CONTENT
