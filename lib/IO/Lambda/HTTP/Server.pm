@@ -111,7 +111,7 @@ sub handle_connection
 		} elsif ( UNIVERSAL::isa( $resp, 'HTTP::Response')) {
 			$resp = "HTTP/1.1 " . $resp->as_string($CRLF);
 		} else {
-			$resp = _msg("200 OK", $resp, !$keep_alive);
+			$resp = _msg("200 OK", $resp // '', !$keep_alive);
 		}
 		context writebuf, $conn, \$resp, length($resp), 0, $opt->{timeout};
 	tail {
