@@ -10,14 +10,14 @@ use IO::Lambda::HTTP::Client;
 
 sub http_request(&) 
 {
-	Carp::carp "IO::Lambda::HTTP is deprecated, use IO::Lambda::HTTP::Client instead";
+#	Carp::carp "IO::Lambda::HTTP is deprecated, use IO::Lambda::HTTP::Client instead";
 	IO::Lambda::HTTP::Client-> new(context)-> 
 		condition(shift, \&http_request, 'http_request')
 }
 
 sub new {
 	shift;
-	Carp::carp "IO::Lambda::HTTP is deprecated, use IO::Lambda::HTTP::Client instead";
+#	Carp::carp "IO::Lambda::HTTP is deprecated, use IO::Lambda::HTTP::Client instead";
 	IO::Lambda::HTTP::Client->new(@_);
 }
 1;
