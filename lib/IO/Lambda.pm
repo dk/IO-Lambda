@@ -1,7 +1,7 @@
 # $Id: Lambda.pm,v 1.191 2012/01/13 06:41:28 dk Exp $
 package IO::Lambda;
 
-use Carp qw(croak);
+use Carp qw(croak confess);
 use strict;
 use warnings;
 use Exporter;
@@ -159,8 +159,8 @@ sub watch_io
 {
 	my ( $self, $flags, $handle, $deadline, $callback, $cancel) = @_;
 
-	croak "can't register events on a stopped lambda" if $self-> {stopped};
-	croak "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
+	confess "can't register events on a stopped lambda" if $self-> {stopped};
+	confess "bad io flags" if 0 == ($flags & (IO_READ|IO_WRITE|IO_EXCEPTION));
 
 	$deadline += time if defined($deadline) and $deadline < 1_000_000_000;
 	
@@ -187,8 +187,8 @@ sub watch_timer
 {
 	my ( $self, $deadline, $callback, $cancel) = @_;
 
-	croak "can't register events on a stopped lambda" if $self-> {stopped};
-	croak "$self: time is undefined" unless defined $deadline;
+	confess "can't register events on a stopped lambda" if $self-> {stopped};
+	confess "$self: time is undefined" unless defined $deadline;
 	
 	$deadline += time if $deadline < 1_000_000_000;
 	my $rec = [
@@ -213,10 +213,10 @@ sub watch_lambda
 	my ( $self, $lambda, $callback, $cancel) = @_;
 	@_ = (); # perl bug http://rt.perl.org/rt3//Public/Bug/Display.html?id=70974
 
-	croak "can't register events on a stopped lambda" if $self-> {stopped};
-	croak "bad lambda" unless $lambda and $lambda->isa('IO::Lambda');
+	confess "can't register events on a stopped lambda" if $self-> {stopped};
+	confess "bad lambda" unless $lambda and $lambda->isa('IO::Lambda');
 
-	croak "won't watch myself" if $self == $lambda;
+	confess "won't watch myself" if $self == $lambda;
 	# XXX check cycling
 	
 	$lambda-> reset if $lambda-> is_stopped;
@@ -336,7 +336,7 @@ sub intercept
 
 sub super
 {
-	croak "super() call outside overridden condition" unless $_[0]-> {super};
+	confess "super() call outside overridden condition" unless $_[0]-> {super};
 	my $data = $_[0]-> {super};
 	if ( defined $data-> [1]) {
 		# override() super
@@ -515,7 +515,7 @@ sub start
 {
 	my $self = shift;
 
-	croak "can't start active lambda, call reset() first" if $self-> is_active;
+	confess "can't start active lambda, call reset() first" if $self-> is_active;
 
 	warn _d( $self, 'started') if $DEBUG_LAMBDA;
 	@{$self->{last}} = $self-> {start}-> ($self, @{$self->{last}})
@@ -536,7 +536,7 @@ sub call
 {
 	my $self = shift;
 
-	croak "can't call active lambda" if $self-> is_active;
+	confess "can't call active lambda" if $self-> is_active;
 
 	@{$self-> {last}} = @_;
 	$self;
@@ -621,7 +621,9 @@ sub wait
 		$self-> call(@_);
 		$self-> start;
 	}
+	my @frame = get_frame();
 	yield while not $self-> {stopped};
+	set_frame(@frame);
 	return $self-> peek;
 }
 
@@ -632,12 +634,14 @@ sub wait_for_all
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
 	my @ret;
+	my @frame = get_frame();
 	while ( 1) {
 		push @ret, map { $_-> peek } grep { $_-> {stopped} } @objects;
 		@objects = grep { not $_-> {stopped} } @objects;
 		last unless @objects;
 		yield;
 	}
+	set_frame(@frame);
 	return @ret;
 }
 
@@ -647,15 +651,22 @@ sub wait_for_any
 	my @objects = @_;
 	return unless @objects;
 	$_-> start for grep { $_-> is_passive } @objects;
+	my @frame = get_frame();
 	while ( 1) {
 		my @n = grep { $_-> {stopped} } @objects;
 		return @n if @n;
 		yield;
 	}
+	set_frame(@frame);
+	return;
 }
 
 # run the event loop until no lambdas are left in the blocking state
-sub run { do {} while yield }
+sub run {
+	my @frame = get_frame();
+	do {} while yield 
+	set_frame(@frame);
+}
 
 #
 # Part II - Procedural interface to the lambda-style programming
@@ -711,7 +722,7 @@ sub again
 	local $AGAIN = 1;
 	defined($METHOD) ?
 		$METHOD-> ($CALLBACK) :
-		croak "again() outside of a restartable call" 
+		confess "again() outside of a restartable call" 
 }
 
 # define context
@@ -744,7 +755,7 @@ sub catch(&$)
 	my ( $cb, $event) = @_;
 	my $who = (caller(1))[3];
 	my @ctx = @CONTEXT;
-	croak "catch callback already defined" if $event-> [WATCH_CANCEL];
+	confess "catch callback already defined" if $event-> [WATCH_CANCEL];
 	$event->[WATCH_CANCEL] = $cb ? sub {
 		local *__ANON__ = "$who\:\:catch" if $DEBUG_CALLER;
 		$THIS     = shift;
@@ -766,7 +777,7 @@ sub catch(&$)
 sub call_again
 {
 	my $self = shift;
-	croak "called outside catch()" unless $self-> {cancelled_event};
+	confess "called outside catch()" unless $self-> {cancelled_event};
 	my $cb = $self-> {cancelled_event}->[WATCH_CALLBACK];
 	$cb->($self, @_) if $cb;
 }
@@ -1309,7 +1320,7 @@ sub getline
 	my $reader = shift;
 	lambda {
 		my ( $fh, $buf, $deadline) = @_;
-		croak "getline() needs a buffer! ( f.ex getline,\$fh,\\(my \$buf='') )"
+		confess "getline() needs a buffer! ( f.ex getline,\$fh,\\(my \$buf='') )"
 			unless ref($buf);
 		context readbuf($reader), $fh, $buf, qr/^[^\n]*\n/, $deadline;
 	tail {
@@ -1369,7 +1380,7 @@ sub bind
 	my $self = shift;
 
 	# create new condition
-	croak "can't register events on a stopped lambda" if $self-> {stopped};
+	confess "can't register events on a stopped lambda" if $self-> {stopped};
 
 	my $rec = [ $self, @_ ];
 	push @{$self-> {in}}, $rec;
