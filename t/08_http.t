@@ -35,7 +35,7 @@ sub http_lambda
 # own
 my $port   = $ENV{TESTPORT} || 29876;
 my $num = 0;
-my $server = http_server {
+my ($server, $error) = http_server {
 	$num++;
 	if ( $num == 1 ) {
 		return HTTP::Response->new(200, 'OK', ['Content-Type' => 'text/plain'], "case1");
@@ -45,6 +45,7 @@ my $server = http_server {
 		return undef, "case3";
 	}
 } "localhost:$port";
+plan skip_all => "listen error: $error" unless $server;
 $server->start;
 
 
