@@ -59,6 +59,8 @@ lambda {
 	tails { ok(( 3 == grep { ref($_) } @_), 'parallel resolve') }
 }-> wait;
 
+# local
+delete $opt{proxy};
 my $resp = http_lambda("localhost:$port")->wait;
 is( $resp->code, "200", "httpd simple code");
 is( $resp->content, "case1", "httpd simple response");
