@@ -15,15 +15,6 @@ plan skip_all => "online tests disabled" unless -e 't/online.enabled';
 
 my %opt;
 
-if ( defined ( my $p = $ENV{http_proxy} )) {
-	$p =~ s{^http://}{};
-	$p =~ s{[\.\-\w]*\@([\.\-w]*:)}{}; # user-pass
-	$p =~ s{/$}{};
-	my ( $host, $port ) = $p =~ /^([\.\-\w]+):?(\d*)$/;
-	$port ||= 80;
-	$opt{proxy} = [ $host, $port ];
-}
-
 sub http_lambda
 {
 	IO::Lambda::HTTP::Client-> new(
@@ -60,7 +51,7 @@ lambda {
 }-> wait;
 
 # local
-delete $opt{proxy};
+$opt{proxy} = undef;
 my $resp = http_lambda("localhost:$port")->wait;
 is( $resp->code, "200", "httpd simple code");
 is( $resp->content, "case1", "httpd simple response");
@@ -75,11 +66,11 @@ $r = HTTP::Request-> new( GET => "http://localhost:$port/");
 
 $num = 0;
 my $conn_cache = LWP::ConnCache->new;
-$resp = IO::Lambda::HTTP::Client->new($r, keep_alive => 1, conn_cache => $conn_cache)->wait;
+$resp = IO::Lambda::HTTP::Client->new($r, keep_alive => 1, conn_cache => $conn_cache, proxy => undef)->wait;
 is( $resp->code, "200", "httpd keep_alive code");
 is( $resp->content, "case1", "httpd keep_alive response");
 is( scalar $conn_cache->get_connections(), 1, "1 active connection");
-$resp = IO::Lambda::HTTP::Client->new($r, keep_alive => 1, conn_cache => $conn_cache)->wait;
+$resp = IO::Lambda::HTTP::Client->new($r, keep_alive => 1, conn_cache => $conn_cache, proxy => undef)->wait;
 is( $resp->code, "200", "httpd keep_alive code");
 is( $resp->content, "case2", "httpd keep_alive response");
 
