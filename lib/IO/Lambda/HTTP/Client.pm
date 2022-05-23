@@ -57,6 +57,14 @@ sub new
 		$h-> header($k, $v) unless defined $h-> header($k);
 	}
 
+	if ( $options{cookie_jar} //= {} ) {
+		if ( ref($options{cookie_jar}) eq 'HASH') {
+			require HTTP::Cookies;
+			$options{cookie_jar} = HTTP::Cookies->new(%{$options{cookie_jar}});
+		}
+		$self->{cookie_jar} = $options{cookie_jar};
+	}
+
 	return $self-> handle_redirect( $req);
 }
 
@@ -64,7 +72,6 @@ sub new
 sub finalize_response
 {
 	my ( $self, $req, $response) = @_;
-	$response-> request($req);
 	return $response;
 }
 
@@ -87,19 +94,26 @@ sub handle_redirect
 			$method = $self-> get_authenticator( $req, $x);
 			undef $auth;
 		}
+		$self->{cookie_jar}->add_cookie_header($req) if
+			$self->{cookie_jar} &&
+			!$req->headers->header('Cookie');
 		context $method || $self-> handle_connection( $req);
 	tail   {
 		# request is finished
 		my $response = shift;
 		return $response unless ref($response);
 
-		if ( $response-> code =~ /^3/) {
+		$response-> request($req);
+		$self->{cookie_jar}->extract_cookies($response) if $self->{cookie_jar};
+
+		if ( $response-> code =~ /^30[12378]$/) {
 			$was_failed_auth = 0;
 			return 'too many redirects'
 				if ++$was_redirected > $self-> {max_redirect};
 
 			my $location = $response-> header('Location');
 			return $response unless defined $location;
+			$req->remove_header('Cookie');
 			$req-> uri( URI-> new_abs( $location, $req-> uri));
 			$req-> headers-> header( Host => $req-> uri-> host);
 
@@ -607,6 +621,12 @@ the C<auth> option:
 The requestor can optionally use a C<LWP::ConnCache> object to reuse
 connections on per-host per-port basis. Desired for HTTP/1.1. Required for the
 NTLM/Negotiate authentication.  See L<LWP::ConnCache> for details.
+
+=item cookie_jar $HTTP::Cookies = {}
+
+The requestor can optionally use a shared C<HTTP::Cookies> object to support cookies.
+If not set, a local cookie jar is created an used fo reventual redirects. To disable that,
+set C<cookie_jar> to 0. See L<HTTP::Cookies> for details.
 
 =item deadline SECONDS = undef
 
