@@ -333,7 +333,7 @@ sub handle_connection
 
 		$self-> {socket} = $sock;
 		$self-> {reader} = readbuf ( $self-> {reader});
-		$self-> {writer} = $self-> {writer}-> ($cached) if $self-> {writer}; 
+		$self-> {writer} = $self-> {writer}-> ($cached, $host, $port) if $self-> {writer};
 		$self-> {writer} = writebuf( $self-> {writer});
 
 		context $self-> handle_request( $req);
