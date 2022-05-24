@@ -562,8 +562,11 @@ sub destroy
 
 # drives objects dependant on the other objects until all of them
 # are stopped
+my ($drive_reentrancy_refresh, $drive_reentrancy_depth) = (0,0);
 sub drive
 {
+	$drive_reentrancy_depth++;
+
 	my $changed = 1;
 	my $executed = 0;
 	warn "IO::Lambda::drive --------\n" if $DEBUG_LAMBDA;
@@ -576,10 +579,14 @@ sub drive
 			$rec->[WATCH_OBJ]-> lambda_handler( $rec);
 			$changed = 1;
 			$executed++;
+			$drive_reentrancy_refresh = 0, last if $drive_reentrancy_refresh;
 		}
 	warn "IO::Lambda::drive .........\n" if $DEBUG_LAMBDA and $changed;
 	}
 	warn "IO::Lambda::drive +++++++++\n" if $DEBUG_LAMBDA;
+
+	$drive_reentrancy_depth--;
+	$drive_reentrancy_refresh++ if $executed && $drive_reentrancy_depth;
 
 	return $executed;
 }
