@@ -129,6 +129,7 @@ sub https_writer
 		my ( $bytes, $error) = @_;
 		return @_ if defined $error;
 
+		$cached++;
 		context $writer, $sock, $req, $length, $offset, $deadline;
 		https_wrapper($sock, $deadline);
 	}}
