@@ -661,7 +661,7 @@ sub wait_for_any
 	my @frame = get_frame();
 	while ( 1) {
 		my @n = grep { $_-> {stopped} } @objects;
-		return @n if @n;
+		set_frame(@frame), return @n if @n;
 		yield;
 	}
 	set_frame(@frame);
@@ -671,7 +671,7 @@ sub wait_for_any
 # run the event loop until no lambdas are left in the blocking state
 sub run {
 	my @frame = get_frame();
-	do {} while yield 
+	do {} while yield;
 	set_frame(@frame);
 }
 
