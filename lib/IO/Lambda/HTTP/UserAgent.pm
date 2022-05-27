@@ -1,5 +1,4 @@
 package IO::Lambda::HTTP::UserAgent;
-
 use strict;
 use warnings;
 use IO::Lambda;
@@ -15,18 +14,20 @@ sub new
 		conn_cache => LWP::ConnCache-> new,
 		signature  => "perl/IO-Lambda-HTTP v$IO::Lambda::VERSION",
 		protocol   => 'HTTP/1.1',
+		timeout    => 60,
 		%opt,
 	}, $class;
 }
 
-sub cookie_jar { $_[0] ? $_[0]->{cookie_jar} = $_[1] : $_[0]->{cookie_jar} }
-sub conn_cache { $_[0] ? $_[0]->{conn_cache} = $_[1] : $_[0]->{conn_cache} }
-sub signature  { $_[0] ? $_[0]->{signature } = $_[1] : $_[0]->{signature } }
-sub protocol   { $_[0] ? $_[0]->{protocol  } = $_[1] : $_[0]->{protocol  } }
+sub cookie_jar { $#_ ? $_[0]->{cookie_jar} = $_[1] : $_[0]->{cookie_jar} }
+sub conn_cache { $#_ ? $_[0]->{conn_cache} = $_[1] : $_[0]->{conn_cache} }
+sub signature  { $#_ ? $_[0]->{signature } = $_[1] : $_[0]->{signature } }
+sub protocol   { $#_ ? $_[0]->{protocol  } = $_[1] : $_[0]->{protocol  } }
+sub timeout    { $#_ ? $_[0]->{timeout   } = $_[1] : $_[0]->{timeout   } }
 
 sub request
 {
-	my ( $self, $req ) = @_;
+	my ( $self, $req, %xopt ) = @_;
 
 	my $keep_alive = 0;
 	my %headers;
@@ -47,9 +48,11 @@ sub request
 	}
 
 	return IO::Lambda::HTTP::Client->new($req,
+		%xopt,
 		cookie_jar => $self->cookie_jar,
 		conn_cache => $self->conn_cache,
 		keep_alive => $keep_alive,
+		timeout    => $self->timeout,
 	);
 }
 
@@ -98,6 +101,9 @@ Default is C<HTTP/1.1>
 
 The default C<User-Agent> header
 
+=item signature $STRING
+
+Timeout for requests, default 60 seconds.
 
 =back
 

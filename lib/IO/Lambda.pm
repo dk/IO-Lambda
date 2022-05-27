@@ -395,7 +395,7 @@ sub lambda_handler
 		if $nn == @$in or $self != $rec->[WATCH_OBJ];
 
 	my $lambda = $rec-> [WATCH_LAMBDA];
-	die _d($self, 
+	die _d($self,
 		'handler called but ', _obj($lambda),
 		' is not finished yet') unless $lambda-> {stopped};
 
@@ -404,14 +404,14 @@ sub lambda_handler
 	delete $EVENTS{"$lambda"} unless @$arr;
 
 	_d_in if $DEBUG_LAMBDA;
-				
+
 	local $self-> {cancel} = $rec-> [WATCH_CANCEL];
-	@{$self->{last}} = 
-		$rec-> [WATCH_CALLBACK] ? 
+	@{$self->{last}} =
+		$rec-> [WATCH_CALLBACK] ?
 			$rec-> [WATCH_CALLBACK]-> (
-				$self, 
+				$self,
 				@{$rec-> [WATCH_LAMBDA]-> {last}}
-			) : 
+			) :
 			@{$rec-> [WATCH_LAMBDA]-> {last}};
 
 	_d_out if $DEBUG_LAMBDA;
@@ -570,19 +570,22 @@ sub drive
 	my $changed = 1;
 	my $executed = 0;
 	warn "IO::Lambda::drive --------\n" if $DEBUG_LAMBDA;
-	while ( $changed) {
-		$changed = 0;
+	eval {
+		while ( $changed) {
+			$changed = 0;
 
-		# dispatch
-		for my $rec ( map { @$_ } values %EVENTS) {
-			next unless $rec->[WATCH_LAMBDA]-> {stopped};
-			$rec->[WATCH_OBJ]-> lambda_handler( $rec);
-			$changed = 1;
-			$executed++;
-			$drive_reentrancy_refresh = 0, last if $drive_reentrancy_refresh;
+			# dispatch
+			for my $rec ( map { @$_ } values %EVENTS) {
+				next unless $rec->[WATCH_LAMBDA]-> {stopped};
+				$changed = 1;
+				$executed++;
+				$rec->[WATCH_OBJ]-> lambda_handler( $rec);
+				$drive_reentrancy_refresh = 0, last if $drive_reentrancy_refresh;
+			}
+			warn "IO::Lambda::drive .........\n" if $DEBUG_LAMBDA and $changed;
 		}
-	warn "IO::Lambda::drive .........\n" if $DEBUG_LAMBDA and $changed;
-	}
+	};
+	die $@ if $@;
 	warn "IO::Lambda::drive +++++++++\n" if $DEBUG_LAMBDA;
 
 	$drive_reentrancy_depth--;

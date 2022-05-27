@@ -116,9 +116,14 @@ sub handle_redirect
 
 			my $location = $response-> header('Location');
 			return $response unless defined $location;
-			$req->remove_header('Cookie');
-			$req-> uri( URI-> new_abs( $location, $req-> uri));
+
+			my $uri = URI-> new_abs( $location, $req-> uri);
+			return $response if $uri->scheme !~ /^https?$/;
+
+			$req-> uri($uri);
 			$req-> headers-> header( Host => $req-> uri-> host);
+			$req-> remove_header('Cookie');
+			$req-> method('GET');
 
 			warn "redirect to " . $req-> uri . "\n" if $DEBUG;
 
@@ -309,8 +314,8 @@ sub handle_connection
 			$self-> {async_dns} and
 			$host !~ /^(\d{1,3}\.){3}(\d{1,3})$/
 		) {
-			context $host, 
-				timeout => ($self-> {deadline} || $IO::Lambda::DNS::TIMEOUT); 
+			context $host,
+				timeout => ($self-> {deadline} || $IO::Lambda::DNS::TIMEOUT);
 			warn "resolving $host\n" if $DEBUG;
 			return IO::Lambda::DNS::dns( sub {
 				$host = shift;
@@ -321,9 +326,9 @@ sub handle_connection
 		}
 
 		delete $self-> {close_connection};
-		$self-> {close_connection}++ 
+		$self-> {close_connection}++
 			if ( $req-> header('Connection') || '') =~ /^close/i;
-		
+
 		# got cached socket?
 		my ( $sock, $cached);
 		my $cc = $self-> {conn_cache};
