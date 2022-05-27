@@ -107,6 +107,9 @@ sub handle_redirect
 		$self->{cookie_jar}->extract_cookies($response) if $self->{cookie_jar};
 
 		if ( $response-> code =~ /^30[12378]$/) {
+			return $self-> finalize_response($req, $response)
+				if $self->{max_redirect} == 0;
+
 			$was_failed_auth = 0;
 			return 'too many redirects'
 				if ++$was_redirected > $self-> {max_redirect};
