@@ -8,6 +8,7 @@ our $DEBUG = $IO::Lambda::DEBUG{http} || 0;
 use strict;
 use warnings;
 use Socket;
+use Errno;
 use Exporter;
 use IO::Socket;
 use HTTP::Response;
@@ -246,17 +247,20 @@ sub http_tail
 	&tail();
 }
 
+my $tcp_proto;
 sub socket
 {
 	my ( $self, $host, $port) = @_;
 
-	my $sock = IO::Socket::INET-> new(
-		PeerAddr => $host,
-		PeerPort => $port,
-		Proto    => 'tcp',
-		Blocking => 0,
-	);
-	return $sock, ( $sock ? undef : "connect: $!");
+	my ($iaddr,$paddr,$sock,$error);
+	$tcp_proto //= getprotobyname('tcp');
+	return undef, "gethostbyname(tcp) error:$!" unless $tcp_proto;
+	return undef, "cannot resolve $host" unless $iaddr = inet_aton($host);
+	$paddr = sockaddr_in($port,$iaddr);
+	return undef, "error creating socket:$!" unless socket($sock,PF_INET,SOCK_STREAM,$tcp_proto);
+	$sock->blocking(0);
+	return undef, "connect($host,$port) error:$!" unless CORE::connect($sock,$paddr) or $!{EINPROGRESS};
+	return $sock;
 }
 
 sub parse_proxy
