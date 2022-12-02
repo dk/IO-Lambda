@@ -76,6 +76,12 @@ sub finalize_response
 	return $response;
 }
 
+sub redirect
+{
+	my ( $self, $location, $req) = @_;
+	return URI-> new_abs( $location, $req-> uri);
+}
+
 # reissue the request, if necessary, because of 30X or 401 errors
 sub handle_redirect
 {
@@ -118,7 +124,7 @@ sub handle_redirect
 			my $location = $response-> header('Location');
 			return $response unless defined $location;
 
-			my $uri = URI-> new_abs( $location, $req-> uri);
+			my $uri = $self->redirect( $location, $req );
 			return $response if $uri->scheme !~ /^https?$/;
 
 			$req-> uri($uri);
